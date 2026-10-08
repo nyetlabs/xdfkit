@@ -40,10 +40,11 @@ source = $(or $(wildcard $(call def,$(1))),$(ARCHIVE)/$(1).kp)
 
 # Zip dates: the last corpus commit of each pack's JSON after the one that
 # imported it, else the date of the archived KP's last change in ecuxplot, else
-# the import commit.
+# the import commit. Commits whose message starts with chore(schema) (model
+# changes that don't change the definitions) don't count.
 DATE_8D0907551M := 20261006
 DATE_4D1907558 := 20200707
-gitdates = $(shell git -C $(CORPUS) log --format=%cd --date=format:%Y%m%d -- defs/$(call imagename,$(1)).json 2>/dev/null)
+gitdates = $(shell git -C $(CORPUS) log --invert-grep --grep='^chore(schema)' --format=%cd --date=format:%Y%m%d -- defs/$(call imagename,$(1)).json 2>/dev/null)
 butlast = $(wordlist 2,$(words $(1)),x $(1))
 date = $(or $(firstword $(call butlast,$(call gitdates,$(1)))),$(DATE_$(1)),$(firstword $(call gitdates,$(1))))
 

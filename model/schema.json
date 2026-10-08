@@ -12,9 +12,17 @@
           "$ref": "#/$defs/Data",
           "description": "Breakpoint storage, for image axes."
         },
+        "header": {
+          "description": "Header bytes before the axis data (WinOLS script DataHeader; KP stores it, likely as the field after the signed flag); usually a point count.",
+          "type": "integer"
+        },
         "mirror": {
           "description": "KP \"mirror map\" axis setting: WinOLS shows the axis in descending order; storage is unchanged.",
           "type": "boolean"
+        },
+        "signature": {
+          "description": "Marker value WinOLS associates with the axis (WinOLS script SignaturByte, likely the byte before the axis data); omitted when none.",
+          "type": "integer"
         },
         "source": {
           "description": "image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\", storage not located); unknown: an unnamed KP datasource (written back as ordinal).",

@@ -1,7 +1,6 @@
 {
   "v1": {
     "axis": {
-      "signature": -1,
       "signedUnk00": [
         0
       ]
@@ -54,7 +53,7 @@
     "slot": {
       "base": 16,
       "mirror": true,
-      "signature": -1,
+      "signatureByte": -1,
       "signedUnk00": [
         0
       ],
@@ -66,9 +65,6 @@
     }
   },
   "v2": {
-    "axis": {
-      "signature": -1
-    },
     "folder": {
       "nameUnk00": "0101",
       "nameUnk02": "0x1000000"
@@ -115,7 +111,7 @@
     "slot": {
       "base": 16,
       "mirror": true,
-      "signature": -1,
+      "signatureByte": -1,
       "type": "u8",
       "value": {
         "factor": 1.0

@@ -307,15 +307,18 @@ func kpValue(v Value) kp.Value {
 	return kp.Value{Description: v.Description, Units: v.Units, Factor: v.Conversion.Factor, Offset: v.Conversion.Offset}
 }
 
-// Axis sources and storage by KP datasource (docs/kp-format.md).
+// Axis sources and storage by KP datasource (docs/kp-format.md). 4 and 5
+// follow the WinOLS script enum order, unconfirmed.
 var axisSources = []struct{ source, stored string }{
 	kp.DSOrdinal:        {"ordinal", ""},
 	kp.DSEeprom:         {"image", "absolute"},
 	kp.DSEepromAdd:      {"image", "add"},
 	kp.DSEepromSubtract: {"image", "subtract"},
-	4:                   {"image", "backwards"},
-	5:                   {"editable", ""},
+	4:                   {"editable", ""},
+	5:                   {"image", "backwards"},
 }
+
+const noSignature = -1
 
 func axisFromKP(a *kp.Axis) *Axis {
 	if a == nil || !a.Defined {
@@ -326,6 +329,11 @@ func axisFromKP(a *kp.Axis) *Axis {
 		Value:  valueFromKP(a.Value, int(a.Precision), a.Reciprocal),
 		View:   View{Base: int(a.Base)},
 		Mirror: a.Mirror,
+		Header: int(a.DataHeader),
+	}
+	if a.SignatureByte != noSignature {
+		s := int(a.SignatureByte)
+		x.Signature = &s
 	}
 	if ds := int(a.DataSource); ds >= 0 && ds < len(axisSources) {
 		x.Source, x.Stored = axisSources[ds].source, axisSources[ds].stored
@@ -347,6 +355,11 @@ func (x *Axis) kpAxis() *kp.Axis {
 	}
 	a.Defined = true
 	a.Mirror = x.Mirror
+	a.DataHeader = int32(x.Header)
+	a.SignatureByte = noSignature
+	if x.Signature != nil {
+		a.SignatureByte = int32(*x.Signature)
+	}
 	a.Value = kpValue(x.Value)
 	a.Reciprocal = x.Value.Conversion.Reciprocal
 	a.Precision = byte(x.Value.Precision)

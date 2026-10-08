@@ -110,4 +110,4 @@ Prefixes: `Feldwerte.` applies to the map values, `StuetzX.` and `StuetzY.` to t
 
 ## Use in this project
 
-xdfkit writes WinOLS scripts as its route from A2L, DAMOS and XDF into WinOLS. Coverage per field: the "WinOLS script" column of `format-matrix.md`.
+xdfkit writes WinOLS scripts as its route from A2L, DAMOS and XDF into WinOLS. Coverage per field: the "WinOLS script" column of `format-matrix.md`. The model's names stay format-neutral; the writer maps them (`bRueckwaerts` from axis `mirror` and `SignaturByte` from axis `signature`, both unconfirmed until a scripted import is saved as KP).

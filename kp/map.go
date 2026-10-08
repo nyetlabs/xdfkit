@@ -92,8 +92,8 @@ type Axis struct {
 	PrecisionUnk00 Hex        `json:"precisionUnk00" kp:"len=3"`
 	Signed         bool       `json:"signed"`
 	SignedUnk00    []int32    `json:"signedUnk00" kp:"bytes"`
-	ListUnk00      int32      `json:"listUnk00"` // after the SignedUnk00 list
-	Signature      int32      `json:"signature"` // meaning unconfirmed
+	DataHeader     int32      `json:"dataHeader"`    // likely the script's DataHeader: header bytes before the axis data
+	SignatureByte  int32      `json:"signatureByte"` // likely the script's SignaturByte (marker byte before the axis); -1 when none
 }
 
 // hook codes Mirror: an int32 in v2, a byte in v1, 0 or 1 in both.

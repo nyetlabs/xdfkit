@@ -27,8 +27,9 @@ const (
 
 var orgNames = map[Org]string{OrgSingle: "single", OrgOneD: "1d", OrgTwoD: "2d", OrgTwoDInv: "2d-inverse"}
 
-// Names follow OLS_LangE.dll. Values 4 and 5 are unconfirmed: the DLL lists
-// "Eprom, backwards" before "Free editable", while mapdump called 4 "Free editable".
+// Names follow OLS_LangE.dll. Values 4 and 5 are unconfirmed (docs/kp-format.md,
+// Enums): 4 free editable and 5 backwards in the script enum order, the reverse
+// of the DLL's UI order.
 var dsNames = map[DataSource]string{
 	DSOrdinal: "ordinal", DSEeprom: "eeprom", DSEepromAdd: "eeprom-add", DSEepromSubtract: "eeprom-subtract",
 }

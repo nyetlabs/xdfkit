@@ -19,7 +19,8 @@ Decided 2026-10-07:
 - `project`: `name`, `version`.
 - `categories`: `id`, `name` (KP folders).
 - `objects`: in source order. Each has `key`, `id`, `description`, `comment`, `categories` (ids), `shape` (`value`, `1d`, `2d`), `inverse` (KP "2d Inverse", meaning unconfirmed), `address`, `rows`, `cols`, `data` (`bits` 8/16/32, `endian` big/little for wider cells, `signed`, `float`), `value` (`description`, `units`, `precision`, `conversion`: `factor`, `offset`, `reciprocal`), `view` (`base`, `difference`, `percent`), and the axes `x` and `y`.
-- Axes: `source` is `image` (read from the image), `ordinal` (1, 2, 3), `editable` (KP "Free editable"; where WinOLS stores those values isn't known) or `unknown` (an unnamed KP datasource, written back as ordinal). Image axes also have `stored` (`absolute`; `subtract`, the confirmed formula in `kp-format.md`; `add` and `backwards`, semantics unknown), `address` and `data`. Every axis has `value` and `view`.
+- Axes: `source` is `image` (read from the image), `ordinal` (1, 2, 3), `editable` (KP "Free editable"; where WinOLS stores those values isn't known) or `unknown` (an unnamed KP datasource, written back as ordinal). Image axes also have `stored` (`absolute`; `subtract`, the confirmed formula in `kp-format.md`; `add` and `backwards`, semantics unknown), `address` and `data`. Every axis has `value` and `view`, `mirror` (WinOLS shows it descending) and, when WinOLS has one, `signature` (the KP `SignatureByte`, likely the WinOLS script's `SignaturByte`: a marker byte before the axis data).
+- Names are format-neutral English (decided 2026-10-08); each writer maps them to its format's names (WinOLS script properties in `winols-script.md`).
 - `image`, the identity of the flash image (part number, version, Bosch ident, SHA-256), is planned for the corpus and not in schema 1 yet.
 
 ## KP output
