@@ -1,0 +1,344 @@
+{
+  "$defs": {
+    "Axis": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "description": "File offset of the first breakpoint, for image axes.",
+          "pattern": "^0x[0-9A-Fa-f]{1,8}$",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/Data",
+          "description": "Breakpoint storage, for image axes."
+        },
+        "mirror": {
+          "description": "KP \"mirror map\" axis setting: WinOLS shows the axis in descending order; storage is unchanged.",
+          "type": "boolean"
+        },
+        "source": {
+          "description": "image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\", storage not located); unknown: an unnamed KP datasource (written back as ordinal).",
+          "enum": [
+            "image",
+            "ordinal",
+            "editable",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        "stored": {
+          "description": "How image values are stored: absolute; subtract: 2^bits minus the sum of the remaining raw values (docs/kp-format.md); add and backwards: semantics unknown.",
+          "enum": [
+            "absolute",
+            "add",
+            "subtract",
+            "backwards"
+          ],
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Value",
+          "description": "Breakpoint meaning and conversion."
+        },
+        "view": {
+          "$ref": "#/$defs/View",
+          "description": "Display settings."
+        }
+      },
+      "required": [
+        "source",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Category": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Identifier referenced by objects.",
+          "type": "integer"
+        },
+        "name": {
+          "description": "Display name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name"
+      ],
+      "type": "object"
+    },
+    "Conversion": {
+      "additionalProperties": false,
+      "properties": {
+        "factor": {
+          "description": "Multiplier.",
+          "type": "number"
+        },
+        "offset": {
+          "description": "Added after the multiplication.",
+          "type": "number"
+        },
+        "reciprocal": {
+          "description": "KP reciprocal flag; exact formula unconfirmed.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "factor",
+        "offset"
+      ],
+      "type": "object"
+    },
+    "Data": {
+      "additionalProperties": false,
+      "properties": {
+        "bits": {
+          "description": "Cell width in bits.",
+          "enum": [
+            8,
+            16,
+            32
+          ],
+          "type": "integer"
+        },
+        "endian": {
+          "description": "Byte order of cells wider than 8 bits.",
+          "enum": [
+            "big",
+            "little"
+          ],
+          "type": "string"
+        },
+        "float": {
+          "description": "IEEE 754 floating point.",
+          "type": "boolean"
+        },
+        "signed": {
+          "description": "Two's complement integers.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bits"
+      ],
+      "type": "object"
+    },
+    "Object": {
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "description": "File offset of the first cell.",
+          "pattern": "^0x[0-9A-Fa-f]{1,8}$",
+          "type": "string"
+        },
+        "categories": {
+          "description": "Category ids.",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "cols": {
+          "description": "Number of columns.",
+          "type": "integer"
+        },
+        "comment": {
+          "description": "Free-text comment.",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/Data",
+          "description": "Cell storage."
+        },
+        "description": {
+          "description": "Long description (KP name).",
+          "type": "string"
+        },
+        "id": {
+          "description": "The source's own identifier (KP id, A2L name); not unique.",
+          "type": "string"
+        },
+        "inverse": {
+          "description": "KP \"2d Inverse\" organisation; its meaning is unconfirmed (docs/kp-format.md).",
+          "type": "boolean"
+        },
+        "key": {
+          "description": "Unique within the file: the source id, with #2, #3 appended to repeats in source order, or obj-N when the id is blank.",
+          "type": "string"
+        },
+        "rows": {
+          "description": "Number of rows.",
+          "type": "integer"
+        },
+        "shape": {
+          "description": "value: one cell; 1d: a row of cols cells; 2d: rows by cols cells.",
+          "enum": [
+            "value",
+            "1d",
+            "2d"
+          ],
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Value",
+          "description": "Cell meaning and conversion."
+        },
+        "view": {
+          "$ref": "#/$defs/View",
+          "description": "Display settings."
+        },
+        "x": {
+          "$ref": "#/$defs/Axis",
+          "description": "Column axis."
+        },
+        "y": {
+          "$ref": "#/$defs/Axis",
+          "description": "Row axis."
+        }
+      },
+      "required": [
+        "key",
+        "id",
+        "shape",
+        "address",
+        "rows",
+        "cols",
+        "data",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Project": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "description": "Project name.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Project version.",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "description": "Original file name.",
+          "type": "string"
+        },
+        "format": {
+          "description": "Source format.",
+          "enum": [
+            "kp"
+          ],
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 of the original file, lowercase hex.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "format",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "Value": {
+      "additionalProperties": false,
+      "properties": {
+        "conversion": {
+          "$ref": "#/$defs/Conversion",
+          "description": "Raw to physical conversion."
+        },
+        "description": {
+          "description": "Description of the quantity.",
+          "type": "string"
+        },
+        "precision": {
+          "description": "Decimal places shown.",
+          "type": "integer"
+        },
+        "units": {
+          "description": "Physical units.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "precision",
+        "conversion"
+      ],
+      "type": "object"
+    },
+    "View": {
+      "additionalProperties": false,
+      "properties": {
+        "base": {
+          "description": "Number base shown (KP: 10, 16 or 2).",
+          "type": "integer"
+        },
+        "difference": {
+          "description": "Show the difference to the original.",
+          "type": "boolean"
+        },
+        "percent": {
+          "description": "Show the difference in percent.",
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "type": "object"
+    }
+  },
+  "$id": "https://go.nyet.org/xdfkit/model/schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "categories": {
+      "description": "Categories (KP folders, XDF categories), referenced by id from objects.",
+      "items": {
+        "$ref": "#/$defs/Category"
+      },
+      "type": "array"
+    },
+    "objects": {
+      "description": "Map definitions, in source order.",
+      "items": {
+        "$ref": "#/$defs/Object"
+      },
+      "type": "array"
+    },
+    "project": {
+      "$ref": "#/$defs/Project",
+      "description": "Project metadata."
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance",
+      "description": "Where the definition was converted from."
+    },
+    "schema": {
+      "description": "Schema version.",
+      "enum": [
+        "xdfkit-model/1"
+      ],
+      "type": "string"
+    },
+    "stamp": {
+      "description": "Edit stamp (docs/stamp-and-metadata.md).",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema",
+    "objects"
+  ],
+  "title": "xdfkit map definition model",
+  "type": "object"
+}

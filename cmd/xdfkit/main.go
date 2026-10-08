@@ -1,36 +1,51 @@
 // Command xdfkit converts map definitions. So far it reads and writes WinOLS KP
-// files and their JSON dump (kp.File's encoding, not yet the canonical model).
+// files and the canonical model JSON (docs/model.md).
 package main
 
 import (
-	"bytes"
 	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
+	"go.nyet.org/xdfkit/api"
 	"go.nyet.org/xdfkit/canon"
-	"go.nyet.org/xdfkit/kp"
+	"go.nyet.org/xdfkit/lint"
 )
 
-// version is set from git describe by the Makefile. Do not edit it here.
-var version = "dev"
-
 const usage = `usage:
-  xdfkit [-f json|kp] [-force] input [output]
+  xdfkit [-f json|kp|csv|xdf] [-template orig.kp] [-i image] [-r ref]...
+         [-force] input [output]
   xdfkit verify file.json...
+  xdfkit lint -i image [-family me7|m3] [-json findings.json] input
+  xdfkit fix -i image (-o output | -n) [-rules R1,R2] [-only ID,...]
+             [-min-confidence high|medium|low] [-findings findings.json] input
   xdfkit version
 
-Converts between KP and its JSON dump; the input format is detected from the
+Converts between KP and the model JSON, and writes CSV and XDF; the input format is detected from the
 contents, the output format comes from -f, else the output extension, else json.
 Input "-" reads stdin; JSON output without an output file goes to stdout.
-Existing output files are not overwritten unless -force is given.
+Existing output files are not overwritten unless -force is given. KP output
+from JSON fills the KP fields the model doesn't carry from -template (the KP
+file the JSON came from reproduces it), else from defaults. CSV output is
+mapdump's map list: -i adds the value ranges from the image, and each -r adds a
+column with the names of the matching maps in that KP or JSON definition.
+XDF output is TunerPro's format; -i adds the file region and the labels of
+"subtract" axes, and the definition title is the output file's name.
 
 verify checks each digest in a JSON file's stamp (RFC 8785 and jq -S .) and
 prints clean, edited, mixed (the digests disagree), unknown or unstamped.
+
+lint checks the KP file's image axes against the flash image and prints one
+line per finding; -json also writes them as JSON ("-" for stdout). It exits 1
+when there are findings. fix applies the findings that have a fix: by default
+those of high confidence, or those chosen by -only, -rules and
+-min-confidence. With -findings it applies the fixes in a (possibly edited)
+lint -json file instead of linting. -o - writes to stdout; -n only reports.
 `
 
 func main() {
@@ -40,25 +55,192 @@ func main() {
 	}
 	args := os.Args[1:]
 	if len(args) == 1 && (args[0] == "version" || args[0] == "-version" || args[0] == "--version") {
-		fmt.Println(version)
+		fmt.Println(api.Version)
 		return
 	}
-	if len(args) > 0 && args[0] == "verify" {
-		if err := verify(args[1:]); err != nil {
-			log(err)
-		}
-		return
+	cmds := map[string]func([]string) error{"verify": verify, "lint": lintCmd, "fix": fix}
+	run := convert
+	if len(args) > 0 && cmds[args[0]] != nil {
+		run, args = cmds[args[0]], args[1:]
 	}
-	if err := convert(args); err != nil {
+	if err := run(args); err != nil {
 		log(err)
 	}
 }
 
-func convert(args []string) error {
-	fs := flag.NewFlagSet("xdfkit", flag.ContinueOnError)
+func newFlags(name string) *flag.FlagSet {
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
-	format := fs.String("f", "", "output format: json or kp")
+	return fs
+}
+
+// parse parses flags anywhere among the arguments and returns the others.
+func parse(fs *flag.FlagSet, args []string) ([]string, error) {
+	var pos []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return nil, err
+		}
+		if fs.NArg() == 0 {
+			return pos, nil
+		}
+		pos, args = append(pos, fs.Arg(0)), fs.Args()[1:]
+	}
+}
+
+func list(s string) []string {
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, ",")
+}
+
+func lintCmd(args []string) error {
+	fs := newFlags("lint")
+	image := fs.String("i", "", "flash image")
+	family := fs.String("family", "", "ECU family: me7 or m3 (default: from the image)")
+	jsonOut := fs.String("json", "", "also write the findings as JSON to this file")
+	force := fs.Bool("force", false, "overwrite an existing JSON file")
+	pos, err := parse(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 1 || *image == "" {
+		fs.Usage()
+		os.Exit(2)
+	}
+	data, err := readInput(pos[0])
+	if err != nil {
+		return err
+	}
+	img, err := os.ReadFile(*image)
+	if err != nil {
+		return err
+	}
+	resp, err := api.Lint(data, api.LintRequest{Image: img, Family: *family})
+	warn(pos[0], resp.Warnings)
+	if err != nil {
+		return fmt.Errorf("%s: %w", pos[0], err)
+	}
+	if *jsonOut != "" {
+		b, err := canon.Marshal(resp)
+		if err != nil {
+			return err
+		}
+		if err := writeOutput(*jsonOut, b, *force); err != nil {
+			return err
+		}
+	}
+	if *jsonOut != "-" {
+		fmt.Printf("%s: family %s (%s), %d findings\n", pos[0], resp.Family, resp.FamilySource, len(resp.Findings))
+		printFindings(os.Stdout, resp.Findings)
+	}
+	if len(resp.Findings) > 0 {
+		os.Exit(1)
+	}
+	return nil
+}
+
+func fix(args []string) error {
+	fs := newFlags("fix")
+	image := fs.String("i", "", "flash image")
+	family := fs.String("family", "", "ECU family: me7 or m3 (default: from the image)")
+	out := fs.String("o", "", "output file")
+	rules := fs.String("rules", "", "comma-separated rules to apply")
+	only := fs.String("only", "", "comma-separated finding IDs to apply")
+	minConf := fs.String("min-confidence", "", "lowest confidence to apply (default high)")
+	findings := fs.String("findings", "", "apply the fixes in this lint -json file")
+	dry := fs.Bool("n", false, "report what would be fixed without writing")
 	force := fs.Bool("force", false, "overwrite an existing output file")
+	pos, err := parse(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 1 || (*out == "") == !*dry || (*image == "" && *findings == "") {
+		fs.Usage()
+		os.Exit(2)
+	}
+	data, err := readInput(pos[0])
+	if err != nil {
+		return err
+	}
+	req := api.FixRequest{
+		LintRequest: api.LintRequest{Family: *family},
+		Rules:       list(*rules), Only: list(*only), MinConfidence: *minConf,
+	}
+	if *image != "" {
+		if req.Image, err = os.ReadFile(*image); err != nil {
+			return err
+		}
+	}
+	if *findings != "" {
+		b, err := readInput(*findings)
+		if err != nil {
+			return err
+		}
+		var lr api.LintResponse
+		if err := canon.Unmarshal(b, &lr); err != nil {
+			return fmt.Errorf("%s: %w", *findings, err)
+		}
+		min := *minConf
+		if min == "" {
+			min = lint.None
+		}
+		req.Findings = lint.Select(lr.Findings, req.Rules, req.Only, min)
+		if req.Findings == nil {
+			req.Findings = []lint.Finding{}
+		}
+	}
+	b, resp, err := api.Fix(data, req)
+	warn(pos[0], resp.Warnings)
+	if err != nil {
+		return fmt.Errorf("%s: %w", pos[0], err)
+	}
+	fmt.Fprintf(os.Stderr, "%s: %d fixes: %s\n", pos[0], len(resp.Applied), strings.Join(resp.Applied, " "))
+	if len(resp.Remaining) > 0 {
+		fmt.Fprintf(os.Stderr, "%s: %d findings remain:\n", pos[0], len(resp.Remaining))
+		printFindings(os.Stderr, resp.Remaining)
+	}
+	if *dry {
+		return nil
+	}
+	return writeOutput(*out, b, *force)
+}
+
+func printFindings(w io.Writer, fs []lint.Finding) {
+	for _, f := range fs {
+		maps := make([]string, len(f.Maps))
+		for i, m := range f.Maps {
+			n := m.ID
+			if n == "" {
+				n = strconv.Quote(m.Name)
+			}
+			if m.Axis != "" {
+				n += "/" + m.Axis
+			}
+			maps[i] = n
+		}
+		fmt.Fprintf(w, "%s %s: %s; %s\n", f.ID, f.Confidence, f.Message, strings.Join(maps, " "))
+	}
+}
+
+func warn(name string, ws []string) {
+	for _, w := range ws {
+		fmt.Fprintf(os.Stderr, "xdfkit: warning: %s: %s\n", name, w)
+	}
+}
+
+func convert(args []string) error {
+	fs := newFlags("xdfkit")
+	format := fs.String("f", "", "output format: json, kp, csv or xdf")
+	force := fs.Bool("force", false, "overwrite an existing output file")
+	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
+	image := fs.String("i", "", "flash image, for CSV value ranges and XDF")
+	var refs []string
+	fs.Func("r", "reference definition, for a CSV column of matching map names (repeatable)", func(s string) error {
+		refs = append(refs, s)
+		return nil
+	})
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -74,56 +256,47 @@ func convert(args []string) error {
 		}
 	}
 
+	if *format == api.KP && out == "" {
+		return errors.New("kp output needs an output file")
+	}
 	data, err := readInput(in)
 	if err != nil {
 		return err
 	}
-	f, err := load(in, data)
-	if err != nil {
-		return err
+	name := filepath.Base(in)
+	if in == "-" {
+		name = ""
 	}
-
-	var b []byte
-	switch *format {
-	case "json":
-		b, err = canon.MarshalStamped(f, "xdfkit "+version)
-	case "kp":
-		if out == "" {
-			return errors.New("kp output needs an output file")
+	req := api.ConvertRequest{To: *format, Name: name}
+	if *format == api.XDF && out != "" && out != "-" {
+		req.Title = strings.TrimSuffix(filepath.Base(out), filepath.Ext(out))
+	}
+	if *template != "" {
+		if req.Template, err = os.ReadFile(*template); err != nil {
+			return err
 		}
-		b, err = f.Encode()
-	default:
-		return fmt.Errorf("unknown output format %q", *format)
 	}
+	if *image != "" {
+		if req.Image, err = os.ReadFile(*image); err != nil {
+			return err
+		}
+	}
+	for _, r := range refs {
+		b, err := os.ReadFile(r)
+		if err != nil {
+			return err
+		}
+		req.Refs = append(req.Refs, api.Ref{Name: r, Data: b})
+	}
+	b, resp, err := api.Convert(data, req)
+	warn(in, resp.Warnings)
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", in, err)
 	}
 	if out == "" {
-		_, err = os.Stdout.Write(b)
-		return err
+		out = "-"
 	}
 	return writeOutput(out, b, *force)
-}
-
-// load parses a KP file or a JSON dump of one, warning about hand-edited JSON.
-func load(name string, data []byte) (*kp.File, error) {
-	if !bytes.HasPrefix(bytes.TrimLeft(data, " \t\r\n"), []byte("{")) {
-		f, err := kp.Parse(data)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", name, err)
-		}
-		return f, nil
-	}
-	if s, checks, err := canon.Verify(data); err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
-	} else if s != canon.Clean && s != canon.Unstamped {
-		fmt.Fprintf(os.Stderr, "xdfkit: warning: %s: stamp %s\n", name, describe(s, checks))
-	}
-	var f kp.File
-	if err := canon.Unmarshal(data, &f); err != nil {
-		return nil, fmt.Errorf("%s: %w", name, err)
-	}
-	return &f, nil
 }
 
 func verify(files []string) error {
@@ -136,29 +309,17 @@ func verify(files []string) error {
 		if err != nil {
 			return err
 		}
-		s, checks, err := canon.Verify(data)
+		v, err := api.Verify(data)
 		if err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
-		fmt.Printf("%s: %s\n", name, describe(s, checks))
-		bad = bad || s != canon.Clean
+		fmt.Printf("%s: %s\n", name, v)
+		bad = bad || v.Status != "clean"
 	}
 	if bad {
 		os.Exit(1)
 	}
 	return nil
-}
-
-// describe renders an overall status with the per-digest results.
-func describe(s canon.Status, checks []canon.Check) string {
-	var parts []string
-	for _, c := range checks {
-		parts = append(parts, fmt.Sprintf("%s %s", c.Canon, c.Status))
-	}
-	if len(parts) == 0 {
-		return s.String()
-	}
-	return fmt.Sprintf("%s (%s)", s, strings.Join(parts, ", "))
 }
 
 func readInput(name string) ([]byte, error) {
@@ -169,6 +330,10 @@ func readInput(name string) ([]byte, error) {
 }
 
 func writeOutput(name string, b []byte, force bool) error {
+	if name == "-" {
+		_, err := os.Stdout.Write(b)
+		return err
+	}
 	flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
 	if force {
 		flags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC

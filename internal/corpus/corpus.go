@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"go.nyet.org/xdfkit/internal/testenv"
 )
 
 // Image is one manifest row.
@@ -32,7 +34,7 @@ func Open(t testing.TB) *Corpus {
 	t.Helper()
 	dir := os.Getenv("XDFKIT_CORPUS")
 	if dir == "" {
-		dir = filepath.Join(moduleRoot(), "corpus")
+		dir = filepath.Join(testenv.ModuleRoot(), "corpus")
 	}
 	if _, err := os.Stat(filepath.Join(dir, "corpus.tsv")); err != nil {
 		msg := fmt.Sprintf("corpus not available at %s (docs/corpus.md, Access)", dir)
@@ -108,15 +110,30 @@ func read(dir string) (*Corpus, error) {
 	return c, nil
 }
 
-// moduleRoot is the nearest directory above the working directory with a go.mod.
-func moduleRoot() string {
-	dir, _ := os.Getwd()
-	for d := dir; ; d = filepath.Dir(d) {
-		if _, err := os.Stat(filepath.Join(d, "go.mod")); err == nil {
-			return d
-		}
-		if filepath.Dir(d) == d {
-			return dir
+// ArchiveImage returns the image for an archived ecuxplot pack stem: the
+// archive's own STEM.bin if it has one (a non-OEM image the corpus can't hold),
+// else the corpus image named in images.tsv, skipping the test without the
+// corpus.
+func ArchiveImage(t testing.TB, stem string) []byte {
+	t.Helper()
+	dir := testenv.Archive(t)
+	if img, err := os.ReadFile(filepath.Join(dir, stem+".bin")); err == nil {
+		return img
+	}
+	c := Open(t)
+	b, err := os.ReadFile(filepath.Join(dir, "images.tsv"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, l := range strings.Split(string(b), "\n") {
+		if s, name, ok := strings.Cut(l, "\t"); ok && s == stem {
+			img, err := os.ReadFile(c.Path(name))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return img
 		}
 	}
+	t.Fatalf("no image for %s in images.tsv", stem)
+	return nil
 }

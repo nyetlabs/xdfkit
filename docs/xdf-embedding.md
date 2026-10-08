@@ -25,4 +25,4 @@ Specification for embedding model data in an XDF comment block. Since 2026-10-07
   - Element and attribute names in the schema never contain `--`. The payload ends with `>` plus a newline, so the trailing-dash rule can't trigger.
 - One block, not one per table: there is only one extraction point, it is easy to strip, and it carries shared objects naturally. Each object in it keys on the same id used for the XDF `title`.
 - Reading: the block is used like a sidecar when no `name.meta.json` exists, with the same digest-based merge rules. A warning is printed if the block's object ids no longer match the XDF tables.
-- Expected limitation, to be confirmed by the TunerPro test: a TunerPro save probably drops comments, so the block survives only XDFs that TunerPro hasn't re-saved. The sidecar is the durable copy.
+- Limitation (confirmed 2026-10-07): TunerPro loads an XDF with a 119 KB block after `XDFHEADER` normally, but a TunerPro save drops it, so the block survives only XDFs that TunerPro hasn't re-saved. The sidecar is the durable copy.

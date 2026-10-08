@@ -1,8 +1,8 @@
 # xdfkit (placeholder name)
 
-Proof of concept for a command-line converter between map definition formats: WinOLS KP (v1 and v2), A2L, DAMOS, TunerPro XDF, WinOLS scripts, and a lossless JSON/YAML model. It also plans an autocorrect (`lint` and `fix`) for KP files.
+Proof of concept for a command-line converter between map definition formats: WinOLS KP (v1 and v2), A2L, DAMOS, TunerPro XDF, WinOLS scripts, and a canonical JSON/YAML model. It also has an autocorrect (`xdfkit lint` and `xdfkit fix`) that checks a KP file's axes against the flash image and fixes datasource and signedness mistakes.
 
-Status: the KP reader and writer, the canonical JSON printer with its edit stamp, and a CLI that converts KP to JSON and back (`xdfkit in.kp out.json`, `xdfkit in.json out.kp`, `xdfkit verify out.json`). See `AGENTS.md` for status and handoff notes, and `docs/design.md` for the design.
+Status: the KP reader and writer, the canonical model (`docs/model.md`) with its generated JSON Schema, the canonical JSON printer with its edit stamp, CSV map list and TunerPro XDF output, `lint` and `fix`, and a CLI over all of them (`xdfkit in.kp out.json`, `xdfkit in.json out.kp`, `xdfkit -f xdf -i image in.json out.xdf`, `xdfkit verify out.json`). `publish/` generates the published ecuxplot definitions from the corpus JSON. Not started: YAML, the XDF sidecar, the WinOLS script writer, and the A2L and DAMOS readers. See `docs/design.md` for the design.
 
 ## Build
 
@@ -11,9 +11,16 @@ make            # lint, test, then build build/xdfkit
 make help       # all targets
 ```
 
-`make lint` needs nothing beyond Go (staticcheck runs through `go run`). Tests use the KP files and mapdump CSVs from ecuxplot (`../ecuxplot/data` by default, or set `XDFKIT_ECUXPLOT_DATA`) and jq 1.8; without them those tests skip, and with `XDFKIT_REQUIRE_DATA=1` (as in CI) they fail instead.
+`make lint` needs nothing beyond Go (staticcheck runs through `go run`). Tests use the archived ecuxplot KP files and mapdump CSVs in `testdata/archive/ecuxplot/`, images from the private corpus submodule, and jq 1.8; without the corpus or jq those tests skip, and with `XDFKIT_REQUIRE_DATA=1` and `XDFKIT_REQUIRE_CORPUS=1` (as in CI) they fail instead.
 
 Corpus tests need the private `ecu-corpus` submodule (`docs/corpus.md`). With read access, fetch it with `git submodule update --init --checkout corpus`; without it, they skip.
+
+## Contributing
+
+- Run `make lint` before sending changes; it must pass. `go.mod` has no toolchain directive; keep it that way.
+- Commit messages start with a prefix that `cliff.toml` groups: `feat`/`add`, `fix`, `docs`, `refactor`, `chore`, `ci`, `build`, `test`, `style`, `chore(deps)`.
+- `testdata/archive/ecuxplot/` is an archive of the original packs and mapdump CSVs (see its README): never edit or regenerate it. Private definition files (DAMOS, A2L, OLS) go only in the gitignored `testdata/local/`; never commit them.
+- `docs/` describes how things are, including decided but unimplemented spec; work in progress and plans are kept outside the repo.
 
 ## Releases
 

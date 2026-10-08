@@ -11,33 +11,14 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.nyet.org/xdfkit/internal/testenv"
 )
 
 // mapdump's legend for the CSV "Organization" column, which is really the value type.
 var mapdumpType = map[Type]string{
 	1: "8 Bit", 2: "16 Bit (HiLo)", 3: "16 Bit (LoHi)", 4: "32 Bit (HiLoHilo)",
 	5: "32 Bit (LoHiLoHi)", 6: "32 BitFloat (HiLoHiLo)", 7: "32 BitFloat (LoHiLoHi)",
-}
-
-// missing skips the test, or fails it when XDFKIT_REQUIRE_DATA is set (CI), so
-// absent test inputs (ecuxplot data, jq) can't turn a run silently green.
-func missing(t *testing.T, format string, args ...any) {
-	t.Helper()
-	if os.Getenv("XDFKIT_REQUIRE_DATA") != "" {
-		t.Fatalf(format+" (XDFKIT_REQUIRE_DATA is set)", args...)
-	}
-	t.Skipf(format, args...)
-}
-
-func dataDir(t *testing.T) string {
-	d := os.Getenv("XDFKIT_ECUXPLOT_DATA")
-	if d == "" {
-		d = filepath.Join("..", "..", "ecuxplot", "data")
-	}
-	if _, err := os.Stat(d); err != nil {
-		missing(t, "ecuxplot data not found at %s (set XDFKIT_ECUXPLOT_DATA)", d)
-	}
-	return d
 }
 
 func axisAddr(a *Axis) string {
@@ -61,9 +42,9 @@ func row(m *Map) string {
 		fmt.Sprintf("%dx%d", m.Cols, m.Rows), mapdumpType[m.Type], axisAddr(m.X), axisAddr(m.Y)}, "|")
 }
 
-// TestMatchesMapdump compares every map against mapdump's CSV output in ecuxplot/data.
+// TestMatchesMapdump compares every map against mapdump's CSV output in the archive.
 func TestMatchesMapdump(t *testing.T) {
-	dir := dataDir(t)
+	dir := testenv.Archive(t)
 	kps, _ := filepath.Glob(filepath.Join(dir, "*.kp"))
 	for _, kpPath := range kps {
 		csvPath := strings.TrimSuffix(kpPath, ".kp") + ".csv"
@@ -89,7 +70,6 @@ func TestMatchesMapdump(t *testing.T) {
 			defer cf.Close()
 			cr := csv.NewReader(cf)
 			cr.FieldsPerRecord = -1
-			cr.LazyQuotes = true
 			recs, err := cr.ReadAll()
 			if err != nil {
 				t.Fatal(err)
@@ -98,20 +78,14 @@ func TestMatchesMapdump(t *testing.T) {
 			if len(recs) != len(maps) {
 				t.Fatalf("map count: kp %d, csv %d", len(maps), len(recs))
 			}
-			bad, quoted := 0, 0
+			bad := 0
 			for i, r := range recs {
-				// mapdump's CSV writer does not escape quotes, so those rows are malformed.
-				if strings.Contains(maps[i].Name, `"`) {
-					quoted++
-					continue
-				}
 				want := strings.Join([]string{r[0], r[1], r[2], r[3], r[4], r[7], r[8]}, "|")
 				if got := row(maps[i]); got != want && bad < 5 {
 					bad++
 					t.Errorf("map %d:\n got  %s\n want %s", i, got, want)
 				}
 			}
-			t.Logf("%d maps, %d skipped (quotes in name)", len(maps), quoted)
 		})
 	}
 }
@@ -121,7 +95,7 @@ func TestMatchesMapdump(t *testing.T) {
 // pack must match outside the zip (apart from the file length at 0x14) and
 // inflate to the same map block.
 func TestRoundTrip(t *testing.T) {
-	dir := dataDir(t)
+	dir := testenv.Archive(t)
 	kps, _ := filepath.Glob(filepath.Join(dir, "*.kp"))
 	for _, kpPath := range kps {
 		t.Run(filepath.Base(kpPath), func(t *testing.T) {
@@ -135,6 +109,9 @@ func TestRoundTrip(t *testing.T) {
 			}
 			if f.Layout() == V2 && int(f.HeaderLen) != len(data) {
 				t.Errorf("header length %d, file length %d", f.HeaderLen, len(data))
+			}
+			if int(f.EndOffset) != len(data)-4 {
+				t.Errorf("end offset %d, file length %d", f.EndOffset, len(data))
 			}
 			out, err := f.Encode()
 			if err != nil {
@@ -172,7 +149,13 @@ func TestRoundTrip(t *testing.T) {
 				t.Errorf("via JSON: map block differs at 0x%x", diffAt(h.Project.intern, f.Project.intern))
 			}
 			patched := append([]byte(nil), out[:h.Project.zipOff]...)
-			copy(patched[headerLenOff:], data[headerLenOff:headerLenOff+4])
+			end, err := f.Offset("endOffset")
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, o := range []int{headerLenOff, end.Off} {
+				copy(patched[o:], data[o:o+4])
+			}
 			if !bytes.Equal(patched, data[:f.Project.zipOff]) {
 				t.Errorf("via JSON: header differs at 0x%x", diffAt(patched, data[:f.Project.zipOff]))
 			}
@@ -188,7 +171,7 @@ func TestRoundTrip(t *testing.T) {
 // TestEdit changes a string length (shifting everything after it) and an address,
 // then checks the re-encoded pack parses back with the edits and nothing else changed.
 func TestEdit(t *testing.T) {
-	dir := dataDir(t)
+	dir := testenv.Archive(t)
 	kps, _ := filepath.Glob(filepath.Join(dir, "*.kp"))
 	for _, kpPath := range kps {
 		t.Run(filepath.Base(kpPath), func(t *testing.T) {
@@ -213,8 +196,9 @@ func TestEdit(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if f.Layout() == V2 {
-				want.HeaderLen = int32(len(out))
+			want.HeaderLen, want.EndOffset = f.HeaderLen, f.EndOffset
+			if int(got.EndOffset) != len(out)-4 {
+				t.Errorf("end offset %d, file length %d", got.EndOffset, len(out))
 			}
 			gj, _ := json.Marshal(got)
 			wj, _ := json.Marshal(want)
@@ -228,7 +212,7 @@ func TestEdit(t *testing.T) {
 // TestOffset reads the patchable fields of a few maps back at the offsets
 // Offsets reports.
 func TestOffset(t *testing.T) {
-	dir := dataDir(t)
+	dir := testenv.Archive(t)
 	kps, _ := filepath.Glob(filepath.Join(dir, "*.kp"))
 	for _, kpPath := range kps {
 		t.Run(filepath.Base(kpPath), func(t *testing.T) {

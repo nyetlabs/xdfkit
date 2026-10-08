@@ -4,6 +4,7 @@
 #   make lint             gofmt (must print nothing), go vet, staticcheck
 #   make test             go test ./...
 #   make build            build/xdfkit
+#   make schema           regenerate model/schema.json and model/kp-defaults.json
 #   make version          git describe (tags vX.Y.Z and vX.Y.Z-rcN)
 #   make package          dist archives for macos, linux, and windows
 #
@@ -12,10 +13,10 @@
 SHELL := /bin/bash
 
 VERSION ?= $(patsubst v%,%,$(shell git describe --tags --match 'v[0-9]*' --dirty --always 2>/dev/null))
-LDFLAGS := -ldflags "-X main.version=$(VERSION)"
+LDFLAGS := -ldflags "-X go.nyet.org/xdfkit/api.Version=$(VERSION)"
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.1
 
-.PHONY: all lint test build version package clean help
+.PHONY: all lint test build schema version package clean help
 
 # Archive name uses macos; the Go port is darwin.
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
@@ -29,6 +30,9 @@ lint:
 
 test:
 	go test ./...
+
+schema:
+	go test ./model -run "TestSchemaFile|TestKPDefaultsFile" -update
 
 build:
 	mkdir -p build
@@ -68,4 +72,4 @@ clean:
 	rm -rf build dist
 
 help:
-	@sed -n '2,10p' Makefile
+	@sed -n '2,11p' Makefile

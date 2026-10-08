@@ -76,7 +76,7 @@ jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
 - This catches real edits made in TunerPro (values, addresses, scaling, axes, added or deleted tables). It ignores TunerPro reformatting, attribute order and table order.
 - Where it is stored:
   - In the metadata file: `xdf.digest`, plus one digest per object (`xdf.objects[id]`), so edits can be pinned to specific tables.
-  - Best effort, in the XDF itself: one line `xdfkit-stamp: sha256:<digest>` in the `XDFHEADER` description, a field TunerPro shows and should preserve. That line is excluded from the XDF view. Whether it survives a TunerPro re-save is part of the `xdf-embed-test`.
+  - Best effort, in the XDF itself: one line `xdfkit-stamp: sha256:<digest>` in the `XDFHEADER` description, a field TunerPro shows and preserves. That line is excluded from the XDF view. Confirmed 2026-10-07: TunerPro shows the description as two lines and keeps the stamp line through a save (writing the line break as `&#010;`; it writes other description line breaks as `&#013;&#010;`, so readers accept both).
 
 ## Metadata sidecar
 
@@ -94,7 +94,7 @@ jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
 
 ## Relation to the embedded model block
 
-- The sidecar is the durable, primary copy of the residue. The comment block in `xdf-embedding.md` probably doesn't survive a TunerPro re-save.
+- The sidecar is the durable, primary copy of the residue. The comment block in `xdf-embedding.md` doesn't survive a TunerPro save (confirmed).
 - Decided 2026-10-07: the embedded block is optional (`--embed`, off by default) and carries the same payload as the sidecar (residue plus digests, XML encoded), not a second full model. Keeping one source of truth avoids the two copies disagreeing.
 
 ## Decided

@@ -19,7 +19,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      XDFKIT_ECUXPLOT_DATA: ${{ github.workspace }}/ecuxplot/data
       XDFKIT_REQUIRE_DATA: 1
       # Fork PRs get no secrets, so they can't fetch the private corpus; their corpus tests skip.
       HAS_CORPUS: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
@@ -27,12 +26,6 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      # Test data: ecuxplot's KP packs and mapdump CSVs (public repo, data/ only).
-      - uses: actions/checkout@v7
-        with:
-          repository: nyetlabs/ecuxplot
-          path: ecuxplot
-          sparse-checkout: data
       # Private corpus (docs/corpus.md): short-lived token from the corpus GitHub App,
       # used for the ecu-corpus URL only; corpus tests become mandatory.
       - if: env.HAS_CORPUS == 'true'

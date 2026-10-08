@@ -1,0 +1,126 @@
+{
+  "v1": {
+    "axis": {
+      "signature": -1,
+      "signedUnk00": [
+        0
+      ]
+    },
+    "folder": {
+      "nameUnk00": "0101",
+      "nameUnk02": "0x1000000"
+    },
+    "map": {
+      "addr2Unk00": [
+        -1,
+        0
+      ],
+      "addr2Unk08": "0x100000",
+      "imageSize": "0x100000",
+      "organizationUnk00": 2,
+      "range": [
+        0,
+        0,
+        255,
+        0
+      ],
+      "rangeUnk00": [
+        0,
+        0,
+        "0xFFFF",
+        0,
+        0,
+        0,
+        -1,
+        0
+      ],
+      "yUnk0E": 1,
+      "yUnk12": [
+        1,
+        1
+      ],
+      "yUnk14": [
+        1.0,
+        1.0
+      ],
+      "yUnk24": -1,
+      "yUnk28": 1,
+      "yUnk29": [
+        300.0,
+        1.0
+      ],
+      "yUnk41": -1
+    },
+    "slot": {
+      "base": 16,
+      "mirror": true,
+      "signature": -1,
+      "signedUnk00": [
+        0
+      ],
+      "type": "u8",
+      "value": {
+        "factor": 1.0
+      },
+      "width": 1
+    }
+  },
+  "v2": {
+    "axis": {
+      "signature": -1
+    },
+    "folder": {
+      "nameUnk00": "0101",
+      "nameUnk02": "0x1000000"
+    },
+    "map": {
+      "addr2Unk08": "0x100000",
+      "idUnk05": 1,
+      "imageSize": "0x100000",
+      "organizationUnk00": 2,
+      "range": [
+        0,
+        0,
+        255,
+        0
+      ],
+      "rangeUnk00": [
+        0,
+        0,
+        "0xFFFF",
+        0,
+        0,
+        0,
+        -1,
+        0
+      ],
+      "unk01": -1,
+      "yUnk0E": 1,
+      "yUnk12": [
+        1,
+        1
+      ],
+      "yUnk14": [
+        1.0,
+        1.0
+      ],
+      "yUnk24": -1,
+      "yUnk28": 1,
+      "yUnk29": [
+        300.0,
+        1.0
+      ],
+      "yUnk41": -1
+    },
+    "slot": {
+      "base": 16,
+      "mirror": true,
+      "signature": -1,
+      "type": "u8",
+      "value": {
+        "factor": 1.0
+      },
+      "width": 1
+    }
+  }
+}

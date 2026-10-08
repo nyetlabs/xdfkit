@@ -12,6 +12,7 @@ import (
 
 	"github.com/gowebpki/jcs"
 
+	"go.nyet.org/xdfkit/internal/testenv"
 	"go.nyet.org/xdfkit/kp"
 )
 
@@ -34,21 +35,9 @@ var edgy = sample{
 
 var canonArgs = []string{"-S", "."}
 
-// missing skips the test, or fails it when XDFKIT_REQUIRE_DATA is set (CI), so
-// absent test inputs (ecuxplot data, jq) can't turn a run silently green.
-func missing(t *testing.T, format string, args ...any) {
-	t.Helper()
-	if os.Getenv("XDFKIT_REQUIRE_DATA") != "" {
-		t.Fatalf(format+" (XDFKIT_REQUIRE_DATA is set)", args...)
-	}
-	t.Skipf(format, args...)
-}
-
 func jq(t *testing.T, in []byte, args ...string) []byte {
 	t.Helper()
-	if _, err := exec.LookPath("jq"); err != nil {
-		missing(t, "jq not installed")
-	}
+	testenv.Jq(t)
 	cmd := exec.Command("jq", args...)
 	cmd.Stdin = bytes.NewReader(in)
 	out, err := cmd.Output()
@@ -117,15 +106,7 @@ func TestStamp(t *testing.T) {
 
 // TestKPDumps checks the canonical dump of every ecuxplot pack against jq.
 func TestKPDumps(t *testing.T) {
-	dir := os.Getenv("XDFKIT_ECUXPLOT_DATA")
-	if dir == "" {
-		dir = filepath.Join("..", "..", "ecuxplot", "data")
-	}
-	kps, _ := filepath.Glob(filepath.Join(dir, "*.kp"))
-	if len(kps) == 0 {
-		missing(t, "no packs in %s (set XDFKIT_ECUXPLOT_DATA)", dir)
-	}
-	for _, p := range kps {
+	for _, p := range testenv.Packs(t) {
 		t.Run(filepath.Base(p), func(t *testing.T) {
 			data, err := os.ReadFile(p)
 			if err != nil {

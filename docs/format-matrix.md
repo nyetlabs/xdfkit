@@ -1,6 +1,6 @@
 # Map definition formats: field support
 
-Written 2026-10-07. KP v1/v2 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, v1, 4170 maps, and `8D0907551M.kp`, v2, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro 1.50 XML; WinOLS script per the "Importing with scripts" help topic (map creation only, write only); JSON/YAML is xdfkit's lossless model (its schema isn't written yet).
+Written 2026-10-07. KP v1/v2 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, v1, 4170 maps, and `8D0907551M.kp`, v2, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro XML (mapdump writes 1.50, TunerPro 5.00 saves 1.80), checked against TunerPro's version history up to 5.00.10305 (2026-01); WinOLS script per the "Importing with scripts" help topic (map creation only, write only); JSON/YAML is xdfkit's canonical model (`model.md`).
 
 Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed (samples needed), `-` not applicable.
 
@@ -9,7 +9,7 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Identity | Short identifier | Y: id, e.g. KFMIOP | Y: id | Y: object name | Y | Y: title | Y: IdName | Y |
 | Identity | Long description | Y: name | Y: name | Y: LongIdentifier | Y | Y: description | Y: Name | Y |
 | Identity | Free-text comment | N | Y: comment; in 8D0907551M it holds hex signature bytes | P: ANNOTATION | ? | P: only by appending to description | Y: Kommentar | Y |
-| Identity | Categories | Y: one folder per map (321 folders in 8D0907551G) | Y: one folder per map | Y: FUNCTION/GROUP, nested, many-to-many | P: function assignment | Y: several CATEGORYMEM per object, flat list | P: FolderName, one folder per map (WinOLS 2.08+) | Y |
+| Identity | Categories | Y: one folder per map (321 folders in 8D0907551G) | Y: one folder per map | Y: FUNCTION/GROUP, nested, many-to-many | P: function assignment | P: a path of up to 3 levels per object (CATEGORYMEM index 0 to 2 is category A, B, C), not many-to-many; up to 2048 categories, but builds before 5.00.9813 (2023) misload numbers above 255 (323 load correctly in 5.00.10305) | P: FolderName, one folder per map (WinOLS 2.08+) | Y |
 | Identity | Project / ECU metadata | P: name and version parsed; most header fields unknown | P: same | Y: PROJECT, HEADER, MODULE, MOD_PAR (EPK, CPU) | P | P: title, description, author | N | Y |
 | Addressing | Address is a file offset | Y | Y | N: ECU CPU address; needs a segment-to-file mapping | N: ECU address | Y: plus header baseoffset | Y: StartAddr / DataAddr (hexdump address, decimal) | Y: file offset plus original CPU address and segment |
 | Addressing | Memory segments | N | N | Y: MEMORY_SEGMENT | ? | P: REGION (size only) | N | Y |
@@ -20,7 +20,7 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Data layout | Value block (array, no axes) | P: 2D with ordinal 1,2,3 axes | P: same | Y: VAL_BLK | ? | Y: table with label axes | P: 2D with no-axis data source | Y |
 | Data layout | Strings | N | N | Y: ASCII | ? | P: outputtype 4 | N | Y |
 | Data layout | Integer 8/16/32, signed | Y | Y | Y: also 64-bit | Y | Y | Y: DataOrg + bVorzeichen | Y |
-| Data layout | Float | Y: 32-bit only | Y: 32-bit only | Y: 16/32/64-bit | ? | Y: float flag; 64-bit unconfirmed | Y: eFloatLoHi / eFloatHiLo, 32-bit | Y |
+| Data layout | Float | Y: 32-bit only | Y: 32-bit only | Y: 16/32/64-bit | ? | Y: float flag, 32-bit; 64-bit unconfirmed. Added in 5.00.8008 (2012) with no equations on float data (only `X`); whether that limit still holds is unconfirmed | Y: eFloatLoHi / eFloatHiLo, 32-bit | Y |
 | Data layout | Endianness per object | Y: HiLo/LoHi in type enum | Y | Y: BYTE_ORDER, module default | ?: likely global | Y: mmedtypeflags | Y: DataOrg | Y |
 | Data layout | Row vs column major | Y: '2d Inverse' (252 of 4170 maps in 8D0907551G) | Y: '2d Inverse' (99 of 471 in 8D0907551M) | Y: RECORD_LAYOUT | ? | Y: major stride / flags | Y: Typ eZweiInv | Y |
 | Data layout | Gaps, alignment, interleaved records | N | N | Y: RECORD_LAYOUT positions, ALIGNMENT_* | ? | P: stride only | P: SkipBytes on axes only | Y |
@@ -39,10 +39,10 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Axes | Axis read from image | Y: datasource EEPROM | Y | Y: STD_AXIS / COM_AXIS | Y | Y: EMBEDDEDDATA | Y: DataSrc eRom | Y |
 | Axes | Per-axis type, sign, units, conversion | Y | Y | Y | Y | Y | Y: StuetzX/Y.* | Y |
 | Axes | Fixed axis values (not in image) | Y: '1,2,3' ordinal or 'Free editable'; axis block sized 4 bytes per point | Y: '1,2,3' ordinal; free-editable storage not located | Y: FIX_AXIS_PAR / _DIST / _LIST | ? | Y: static LABELs | P: DataSrc eUserdef, but no property for the values | Y |
-| Axes | Shared axis object | N: address repeated per map | N | Y: COM_AXIS -> AXIS_PTS | ? | P: address repeated; no shared object | N | Y |
+| Axes | Shared axis object | N: address repeated per map | N | Y: COM_AXIS -> AXIS_PTS | ? | Y: axis linked to another table (`embedinfo type="3" linkobjid`, the table's uniqueid; TunerPro 5) | N | Y |
 | Axes | Axis point count read from image | ? | ? | Y: NO_AXIS_PTS in record layout | ? | N | ?: DataHeader marks header bytes; whether the count is read is undocumented | Y |
-| Axes | Axis stored as differences | Y: 'EEPROM, subtract' = running sum (start value + offsets); 273 axes in 8D0907558E; 'add' and 'backwards' still unknown | Y: same datasource field; ME7 packs have mislabelled absolute axes | Y: DEPOSIT DIFFERENCE | ? | P: static LABELs computed from the bin; no equation form | Y: DataSrc eRomAdd / eRomSub; also eRomBackwards | Y |
-| Axes | Rescale / curve axes | N | N | Y: RES_AXIS, CURVE_AXIS | N | N | N | Y |
+| Axes | Axis stored as differences | Y: 'EEPROM, subtract' = gaps between breakpoints, counted down from 256 (`kp-format.md`); 273 axes in 8D0907558E; 'add' and 'backwards' still unknown | Y: same datasource field; ME7 packs have mislabelled absolute axes | Y: DEPOSIT DIFFERENCE | ? | P: static LABELs computed from the bin; or live, through a linked helper table with `CELL()` equations (`kp-format.md`; XML unconfirmed) | Y: DataSrc eRomAdd / eRomSub; also eRomBackwards | Y |
+| Axes | Rescale / curve axes | N | N | Y: RES_AXIS, CURVE_AXIS | N | P: axis "Normalized" through a function (XDFFUNCTION, Ford-style normalizer); how closely it matches CURVE_AXIS is unconfirmed | N | Y |
 | Tool-specific | Patches | N | N | N | N | Y: XDFPATCH | N | Y |
 | Tool-specific | Measurements (logging channels) | N | N | Y: MEASUREMENT; useful for ecuxplot | N | N | N | Y |
 
@@ -54,6 +54,6 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | KP v2 | 21 | 2 | 12 | 4 |
 | A2L | 31 | 2 | 5 | 0 |
 | DAMOS | 8 | 2 | 9 | 19 |
-| XDF | 22 | 9 | 7 | 0 |
+| XDF | 22 | 10 | 6 | 0 |
 | WinOLS script | 17 | 6 | 14 | 1 |
 | JSON/YAML | 39 | 0 | 0 | 0 |

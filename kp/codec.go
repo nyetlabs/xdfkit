@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -288,8 +289,11 @@ func (c *codec) put(v ...byte) {
 	c.pos = len(c.b)
 }
 
-// Hex is an undecoded byte run, shown as hex in JSON.
+// Hex is an undecoded byte run, shown as hex in JSON. All zeros counts as
+// zero (omitzero); a fixed-length run encodes empty as zeros.
 type Hex []byte
+
+func (h Hex) IsZero() bool { return !slices.ContainsFunc(h, func(b byte) bool { return b != 0 }) }
 
 func (h Hex) MarshalJSON() ([]byte, error) { return json.Marshal(hex.EncodeToString(h)) }
 
@@ -305,6 +309,10 @@ func (h *Hex) UnmarshalJSON(b []byte) error {
 
 func (c *codec) raw(p *Hex, n int) {
 	if c.enc {
+		if len(*p) == 0 {
+			c.put(make([]byte, n)...)
+			return
+		}
 		if len(*p) != n {
 			c.fail("raw block: have %d bytes, layout needs %d", len(*p), n)
 		}
