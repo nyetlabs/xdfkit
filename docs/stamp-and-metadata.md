@@ -1,4 +1,4 @@
-# Edit stamp and XDF metadata sidecar
+# Edit stamp and XDF metadata file
 
 Spec items added 2026-10-07:
 
@@ -78,7 +78,7 @@ jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
   - In the metadata file: `xdf.digest`, plus one digest per object (`xdf.objects[id]`), so edits can be pinned to specific tables.
   - Best effort, in the XDF itself: one line `xdfkit-stamp: sha256:<digest>` in the `XDFHEADER` description, a field TunerPro shows and preserves. That line is excluded from the XDF view. Confirmed 2026-10-07: TunerPro shows the description as two lines and keeps the stamp line through a save (writing the line break as `&#010;`; it writes other description line breaks as `&#013;&#010;`, so readers accept both).
 
-## Metadata sidecar
+## Metadata file
 
 - Written next to every XDF: `name.xdf` and `name.meta.json` (see `naming.md`).
 - Contents: everything the XDF lowering dropped or approximated. It is the residue, not the full model:
@@ -89,14 +89,14 @@ jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
 - Reconstruction: model = XDF view merged with metadata.
   - XDF digest matches `xdf.digest`: the merge is exact. XDF plus metadata reproduces the full model, so XDF to JSON to XDF is lossless.
   - XDF digest differs (edited in TunerPro): merge per object. Unchanged objects get all their metadata. Changed objects take the XDF's values and keep only the metadata fields XDF can't express, with a warning that names them. Objects missing from the XDF are dropped with a warning; new XDF objects have no metadata.
-  - Metadata stamp doesn't match: someone hand edited the sidecar. Warn and use it anyway.
+  - Metadata stamp doesn't match: someone hand edited the metadata file. Warn and use it anyway.
   - No metadata file: plain lossy XDF read.
 
 ## Relation to the embedded model block
 
-- The sidecar is the durable, primary copy of the residue. The comment block in `xdf-embedding.md` doesn't survive a TunerPro save (confirmed).
-- Decided 2026-10-07: the embedded block is optional (`--embed`, off by default) and carries the same payload as the sidecar (residue plus digests, XML encoded), not a second full model. Keeping one source of truth avoids the two copies disagreeing.
+- The metadata file is the durable, primary copy of the residue. The comment block in `xdf-embedding.md` doesn't survive a TunerPro save (confirmed).
+- Decided 2026-10-07: the embedded block is optional (`--embed`, off by default) and carries the same payload as the metadata file (residue plus digests, XML encoded), not a second full model. Keeping one source of truth avoids the two copies disagreeing.
 
 ## Decided
 
-- Sidecar file name: `name.meta.json` next to `name.xdf` (2026-10-07; see `naming.md`).
+- Metadata file name: `name.meta.json` next to `name.xdf` (2026-10-07; see `naming.md`).

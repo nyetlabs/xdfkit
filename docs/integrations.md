@@ -4,12 +4,12 @@ How xdfkit relates to the neighbouring projects. None of them is vendored into t
 
 - [ecu-corpus](corpus.md): the shared test corpus of OEM images and canonical JSON, in the private repo `github.com/nyetlabs/ecu-corpus`, a git submodule (`corpus/`, shallow, `update = none`) of xdfkit, and to be added to ecuxplot, ME7Sum and me7-logger. Its tooling (`tools/`, including `corpus-manifest`) is a separate Go module inside it. Without access, corpus tests skip; CI reads it through a GitHub App token and sets `XDFKIT_REQUIRE_CORPUS=1` so they fail instead (corpus.md, Access and CI credential).
 - [me7-logger](https://github.com/nyetlabs/me7-logger) (MIT): a Go module dependency (`go.nyet.org/me7-logger`), pinned to a tag, used behind one package (`me7/`) so the rest of xdfkit doesn't depend on its types. Not wired in yet. What xdfkit uses from it, all ME7 only and all needing the flash image:
-  - RAM measurement variables (A2L MEASUREMENT), stored in the model's `measurements` and therefore in the canonical JSON and the XDF sidecar.
+  - RAM measurement variables (A2L MEASUREMENT), stored in the model's `measurements` and therefore in the canonical JSON and the XDF metadata file.
   - Located maps, to cross-check a definition's addresses and offer missing maps and axis data.
   - Identification (part number, software version) for project metadata and for warning when a definition is used with a different image.
 - [ecuxplot](https://github.com/nyetlabs/ecuxplot): the reference KP reader (mapdump, `org.nyet.mappack`) that `kp/` is ported from. Its original KP packs and their mapdump CSVs are archived in xdfkit's `testdata/archive/ecuxplot/` (copied from `data/` at `a72b8d3`), which the tests read; ecuxplot isn't needed to run them. Its `data/` moved to ecu-corpus as model JSON on 2026-10-08 and is deleted from ecuxplot; xdfkit's `publish/` generates and uploads the KP, CSV and XDF outputs from that JSON.
 - [ME7Sum](https://github.com/nyetlabs/ME7Sum): checksum checker; supplies images to the corpus and the OEM checks behind ecu-corpus's `corpus-manifest -me7sum`. No code dependency.
-- Both xdfkit and me7-logger write XDF: me7-logger from its located maps, xdfkit from the model (with stamp and sidecar).
+- Both xdfkit and me7-logger write XDF: me7-logger from its located maps, xdfkit from the model (with stamp and metadata file).
 
 ## Go import paths
 

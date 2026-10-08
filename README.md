@@ -2,7 +2,7 @@
 
 Proof of concept for a command-line converter between map definition formats: WinOLS KP (v1 and v2), A2L, DAMOS, TunerPro XDF, WinOLS scripts, and a canonical JSON/YAML model. It also has an autocorrect (`xdfkit lint` and `xdfkit fix`) that checks a KP file's axes against the flash image and fixes datasource and signedness mistakes.
 
-Status: the KP reader and writer, the canonical model (`docs/model.md`) with its generated JSON Schema, the canonical JSON printer with its edit stamp and typed YAML, CSV map list and TunerPro XDF output, `lint` and `fix`, and a CLI over all of them (`xdfkit in.kp out.json`, `xdfkit in.json out.kp`, `xdfkit in.kp out.yaml`, `xdfkit -f xdf -i image in.json out.xdf`, `xdfkit verify out.json`). `publish/` generates the published ecuxplot definitions from the corpus JSON. Not started: the XDF sidecar, the WinOLS script writer, and the A2L and DAMOS readers. See `docs/design.md` for the design.
+Status: the KP reader and writer, the canonical model (`docs/model.md`) with its generated JSON Schema, the canonical JSON printer with its edit stamp and typed YAML, CSV map list and TunerPro XDF output, `lint` and `fix`, and a CLI over all of them (`xdfkit in.kp out.json`, `xdfkit in.json out.kp`, `xdfkit in.kp out.yaml`, `xdfkit -f xdf -i image in.json out.xdf`, `xdfkit verify out.json`). `publish/` generates the published ecuxplot definitions from the corpus JSON. Not started: the XDF metadata file, the WinOLS script writer, and the A2L and DAMOS readers. See `docs/design.md` for the design.
 
 ## Build
 

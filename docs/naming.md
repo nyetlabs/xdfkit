@@ -35,7 +35,8 @@ Decided 2026-10-07 for the shared corpus and xdfkit outputs: image names from th
 ## xdfkit outputs
 
 - Default output names replace the input's extension: `foo.kp` becomes `foo.json`, `foo.xdf`, `foo.yaml`.
-- The XDF sidecar is `foo.meta.json` next to `foo.xdf` (confirmed 2026-10-07).- WinOLS script output: extension to be confirmed from the help file's examples.
+- The XDF metadata file is `foo.meta.json` next to `foo.xdf` (confirmed 2026-10-07).
+- WinOLS script output: extension to be confirmed from the help file's examples.
 
 ## Hand overrides
 
