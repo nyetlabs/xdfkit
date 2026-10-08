@@ -12,6 +12,8 @@ permissions:
 jobs:
   build:
     uses: ./.github/workflows/build.yml
+    # The corpus fetch in build.yml needs CORPUS_APP_KEY.
+    secrets: inherit
 
   release:
     needs: build
