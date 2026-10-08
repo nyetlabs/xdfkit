@@ -1,0 +1,7 @@
+/.cursor
+/.vscode
+.*.swp
+/testdata/local/
+/plans/
+/build/
+/dist/
