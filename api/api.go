@@ -28,9 +28,10 @@ import (
 // Version is set from git describe by the Makefile. Do not edit it here.
 var Version = "dev"
 
-// Formats. CSV and XDF are output only.
+// Formats. CSV and XDF are output only. YAML is the model JSON in YAML syntax.
 const (
 	JSON = "json"
+	YAML = "yaml"
 	KP   = "kp"
 	CSV  = "csv"
 	XDF  = "xdf"
@@ -66,15 +67,15 @@ type ConvertResponse struct {
 	Warnings []string `json:"warnings,omitempty"`
 }
 
-// Convert converts a KP file or a model JSON document (docs/model.md) into To
-// (json, kp, csv or xdf). JSON output is the stamped canonical model; Name, the input's
-// file name, goes into its provenance. KP input to KP output is re-encoded
-// as is. Loading hand-edited JSON, or a template other than the file the
-// model was read from, adds a warning.
+// Convert converts a KP file or a model JSON or YAML document (docs/model.md)
+// into To (json, yaml, kp, csv or xdf). JSON and YAML output is the stamped
+// canonical model; Name, the input's file name, goes into its provenance. KP
+// input to KP output is re-encoded as is. Loading a hand-edited document, or a
+// template other than the file the model was read from, adds a warning.
 func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	resp := ConvertResponse{From: Detect(in), To: req.To}
-	if req.Template != nil && (req.To != KP || resp.From != JSON) {
-		return nil, resp, errors.New("a template applies only to KP output from model JSON")
+	if req.Template != nil && (req.To != KP || resp.From == KP) {
+		return nil, resp, errors.New("a template applies only to KP output from a model document")
 	}
 	if req.Image != nil && req.To != CSV && req.To != XDF {
 		return nil, resp, errors.New("an image applies only to CSV and XDF output")
@@ -135,12 +136,16 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	return out, resp, err
 }
 
-// loadModel reads a KP file or a model JSON document. Hand-edited JSON adds a
-// warning.
+// loadModel reads a KP file or a model JSON or YAML document. A hand-edited
+// document adds a warning.
 func loadModel(in []byte, name string) (*model.Model, []string, error) {
 	if Detect(in) == KP {
 		m, err := model.ReadKP(in, name)
 		return m, nil, err
+	}
+	in, err := asJSON(in)
+	if err != nil {
+		return nil, nil, err
 	}
 	v, err := Verify(in)
 	if err != nil {
@@ -157,7 +162,15 @@ func loadModel(in []byte, name string) (*model.Model, []string, error) {
 	return m, warnings, m.Check()
 }
 
-// load reads a KP file or a model JSON document as a KP file.
+// asJSON returns a model document as JSON, converting YAML.
+func asJSON(in []byte) ([]byte, error) {
+	if Detect(in) == YAML {
+		return canon.YAMLToJSON(in)
+	}
+	return in, nil
+}
+
+// load reads a KP file or a model JSON or YAML document as a KP file.
 func load(in []byte) (*kp.File, []string, error) {
 	if Detect(in) == KP {
 		f, err := kp.Parse(in)
@@ -175,8 +188,12 @@ func load(in []byte) (*kp.File, []string, error) {
 // carry from template (nil: defaults).
 func encodeModel(m *model.Model, to string, template *kp.File) ([]byte, error) {
 	switch to {
-	case JSON:
-		return canon.MarshalStamped(m, "xdfkit "+Version)
+	case JSON, YAML:
+		b, err := canon.MarshalStamped(m, "xdfkit "+Version)
+		if err != nil || to == JSON {
+			return b, err
+		}
+		return canon.JSONToYAML(b)
 	case KP:
 		f, err := m.KP(template)
 		if err != nil {
@@ -194,12 +211,19 @@ func encode(f *kp.File, to string) ([]byte, error) {
 	return encodeModel(model.FromKP(f), to, nil)
 }
 
-// Detect names the input format from its contents: json for a JSON object, else kp.
+// kpMagic starts every KP file: the length-prefixed "WinOLS File" signature.
+var kpMagic = []byte("\x0b\x00\x00\x00WinOLS File")
+
+// Detect names the input format from its contents: json for a JSON object, kp
+// for the KP signature, else yaml.
 func Detect(in []byte) string {
-	if bytes.HasPrefix(bytes.TrimLeft(in, " \t\r\n"), []byte("{")) {
+	switch {
+	case bytes.HasPrefix(bytes.TrimLeft(in, " \t\r\n"), []byte("{")):
 		return JSON
+	case bytes.HasPrefix(in, kpMagic):
+		return KP
 	}
-	return KP
+	return YAML
 }
 
 // VerifyResponse is the stamp status of a JSON document: clean, edited, mixed,
@@ -228,8 +252,12 @@ func (v VerifyResponse) String() string {
 	return fmt.Sprintf("%s (%s)", v.Status, strings.Join(parts, ", "))
 }
 
-// Verify checks each digest in a JSON document's stamp.
+// Verify checks each digest in a JSON or YAML document's stamp.
 func Verify(in []byte) (VerifyResponse, error) {
+	in, err := asJSON(in)
+	if err != nil {
+		return VerifyResponse{}, err
+	}
 	s, checks, err := canon.Verify(in)
 	if err != nil {
 		return VerifyResponse{}, err

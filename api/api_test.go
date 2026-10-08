@@ -30,6 +30,17 @@ func TestConvertRoundTrip(t *testing.T) {
 			if err != nil || resp.From != JSON || !bytes.Equal(back, js) {
 				t.Fatalf("json to json: %v %+v", err, resp)
 			}
+			y, _, err := Convert(in, ConvertRequest{To: YAML})
+			if err != nil {
+				t.Fatalf("kp to yaml: %v", err)
+			}
+			back, resp, err = Convert(y, ConvertRequest{To: JSON})
+			if err != nil || resp.From != YAML || len(resp.Warnings) != 0 || !bytes.Equal(back, js) {
+				t.Fatalf("yaml to json: %v %+v", err, resp)
+			}
+			if v, err := Verify(y); err != nil || v.Status != "clean" {
+				t.Fatalf("verify yaml: %v %+v", err, v)
+			}
 			if _, _, err := Convert(js, ConvertRequest{To: KP}); err != nil {
 				t.Fatalf("json to kp: %v", err)
 			}

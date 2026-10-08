@@ -34,7 +34,7 @@ Decided and implemented 2026-10-07 (`canon/typed.go`: `canon.Marshal`, `canon.Ma
   - Unknown fields are errors, except the top-level `stamp`. Types with `UnmarshalJSON` get their subtree. Arrays must have exactly the Go array's length. Key names match exactly (no case folding).
 - Effects:
   - A respelled number still shows as `mixed` (the jq digest flags it), but the file always converts.
-  - YAML will be encoded from the same tree and keep the int/float distinction.
+  - YAML goes through the same typed layer (decided 2026-10-08): it is a syntax layer over the canonical JSON, converted node for node with each number's spelling kept, so the int/float rules and the stamp apply to it unchanged (`canon/yaml.go`: `canon.JSONToYAML`, `canon.YAMLToJSON`). Strings that YAML would read as another type (`"0x1F"`, `"true"`) are quoted. On input, YAML number spellings that JSON lacks (`0x1F`, `1_000`) are normalized, `.inf` and `.nan` are errors, and timestamps are read as strings.
 
 ## Stamp
 

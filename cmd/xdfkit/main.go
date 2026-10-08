@@ -1,5 +1,5 @@
 // Command xdfkit converts map definitions. So far it reads and writes WinOLS KP
-// files and the canonical model JSON (docs/model.md).
+// files and the canonical model JSON or YAML (docs/model.md).
 package main
 
 import (
@@ -18,27 +18,29 @@ import (
 )
 
 const usage = `usage:
-  xdfkit [-f json|kp|csv|xdf] [-template orig.kp] [-i image] [-r ref]...
+  xdfkit [-f json|yaml|kp|csv|xdf] [-template orig.kp] [-i image] [-r ref]...
          [-force] input [output]
-  xdfkit verify file.json...
+  xdfkit verify file.json|file.yaml...
   xdfkit lint -i image [-family me7|m3] [-json findings.json] input
   xdfkit fix -i image (-o output | -n) [-rules R1,R2] [-only ID,...]
              [-min-confidence high|medium|low] [-findings findings.json] input
   xdfkit version
 
-Converts between KP and the model JSON, and writes CSV and XDF; the input format is detected from the
-contents, the output format comes from -f, else the output extension, else json.
-Input "-" reads stdin; JSON output without an output file goes to stdout.
-Existing output files are not overwritten unless -force is given. KP output
-from JSON fills the KP fields the model doesn't carry from -template (the KP
-file the JSON came from reproduces it), else from defaults. CSV output is
+Converts between KP and the model JSON or YAML, and writes CSV and XDF; the
+input format is detected from the contents, the output format comes from -f,
+else the output extension (.yml is yaml), else json. YAML is the model JSON in
+YAML syntax, with the same typed numbers and stamp. Input "-" reads stdin;
+output other than KP without an output file goes to stdout. Existing output
+files are not overwritten unless -force is given. KP output from JSON or YAML
+fills the KP fields the model doesn't carry from -template (the KP file the
+JSON came from reproduces it), else from defaults. CSV output is
 mapdump's map list: -i adds the value ranges from the image, and each -r adds a
-column with the names of the matching maps in that KP or JSON definition.
+column with the names of the matching maps in that KP, JSON or YAML definition.
 XDF output is TunerPro's format; -i adds the file region and the labels of
 "subtract" axes, and the definition title is the output file's name.
 
-verify checks each digest in a JSON file's stamp (RFC 8785 and jq -S .) and
-prints clean, edited, mixed (the digests disagree), unknown or unstamped.
+verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
+and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
 
 lint checks the KP file's image axes against the flash image and prints one
 line per finding; -json also writes them as JSON ("-" for stdout). It exits 1
@@ -232,7 +234,7 @@ func warn(name string, ws []string) {
 
 func convert(args []string) error {
 	fs := newFlags("xdfkit")
-	format := fs.String("f", "", "output format: json, kp, csv or xdf")
+	format := fs.String("f", "", "output format: json, yaml, kp, csv or xdf")
 	force := fs.Bool("force", false, "overwrite an existing output file")
 	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
 	image := fs.String("i", "", "flash image, for CSV value ranges and XDF")
@@ -251,8 +253,11 @@ func convert(args []string) error {
 	in, out := fs.Arg(0), fs.Arg(1)
 	if *format == "" {
 		*format = strings.TrimPrefix(filepath.Ext(out), ".")
-		if *format == "" {
-			*format = "json"
+		switch *format {
+		case "":
+			*format = api.JSON
+		case "yml":
+			*format = api.YAML
 		}
 	}
 
