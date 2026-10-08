@@ -61,6 +61,7 @@ flowchart LR
 ## Repo layout
 
 - `cmd/xdfkit/` CLI: `xdfkit [-i image.bin] [--base 0x...] [-f json|yaml|kp|xdf] [--report f] input.{kp,a2l,dam,json,yaml,xdf} [out]`, with input format detected from the file contents; `XXX2YYY` conversion commands (see Decisions, CLI naming); subcommands `xdfkit lint` and `xdfkit fix` (see Autocorrect)
+- `internal/corpus`: test access to the `ecu-corpus` submodule (manifest lookups by name or SHA-256, skip or fail when absent).
 - `api/` (the façade for all bindings), `capi/` (C ABI shared library, cgo), `model/` (with `schema.json`), `kp/`, `lint/`, `a2l/`, `dam/`, `json/` (YAML encoding lives here too), `addrmap/`, `xdf/`, `cmd/sampdiff/`
 - `Makefile` (lint, test, build, package; version from git tags), `.github/` (build and release workflows, Dependabot), `cliff.toml` (release notes).
 - `docs/`, `testdata/` (committed fixtures), `testdata/local/` (gitignored: private samples, never committed; tests that need them skip when absent), `corpus/` (the `ecu-corpus` git submodule, see `corpus.md`; not added yet)

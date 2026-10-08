@@ -1,0 +1,65 @@
+# git-cliff configuration (https://git-cliff.org/docs/configuration).
+# Same commit prefixes and template as me7-logger. Release process: README "Releases".
+
+[changelog]
+# group_by(group) gives the sections, group_by(message) dedups. #N links are built in the
+# template from remote_url() (GITHUB_REPO in CI), so no repo URL is hardcoded here.
+body = """
+## What's Changed
+
+{%- if version %} in {{ version | trim_start_matches(pat="v") }}{%- else %} (since {{ previous.version | default(value="initial") }}){%- endif -%}
+{%- for group, group_commits in commits | group_by(attribute="group") %}
+### {{ group | striptags | trim }}
+{% for msg, dupes in group_commits | group_by(attribute="message") -%}
+  {%- set commit = dupes | first -%}
+  {%- if commit.remote.pr_title -%}
+    {%- set commit_message = commit.remote.pr_title -%}
+  {%- else -%}
+    {%- set commit_message = commit.message -%}
+  {%- endif %}
+  * {{ commit_message | split(pat="\n") | first | trim | replace_regex(from="(^|[^\\[])#([0-9]+)", to=["$1[#$2](", self::remote_url(), "/issues/$2)"] | join(sep="")) }}\
+    {%- if commit.remote.username %} by @{{ commit.remote.username }}{% endif -%}
+    {%- if commit.remote.pr_number %} in [#{{ commit.remote.pr_number }}]({{ self::remote_url() }}/pull/{{ commit.remote.pr_number }}){% endif %}
+{%- endfor -%}
+{% raw %}
+{% endraw -%}
+{%- endfor -%}
+
+{% if version %}
+    {% if previous.version %}
+      **Full Changelog**: {{ self::remote_url() }}/compare/{{ previous.version }}...{{ version }}
+    {% endif %}
+{% else -%}
+  {% raw %}\n{% endraw %}
+{% endif %}
+
+{%- macro remote_url() -%}
+  https://github.com/{{ remote.github.owner }}/{{ remote.github.repo }}
+{%- endmacro -%}
+"""
+trim = true
+
+[git]
+# Explicit parsers assign groups; "<!-- N -->" orders the sections (stripped in the template).
+conventional_commits = false
+filter_unconventional = false
+split_commits = false
+# First match wins. chore(deps) sits above the generic chore rule, and Dependabot merges
+# above the "Merge pull request" skip. ".*" stays last.
+commit_parsers = [
+  { message = "(?i)^(feat|add)", group = "<!-- 00 -->Features" },
+  { message = "(?i)^fix", group = "<!-- 01 -->Bug Fixes" },
+  { message = "(?i)^docs?", group = "<!-- 02 -->Documentation" },
+  { message = "(?i)^refactor", group = "<!-- 03 -->Refactor" },
+  { message = "(?i)^chore\\(deps\\)", group = "<!-- 05 -->Dependencies" },
+  { message = "(?i)^(chore|ci|build|test|style)", group = "<!-- 04 -->Chore" },
+  { message = "^Bump", group = "<!-- 05 -->Dependencies" },
+  { message = "^Merge pull request.*dependabot", group = "<!-- 05 -->Dependencies" },
+  { message = "^Merge pull request", skip = true },
+  { message = ".*", group = "<!-- 06 -->Other" },
+]
+filter_commits = false
+sort_commits = "newest"
+# Stable vX.Y.Z and prerelease vX.Y.Z-rcN. Stable release notes skip RC tags (--ignore-tags in
+# release.yml), so they cover everything since the previous stable release.
+tag_pattern = "^v[0-9]+\\.[0-9]+\\.[0-9]+(-rc[0-9]+)?$"

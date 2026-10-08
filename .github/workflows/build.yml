@@ -1,0 +1,76 @@
+# Lint, test and build on pushes to master and on PRs. The work is in the Makefile.
+name: Build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  JQ_VERSION: 1.8.1
+  JQ_SHA256: 020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      XDFKIT_ECUXPLOT_DATA: ${{ github.workspace }}/ecuxplot/data
+      XDFKIT_REQUIRE_DATA: 1
+      # Fork PRs get no secrets, so they can't fetch the private corpus; their corpus tests skip.
+      HAS_CORPUS: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      # Test data: ecuxplot's KP packs and mapdump CSVs (public repo, data/ only).
+      - uses: actions/checkout@v7
+        with:
+          repository: nyetlabs/ecuxplot
+          path: ecuxplot
+          sparse-checkout: data
+      # Private corpus (docs/corpus.md): short-lived token from the corpus GitHub App,
+      # used for the ecu-corpus URL only; corpus tests become mandatory.
+      - if: env.HAS_CORPUS == 'true'
+        id: corpus-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.CORPUS_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CORPUS_APP_KEY }}
+          owner: nyetlabs
+          repositories: ecu-corpus
+      - if: env.HAS_CORPUS == 'true'
+        name: Fetch corpus
+        env:
+          TOKEN: ${{ steps.corpus-token.outputs.token }}
+        run: |
+          git config --global url."https://x-access-token:${TOKEN}@github.com/nyetlabs/ecu-corpus".insteadOf https://github.com/nyetlabs/ecu-corpus
+          git submodule update --init --checkout --depth 1 corpus
+          echo XDFKIT_REQUIRE_CORPUS=1 >>"$GITHUB_ENV"
+      # canon tests compare against jq 1.8; the runner's jq may be older.
+      - name: Install jq ${{ env.JQ_VERSION }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSfL -o "$RUNNER_TEMP/bin/jq" "https://github.com/jqlang/jq/releases/download/jq-$JQ_VERSION/jq-linux-amd64"
+          echo "$JQ_SHA256  $RUNNER_TEMP/bin/jq" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/bin/jq"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - run: test "$(jq --version)" = "jq-$JQ_VERSION"
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: make lint
+        run: make lint
+      - name: make test
+        run: make test
+      - name: make build
+        run: make build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: xdfkit
+          path: build/xdfkit
