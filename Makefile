@@ -7,6 +7,8 @@
 #   make schema           regenerate model/schema.json and model/kp-defaults.json
 #   make version          git describe (tags vX.Y.Z and vX.Y.Z-rcN)
 #   make package          dist archives for macos, linux, and windows
+#   make corpus           fetch the corpus submodule at its pinned commit (needs access)
+#   make corpus-bump      move the corpus submodule to the ecu-corpus head (commit it yourself)
 #
 # Version comes from git tags only. Do not edit a version by hand.
 
@@ -16,7 +18,7 @@ VERSION ?= $(patsubst v%,%,$(shell git describe --tags --match 'v[0-9]*' --dirty
 LDFLAGS := -ldflags "-X go.nyet.org/xdfkit/api.Version=$(VERSION)"
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.1
 
-.PHONY: all lint test build schema version package clean help
+.PHONY: all lint test build schema version package corpus corpus-bump clean help
 
 # Archive name uses macos; the Go port is darwin.
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
@@ -68,8 +70,17 @@ package:
 		rm -rf "$$stage"; \
 	done
 
+# --checkout overrides update = none in .gitmodules.
+corpus:
+	git submodule update --init --checkout --depth 1 corpus
+
+corpus-bump:
+	git submodule update --init --checkout --remote --depth 1 corpus
+	@git -C corpus log -1 --format='corpus now at %h %s'
+	@git status --short corpus
+
 clean:
 	rm -rf build dist
 
 help:
-	@sed -n '2,11p' Makefile
+	@sed -n '2,13p' Makefile

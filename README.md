@@ -13,7 +13,7 @@ make help       # all targets
 
 `make lint` needs nothing beyond Go (staticcheck runs through `go run`). Tests use the archived ecuxplot KP files and mapdump CSVs in `testdata/archive/ecuxplot/`, images from the private corpus submodule, and jq 1.8; without the corpus or jq those tests skip, and with `XDFKIT_REQUIRE_DATA=1` and `XDFKIT_REQUIRE_CORPUS=1` (as in CI) they fail instead.
 
-Corpus tests need the private `ecu-corpus` submodule (`docs/corpus.md`). With read access, fetch it with `git submodule update --init --checkout corpus`; without it, they skip.
+Corpus tests need the private `ecu-corpus` submodule (`docs/corpus.md`). With read access, fetch it with `make corpus` (`make corpus-bump` moves it to the corpus head); without it, they skip.
 
 ## Contributing
 
