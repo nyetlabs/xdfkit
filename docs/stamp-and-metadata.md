@@ -72,25 +72,44 @@ jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
 
 ### XDF stamp
 
-- An XDF has no JSON of its own, so its digest covers the XDF view: the JSON that xdfkit's XDF reader builds from the XDF elements alone. That excludes comments, the embedded model block and the stamp line itself, and objects are sorted by id. Digests: the same two forms as the JSON stamp, over the XDF view.
+- An XDF has no JSON of its own, so its digest covers the XDF view: the model JSON that xdfkit's XDF reader builds from the XDF elements alone (`xdf.Read` without a metadata file), without object keys, which the reader derives from the titles of all objects. That excludes comments, the embedded model block, the stamp line itself, and label values (the model has no field for them), and objects are sorted by uniqueid. Digests: the same two forms as the JSON stamp, over the XDF view.
 - This catches real edits made in TunerPro (values, addresses, scaling, axes, added or deleted tables). It ignores TunerPro reformatting, attribute order and table order.
 - Where it is stored:
-  - In the metadata file: `xdf.digest`, plus one digest per object (`xdf.objects[id]`), so edits can be pinned to specific tables.
-  - Best effort, in the XDF itself: one line `xdfkit-stamp: sha256:<digest>` in the `XDFHEADER` description, a field TunerPro shows and preserves. That line is excluded from the XDF view. Confirmed 2026-10-07: TunerPro shows the description as two lines and keeps the stamp line through a save (writing the line break as `&#010;`; it writes other description line breaks as `&#013;&#010;`, so readers accept both).
+  - In the metadata file: `xdf.digests` (both forms, for the whole view). Implemented.
+  - Best effort, in the XDF itself (not written yet; the reader already leaves it out of the view): one line `xdfkit-stamp: sha256:<digest>` in the `XDFHEADER` description, a field TunerPro shows and preserves. That line is excluded from the XDF view. Confirmed 2026-10-07: TunerPro shows the description as two lines and keeps the stamp line through a save (writing the line break as `&#010;`; it writes other description line breaks as `&#013;&#010;`, so readers accept both).
 
 ## Metadata file
 
-- Written next to every XDF: `name.xdf` and `name.meta.json` (see `naming.md`).
-- Contents: everything the XDF lowering dropped or approximated. It is the residue, not the full model:
-  - Per object, keyed by the same id as the XDF table title: the fields XDF can't express (see `format-matrix.md`, the XDF column), the loss-report entries for that object, and the per-source raw block (for KP, the unidentified fields).
-  - Shared objects (axes, conversions, record layouts) and project-level data (source file name and SHA-256, KP header fields, folders).
-  - `xdf`: the digest of the XDF view it was generated with, plus per-object digests.
-  - Its own `stamp`.
-- Reconstruction: model = XDF view merged with metadata.
-  - XDF digest matches `xdf.digest`: the merge is exact. XDF plus metadata reproduces the full model, so XDF to JSON to XDF is lossless.
-  - XDF digest differs (edited in TunerPro): merge per object. Unchanged objects get all their metadata. Changed objects take the XDF's values and keep only the metadata fields XDF can't express, with a warning that names them. Objects missing from the XDF are dropped with a warning; new XDF objects have no metadata.
+Implemented 2026-10-08 (`xdf/meta.go`: `xdf.Meta`, `xdf.Read`).
+
+- Written next to every XDF output file: `name.xdf` and `name.meta.json` (see `naming.md`). XDF written to stdout gets none. API callers get it as `ConvertResponse.Meta` and pass it back as `ConvertRequest.Meta`.
+- Contents: the difference between the model and the XDF view of the XDF written from it. It is the residue, not the full model. The model carries no KP residue (`model.md`), so neither does the metadata file; KP output from an XDF takes the undecoded KP fields from a template or the defaults, as from JSON.
+
+```json
+{
+  "model": {"categories": [...], "provenance": {...}},
+  "objects": {
+    "0x1": {"categories": [2], "id": "KFLDRQ2 (AR 27C02)", "inverse": true, "key": "KFLDRQ2 (AR 27C02)"}
+  },
+  "schema": "xdfkit-xdf-meta/1",
+  "stamp": {...},
+  "xdf": {
+    "digests": [{"canon": "RFC8785", "digest": "sha256:..."}, {"canon": "jq -S .", "digest": "sha256:..."}]
+  }
+}
+```
+
+- `model`: a JSON Merge Patch (RFC 7396) from the view without its objects to the model without its objects: provenance, categories (KP folder ids and order; the XDF numbers categories by sorted name), project fields the XDF lost.
+- `objects`: per object, keyed by its XDF `uniqueid`, the merge patch from its view to the model object, left out when empty. Typical entries: the key, the full id (the XDF title has only its first word), the comment (merged into the XDF description), category ids, `inverse`, `value.description`, the display base, axis `mirror`, `header` and `signature`, the storage of "subtract" axes written as labels, and precision the writer limited to six digits. Keyed by uniqueid rather than title because titles repeat; TunerPro keeps uniqueids through a save (8D0907551M, observed 2026-10-07).
+- `xdf`: the digests of the view (see XDF stamp).
+- Its own `stamp`.
+- Reconstruction (`xdf.Read`): model = XDF view merged with metadata, by uniqueid.
+  - Digest matches `xdf.digests`: the merge is exact, so XDF plus metadata reproduces the model and JSON to XDF to JSON is lossless (tested on every archived pack, with and without image).
+  - Digest differs (edited in TunerPro): warning. The project takes the `model` patch over the XDF's header, and XDF categories missing from the metadata are added. Each object takes the XDF's values, and keeps the metadata's for what XDF can't express (key, `inverse`, `value.description`, display settings, axis `mirror`, `header`, `signature`, axis storage the XDF can't show) and where the metadata's value lowers to what the XDF holds (id, description and comment when the title and description are unchanged; category, shape, units, conversion, precision). Unedited objects therefore come out as before. A warning names each object whose metadata fields were not applied; it can't name which XDF values changed, because the metadata file doesn't hold the original view.
+  - Objects in the metadata but missing from the XDF are dropped with a warning; objects new in the XDF (or with a repeated uniqueid) have no metadata, get a key from their title, and are reported.
   - Metadata stamp doesn't match: someone hand edited the metadata file. Warn and use it anyway.
-  - No metadata file: plain lossy XDF read.
+  - No metadata file: the plain XDF view, with provenance format `xdf`.
+- The XDF view: title as id, description as description, `CATEGORYMEM` as categories, cells from `EMBEDDEDDATA` (type flags: signed, little endian, float), the equation as factor and offset (any expression linear in X, or factor/X + offset for KP's reciprocal; anything else reads as X with a warning), `decimalpl` (default: `DEFAULTS sigdigits`) as precision, output type 3 as base 16 and the others as base 10. Table axes with a location are image axes; label axes are ordinal, and dropped when they have at most one label. Elements other than tables and constants (`XDFFLAG`, `XDFPATCH`, `XDFFUNCTION`) are ignored with a warning. Input that isn't valid UTF-8 is read as Windows-1252.
 
 ## Relation to the embedded model block
 

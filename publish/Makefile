@@ -1,9 +1,10 @@
 # Generate the published map definitions, formerly ecuxplot's data/Makefile:
-# per pack a KP, a CSV map list and an XDF, and dated zips. Outputs go to
+# per pack a KP, a CSV map list and an XDF with its metadata file
+# (NAME.meta.json, docs/stamp-and-metadata.md), and dated zips. Outputs go to
 # build/publish/. Run in publish/, or with make -C publish
 # from the root.
 #
-#   make                  KP, CSV and XDF for every pack (make all)
+#   make                  KP, CSV, XDF and metadata file for every pack (make all)
 #   make help             this help
 #   make zips             dated and -latest zips
 #   make upload           publish, if local.mk (gitignored) defines it
@@ -48,7 +49,8 @@ gitdates = $(shell git -C $(CORPUS) log --invert-grep --grep='^chore(schema)' --
 butlast = $(wordlist 2,$(words $(1)),x $(1))
 date = $(or $(firstword $(call butlast,$(call gitdates,$(1)))),$(DATE_$(1)),$(firstword $(call gitdates,$(1))))
 
-TARGETS := $(foreach p,$(PACKS),$(OUT)/$(p).kp $(OUT)/$(p).csv $(OUT)/$(p).xdf)
+EXTS := kp xdf meta.json csv
+TARGETS := $(foreach p,$(PACKS),$(addprefix $(OUT)/$(p).,$(EXTS)))
 
 .PHONY: all help zips clean import
 
@@ -82,13 +84,14 @@ $(OUT)/8D0907551H.csv $(OUT)/8D0907551M.csv: $(addprefix $(OUT)/,$(addsuffix .js
 $(OUT)/%.csv: $(OUT)/%.json | $(XDFKIT)
 	cd $(OUT) && $(XDFKIT) -f csv -force -i $(call image,$*) $(REFS_$*) $*.json $*.csv
 
-$(OUT)/%.xdf: $(OUT)/%.json | $(XDFKIT)
-	$(XDFKIT) -f xdf -force -i $(call image,$*) $< $@
+# one run writes both
+$(OUT)/%.xdf $(OUT)/%.meta.json: $(OUT)/%.json | $(XDFKIT)
+	$(XDFKIT) -f xdf -force -i $(call image,$*) $< $(OUT)/$*.xdf
 
 define ZIP_template
-$(OUT)/$(1)-$(call date,$(1)).zip: $(addprefix $(OUT)/$(1).,kp xdf csv)
-	cd $(OUT) && rm -f $$@ && for e in kp xdf csv; do cp $(1).$$$$e $(1)-$(call date,$(1)).$$$$e; done && \
-		zip $$@ $(addprefix $(1)-$(call date,$(1)).,kp xdf csv) && rm $(addprefix $(1)-$(call date,$(1)).,kp xdf csv)
+$(OUT)/$(1)-$(call date,$(1)).zip: $(addprefix $(OUT)/$(1).,$(EXTS))
+	cd $(OUT) && rm -f $$@ && for e in $(EXTS); do cp $(1).$$$$e $(1)-$(call date,$(1)).$$$$e; done && \
+		zip $$@ $(addprefix $(1)-$(call date,$(1)).,$(EXTS)) && rm $(addprefix $(1)-$(call date,$(1)).,$(EXTS))
 $(OUT)/$(1)-latest.zip: $(OUT)/$(1)-$(call date,$(1)).zip
 	ln -sf $$(notdir $$<) $$@
 ZIPS += $(OUT)/$(1)-latest.zip $(OUT)/$(1)-$(call date,$(1)).zip

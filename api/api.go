@@ -28,7 +28,7 @@ import (
 // Version is set from git describe by the Makefile. Do not edit it here.
 var Version = "dev"
 
-// Formats. CSV and XDF are output only. YAML is the model JSON in YAML syntax.
+// Formats. CSV is output only. YAML is the model JSON in YAML syntax.
 const (
 	JSON = "json"
 	YAML = "yaml"
@@ -44,7 +44,8 @@ const (
 // columns and XDF (file size, "subtract" axis labels). Refs, for CSV output,
 // are reference definitions (KP or model JSON) whose matching map names fill
 // one column each. Title is the XDF definition title (default: Name without
-// its extension).
+// its extension). Meta is the metadata file of an XDF input
+// (docs/stamp-and-metadata.md).
 type ConvertRequest struct {
 	To       string `json:"to"`
 	Name     string `json:"name,omitempty"`
@@ -52,6 +53,7 @@ type ConvertRequest struct {
 	Image    []byte `json:"image,omitempty"`
 	Refs     []Ref  `json:"refs,omitempty"`
 	Title    string `json:"title,omitempty"`
+	Meta     []byte `json:"meta,omitempty"`
 }
 
 // Ref is a reference definition for CSV output; Name heads its column.
@@ -60,20 +62,27 @@ type Ref struct {
 	Data []byte `json:"data"`
 }
 
-// ConvertResponse reports what was converted and any warnings.
+// ConvertResponse reports what was converted and any warnings. Meta is the
+// metadata file that goes with XDF output.
 type ConvertResponse struct {
 	From     string   `json:"from"`
 	To       string   `json:"to"`
 	Warnings []string `json:"warnings,omitempty"`
+	Meta     []byte   `json:"meta,omitempty"`
 }
 
-// Convert converts a KP file or a model JSON or YAML document (docs/model.md)
-// into To (json, yaml, kp, csv or xdf). JSON and YAML output is the stamped
-// canonical model; Name, the input's file name, goes into its provenance. KP
-// input to KP output is re-encoded as is. Loading a hand-edited document, or a
-// template other than the file the model was read from, adds a warning.
+// Convert converts a KP file, a model JSON or YAML document (docs/model.md)
+// or an XDF, with its metadata file if given, into To (json, yaml, kp, csv or
+// xdf). JSON and YAML output is the stamped canonical model; Name, the input's
+// file name, goes into its provenance. KP input to KP output is re-encoded as
+// is. XDF output comes with its metadata file. Loading a hand-edited document,
+// an XDF edited since its metadata file was written, or a template other than
+// the file the model was read from, adds a warning.
 func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	resp := ConvertResponse{From: Detect(in), To: req.To}
+	if req.Meta != nil && resp.From != XDF {
+		return nil, resp, errors.New("a metadata file applies only to XDF input")
+	}
 	if req.Template != nil && (req.To != KP || resp.From == KP) {
 		return nil, resp, errors.New("a template applies only to KP output from a model document")
 	}
@@ -94,7 +103,7 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 		out, err := f.Encode()
 		return out, resp, err
 	}
-	m, warnings, err := loadModel(in, req.Name)
+	m, warnings, err := loadModel(in, req.Name, req.Meta)
 	resp.Warnings = warnings
 	if err != nil {
 		return nil, resp, err
@@ -102,7 +111,7 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	if req.To == CSV {
 		refs := make([]mapcsv.Ref, len(req.Refs))
 		for i, r := range req.Refs {
-			rm, w, err := loadModel(r.Data, r.Name)
+			rm, w, err := loadModel(r.Data, r.Name, nil)
 			for _, s := range w {
 				resp.Warnings = append(resp.Warnings, r.Name+": "+s)
 			}
@@ -120,6 +129,10 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 			title = strings.TrimSuffix(req.Name, path.Ext(req.Name))
 		}
 		out, err := xdf.Write(m, req.Image, title)
+		if err != nil {
+			return nil, resp, err
+		}
+		resp.Meta, err = xdf.Meta(m, out, "xdfkit "+Version)
 		return out, resp, err
 	}
 	var t *kp.File
@@ -136,12 +149,20 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	return out, resp, err
 }
 
-// loadModel reads a KP file or a model JSON or YAML document. A hand-edited
-// document adds a warning.
-func loadModel(in []byte, name string) (*model.Model, []string, error) {
-	if Detect(in) == KP {
+// loadModel reads a KP file, a model JSON or YAML document, or an XDF with
+// its metadata file (nil: none). A hand-edited document adds a warning.
+func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, error) {
+	switch Detect(in) {
+	case KP:
 		m, err := model.ReadKP(in, name)
 		return m, nil, err
+	case XDF:
+		m, warnings, err := xdf.Read(in, meta)
+		if err == nil && meta == nil {
+			sum := sha256.Sum256(in)
+			m.Provenance = &model.Provenance{Format: XDF, File: name, SHA256: hex.EncodeToString(sum[:])}
+		}
+		return m, warnings, err
 	}
 	in, err := asJSON(in)
 	if err != nil {
@@ -176,7 +197,7 @@ func load(in []byte) (*kp.File, []string, error) {
 		f, err := kp.Parse(in)
 		return f, nil, err
 	}
-	m, warnings, err := loadModel(in, "")
+	m, warnings, err := loadModel(in, "", nil)
 	if err != nil {
 		return nil, warnings, err
 	}
@@ -214,12 +235,15 @@ func encode(f *kp.File, to string) ([]byte, error) {
 // kpMagic starts every KP file: the length-prefixed "WinOLS File" signature.
 var kpMagic = []byte("\x0b\x00\x00\x00WinOLS File")
 
-// Detect names the input format from its contents: json for a JSON object, kp
-// for the KP signature, else yaml.
+// Detect names the input format from its contents: json for a JSON object,
+// xdf for XML, kp for the KP signature, else yaml.
 func Detect(in []byte) string {
+	text := bytes.TrimLeft(bytes.TrimPrefix(in, []byte("\uFEFF")), " \t\r\n")
 	switch {
-	case bytes.HasPrefix(bytes.TrimLeft(in, " \t\r\n"), []byte("{")):
+	case bytes.HasPrefix(text, []byte("{")):
 		return JSON
+	case bytes.HasPrefix(text, []byte("<")):
+		return XDF
 	case bytes.HasPrefix(in, kpMagic):
 		return KP
 	}
@@ -254,6 +278,9 @@ func (v VerifyResponse) String() string {
 
 // Verify checks each digest in a JSON or YAML document's stamp.
 func Verify(in []byte) (VerifyResponse, error) {
+	if Detect(in) == XDF {
+		return VerifyResponse{}, errors.New("XDF stamps can't be verified yet")
+	}
 	in, err := asJSON(in)
 	if err != nil {
 		return VerifyResponse{}, err
@@ -399,7 +426,8 @@ type errorResponse struct {
 // returns the output bytes and the response as canonical JSON. A failure,
 // including a panic, returns no output and {"error": "..."}. Methods: convert
 // (ConvertRequest), lint (LintRequest), fix (FixRequest), verify and version
-// (no request fields). Images and templates in requests are base64.
+// (no request fields). Images, templates and metadata files in requests and
+// responses are base64.
 func Call(method string, request, input []byte) (out, response []byte) {
 	defer func() {
 		if r := recover(); r != nil {

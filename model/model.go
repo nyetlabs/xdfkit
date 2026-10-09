@@ -27,7 +27,7 @@ type Model struct {
 
 // Provenance identifies the original file, which the corpus doesn't hold.
 type Provenance struct {
-	Format string `json:"format" doc:"Source format." enum:"kp"`
+	Format string `json:"format" doc:"Source format." enum:"kp|xdf"`
 	File   string `json:"file,omitempty" doc:"Original file name."`
 	SHA256 string `json:"sha256" doc:"SHA-256 of the original file, lowercase hex." pattern:"^[0-9a-f]{64}$"`
 }
@@ -129,10 +129,17 @@ func (Addr) jsonSchema() map[string]any {
 	return map[string]any{"type": "string", "pattern": "^0x[0-9A-Fa-f]{1,8}$"}
 }
 
-// assignKeys sets each object's Key from its ID (see Object.Key).
-func (m *Model) assignKeys() {
+// AssignKeys sets the Key of each object that has none from its ID (see
+// Object.Key), avoiding the keys already set.
+func (m *Model) AssignKeys() {
 	used := map[string]bool{}
+	for _, o := range m.Objects {
+		used[o.Key] = o.Key != ""
+	}
 	for i, o := range m.Objects {
+		if o.Key != "" {
+			continue
+		}
 		base := o.ID
 		if strings.TrimSpace(base) == "" {
 			base = fmt.Sprintf("obj-%d", i+1)

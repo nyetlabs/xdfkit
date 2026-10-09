@@ -52,6 +52,14 @@ func TestConvertRoundTrip(t *testing.T) {
 			if err != nil || len(resp.Warnings) != 0 || !bytes.Equal(out, want) {
 				t.Fatalf("json to kp with the original as template: %v %+v", err, resp)
 			}
+			x, resp, err := Convert(js, ConvertRequest{To: XDF})
+			if err != nil || resp.Meta == nil {
+				t.Fatalf("json to xdf: %v %+v", err, resp)
+			}
+			back, resp, err = Convert(x, ConvertRequest{To: JSON, Meta: resp.Meta})
+			if err != nil || resp.From != XDF || len(resp.Warnings) != 0 || !bytes.Equal(back, js) {
+				t.Fatalf("xdf with metadata to json: %v %+v", err, resp)
+			}
 		})
 	}
 }
@@ -111,6 +119,22 @@ func TestCall(t *testing.T) {
 	}
 	if _, m := call("verify", "", js); m["status"] != "clean" {
 		t.Errorf("verify: %v", m)
+	}
+	x, m := call("convert", `{"to": "xdf"}`, js)
+	meta, _ := m["meta"].(string)
+	if meta == "" {
+		t.Fatalf("convert to xdf: no metadata file: %v", m)
+	}
+	if back, m := call("convert", `{"to": "json", "meta": "`+meta+`"}`, x); m["from"] != "xdf" || !bytes.Equal(back, js) {
+		t.Errorf("xdf with metadata to json: %v", m)
+	}
+	if _, m := call("convert", `{"to": "json", "meta": "`+meta+`"}`, js); m["error"] == nil {
+		t.Errorf("metadata file with json input: %v", m)
+	}
+	v, m := call("convert", `{"to": "json", "name": "a.xdf"}`, x)
+	var vm struct{ Provenance struct{ Format, File string } }
+	if err := json.Unmarshal(v, &vm); err != nil || vm.Provenance.Format != "xdf" || vm.Provenance.File != "a.xdf" {
+		t.Errorf("xdf alone to json: %v %v %+v", err, m, vm)
 	}
 }
 

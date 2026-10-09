@@ -225,7 +225,7 @@ func TestKPDefaultsFile(t *testing.T) {
 
 func TestKeys(t *testing.T) {
 	m := &Model{Objects: []*Object{{ID: "A"}, {ID: "-"}, {ID: "A"}, {ID: "-"}, {ID: " "}, {ID: "A#2"}}}
-	m.assignKeys()
+	m.AssignKeys()
 	var keys []string
 	for _, o := range m.Objects {
 		keys = append(keys, o.Key)

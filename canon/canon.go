@@ -76,15 +76,15 @@ func MarshalStamped(v any, tool string) ([]byte, error) {
 		return nil, fmt.Errorf("canon: stamped document must be an object")
 	}
 	delete(obj, StampKey)
-	var ds []any
-	for _, c := range canonical {
-		d, err := digest(c.text, obj)
-		if err != nil {
-			return nil, err
-		}
-		ds = append(ds, map[string]any{"canon": c.name, "digest": d})
+	ds, err := Digests(obj)
+	if err != nil {
+		return nil, err
 	}
-	obj[StampKey] = map[string]any{"digests": ds, "tool": tool}
+	st, err := tree(Stamp{ds, tool})
+	if err != nil {
+		return nil, err
+	}
+	obj[StampKey] = st
 	return render(obj), nil
 }
 

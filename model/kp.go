@@ -39,7 +39,7 @@ func FromKP(f *kp.File) *Model {
 	for _, km := range p.Maps {
 		m.Objects = append(m.Objects, objectFromKP(km, folders[km.FolderID]))
 	}
-	m.assignKeys()
+	m.AssignKeys()
 	return m
 }
 

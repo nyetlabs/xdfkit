@@ -1,5 +1,6 @@
 // Command xdfkit converts map definitions. So far it reads and writes WinOLS KP
-// files and the canonical model JSON or YAML (docs/model.md).
+// files, the canonical model JSON or YAML (docs/model.md) and TunerPro XDF
+// with its metadata file, and writes CSV map lists.
 package main
 
 import (
@@ -19,14 +20,14 @@ import (
 
 const usage = `usage:
   xdfkit [-f json|yaml|kp|csv|xdf] [-template orig.kp] [-i image] [-r ref]...
-         [-force] input [output]
+         [-meta file.meta.json] [-force] input [output]
   xdfkit verify file.json|file.yaml...
   xdfkit lint -i image [-family me7|m3] [-json findings.json] input
   xdfkit fix -i image (-o output | -n) [-rules R1,R2] [-only ID,...]
              [-min-confidence high|medium|low] [-findings findings.json] input
   xdfkit version
 
-Converts between KP and the model JSON or YAML, and writes CSV and XDF; the
+Converts between KP, XDF and the model JSON or YAML, and writes CSV; the
 input format is detected from the contents, the output format comes from -f,
 else the output extension (.yml is yaml), else json. YAML is the model JSON in
 YAML syntax, with the same typed numbers and stamp. Input "-" reads stdin;
@@ -37,7 +38,12 @@ JSON came from reproduces it), else from defaults. CSV output is
 mapdump's map list: -i adds the value ranges from the image, and each -r adds a
 column with the names of the matching maps in that KP, JSON or YAML definition.
 XDF output is TunerPro's format; -i adds the file region and the labels of
-"subtract" axes, and the definition title is the output file's name.
+"subtract" axes, and the definition title is the output file's name. An XDF
+output file comes with its metadata file, NAME.meta.json next to NAME.xdf,
+holding what XDF can't express. XDF input reads the metadata file given by
+-meta, else NAME.meta.json next to it if it exists; with it, an XDF unchanged
+since it was written converts back to the definition exactly, and edits made
+to it are reported.
 
 verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
 and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
@@ -238,6 +244,7 @@ func convert(args []string) error {
 	force := fs.Bool("force", false, "overwrite an existing output file")
 	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
 	image := fs.String("i", "", "flash image, for CSV value ranges and XDF")
+	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
 	var refs []string
 	fs.Func("r", "reference definition, for a CSV column of matching map names (repeatable)", func(s string) error {
 		refs = append(refs, s)
@@ -293,6 +300,16 @@ func convert(args []string) error {
 		}
 		req.Refs = append(req.Refs, api.Ref{Name: r, Data: b})
 	}
+	if *meta == "" && in != "-" && api.Detect(data) == api.XDF {
+		if _, err := os.Stat(metaName(in)); err == nil {
+			*meta = metaName(in)
+		}
+	}
+	if *meta != "" {
+		if req.Meta, err = os.ReadFile(*meta); err != nil {
+			return err
+		}
+	}
 	b, resp, err := api.Convert(data, req)
 	warn(in, resp.Warnings)
 	if err != nil {
@@ -301,7 +318,21 @@ func convert(args []string) error {
 	if out == "" {
 		out = "-"
 	}
-	return writeOutput(out, b, *force)
+	if resp.Meta == nil || out == "-" {
+		return writeOutput(out, b, *force)
+	}
+	if _, err := os.Stat(metaName(out)); err == nil && !*force {
+		return fmt.Errorf("%s exists (use -force)", metaName(out))
+	}
+	if err := writeOutput(out, b, *force); err != nil {
+		return err
+	}
+	return writeOutput(metaName(out), resp.Meta, *force)
+}
+
+// metaName is the metadata file next to an XDF: NAME.meta.json for NAME.xdf.
+func metaName(xdf string) string {
+	return strings.TrimSuffix(xdf, filepath.Ext(xdf)) + ".meta.json"
 }
 
 func verify(files []string) error {

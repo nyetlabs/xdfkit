@@ -243,7 +243,8 @@
         "format": {
           "description": "Source format.",
           "enum": [
-            "kp"
+            "kp",
+            "xdf"
           ],
           "type": "string"
         },

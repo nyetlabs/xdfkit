@@ -221,10 +221,6 @@ func float(f float64, bits int) (json.Number, error) {
 // literal with an exact whole value in range (16, 16.0, 1.6E1). Unknown object
 // fields are errors, except the top-level stamp. Errors name the JSON path.
 func Unmarshal(data []byte, v any) error {
-	rv := reflect.ValueOf(v)
-	if rv.Kind() != reflect.Pointer || rv.IsNil() {
-		return fmt.Errorf("canon: Unmarshal needs a non-nil pointer, not %T", v)
-	}
 	t, err := decode(data)
 	if err != nil {
 		return err
@@ -232,7 +228,7 @@ func Unmarshal(data []byte, v any) error {
 	if obj, ok := t.(map[string]any); ok {
 		delete(obj, StampKey)
 	}
-	return assign(t, rv.Elem(), "")
+	return FromTree(t, v)
 }
 
 func pathErr(path, format string, a ...any) error {

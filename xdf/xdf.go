@@ -243,14 +243,7 @@ func byAddress(m *model.Model) []*model.Object {
 // object is the XDFCONSTANT or XDFTABLE of o; index is its position in the
 // source, which numbers it.
 func object(o *model.Object, index int, catIndex map[int]int, image []byte) (any, error) {
-	title, desc := trim(o.Description), trim(o.Comment)
-	if o.ID != "" {
-		title, _, _ = strings.Cut(o.ID, " ")
-		desc = trim(o.Description)
-		if c := trim(o.Comment); c != "" {
-			desc += "\n" + c
-		}
-	}
+	title, desc := text(o)
 	cat := 0
 	if len(o.Categories) > 0 {
 		cat = catIndex[o.Categories[0]]
@@ -260,7 +253,7 @@ func object(o *model.Object, index int, catIndex map[int]int, image []byte) (any
 	prec := limitPrecision(o.Value, o.Data.Bits, o.Data.Signed)
 	if o.Shape == "value" {
 		return &constant{
-			UniqueID: uid, Title: trim(title), Description: desc, CategoryMem: mem,
+			UniqueID: uid, Title: title, Description: desc, CategoryMem: mem,
 			Data:       cells(o.Data, o.Address),
 			Units:      trim(o.Value.Units),
 			OutputType: outputType(prec, o.View.Base),
@@ -268,7 +261,7 @@ func object(o *model.Object, index int, catIndex map[int]int, image []byte) (any
 			Math:       formula(o.Value.Conversion),
 		}, nil
 	}
-	t := &table{UniqueID: uid, Flags: "0x0", Title: trim(title), Description: desc, CategoryMem: mem}
+	t := &table{UniqueID: uid, Flags: "0x0", Title: title, Description: desc, CategoryMem: mem}
 	for _, a := range []struct {
 		id   string
 		x    *model.Axis
@@ -302,12 +295,32 @@ func object(o *model.Object, index int, catIndex map[int]int, image []byte) (any
 	return t, nil
 }
 
+// text is the XDF title and description of o: the first word of its id and
+// its description plus comment, or without an id, its description and comment.
+func text(o *model.Object) (title, desc string) {
+	if o.ID == "" {
+		return trim(o.Description), trim(o.Comment)
+	}
+	title, _, _ = strings.Cut(o.ID, " ")
+	desc = trim(o.Description)
+	if c := trim(o.Comment); c != "" {
+		desc += "\n" + c
+	}
+	return trim(title), desc
+}
+
+// labels reports whether the writer gives axis x labels instead of an image
+// location (see breakpoints; "subtract" axes get labels only with an image).
+func labels(x *model.Axis) bool {
+	return x == nil || x.Source != "image" || x.Stored == "backwards"
+}
+
 // breakpoints is the XDFAXIS of a table's x or y axis: labels for axes not
 // read from the image (ordinal, editable, unknown, missing, "backwards") and
 // for "subtract" axes, else the breakpoints' image location.
 func breakpoints(id string, x *model.Axis, size int, image []byte) (axis, error) {
 	a := axis{ID: id, UniqueID: "0x0", IndexCount: &size, link: &link{}}
-	ordinal := x == nil || x.Source != "image" || x.Stored == "backwards"
+	ordinal := labels(x)
 	if !ordinal && (x.Address == nil || x.Data == nil) {
 		return a, fmt.Errorf("axis %s: image axis without address or storage", id)
 	}
