@@ -28,7 +28,9 @@ Corpus tests need the private `ecu-corpus` submodule (`docs/corpus.md`). With re
 
 ## WARNING
 
-This repo is under heavy development. It may not work as expected. DO NOT CLONE unless you are willing to do `git --hard reset origin/master` often, as the history here will be rewritten frequently.
+This repo is under heavy development. It may not work as expected. DO NOT CLONE unless you are willing to do `git reset --hard origin/master` often, as the history here will be rewritten frequently.
+
+There are no contracts: the CLI, the `api` package, the JSON model and schema, file formats, the corpus layout and its history are all subject to change without notice, documentation or compatibility guarantees.
 
 ## Licence
 

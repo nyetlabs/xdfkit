@@ -1,6 +1,6 @@
 # Map definition formats: field support
 
-Written 2026-10-07. KP v1/v2 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, v1, 4170 maps, and `8D0907551M.kp`, v2, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro XML (mapdump writes 1.50, TunerPro 5.00 saves 1.80), checked against TunerPro's version history up to 5.00.10305 (2026-01); WinOLS script per the "Importing with scripts" help topic (map creation only, write only); JSON/YAML is xdfkit's canonical model (`model.md`).
+Written 2026-10-07. KP v1/v2 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, v1, 4170 maps, and `8D0907551M.kp`, v2, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro XML (mapdump writes 1.50, TunerPro 5.00 saves 1.80), checked against TunerPro's version history up to 5.00.10305 (2026-01); WinOLS script per the "Importing with scripts" help topic (map creation only, write only); JSON/YAML is xdfkit's canonical model (`model.md`); its column is the target, and schema 1 holds only what the KP and XDF readers produce (no 3D, conversions beyond factor and offset, memory segments, checksums or shared axes yet).
 
 Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed (samples needed), `-` not applicable.
 
@@ -35,7 +35,7 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Conversion | Display base dec / hex / binary | Y: base field | Y: base 10/16/2; binary on codewords, e.g. CWMSRCAN | N | ? | P: dec/hex only | P: Radix 10 / 16; binary not documented | Y |
 | Conversion | Min / max limits | ?: range field is 0-255 on every map | ?: range varies per map (-13..42, 2..46); edit limits or stored data range? | Y: limits + EXTENDED_LIMITS | ? | Y: min / max | N: no property | Y |
 | Conversion | Difference / percent view vs original | Y: flags | Y: flags D, P | N | N | N | Y: bDelta / bProzent | Y |
-| Conversion | Unidentified per-map doubles | ?: header9a/10/11 hold doubles: 300.0, 1.0, -0.9 | ?: same blocks; 0.01, -2.7 also seen | - | - | - | - | Y: kept as raw hex in the per-source block until identified |
+| Conversion | Unidentified per-map doubles | ?: header9a/10/11 hold doubles: 300.0, 1.0, -0.9 | ?: same blocks; 0.01, -2.7 also seen | - | - | - | - | N: not in the model until identified; KP output takes them from a template KP or defaults |
 | Axes | Axis read from image | Y: datasource EEPROM | Y | Y: STD_AXIS / COM_AXIS | Y | Y: EMBEDDEDDATA | Y: DataSrc eRom | Y |
 | Axes | Per-axis type, sign, units, conversion | Y | Y | Y | Y | Y | Y: StuetzX/Y.* | Y |
 | Axes | Fixed axis values (not in image) | Y: '1,2,3' ordinal or 'Free editable'; axis block sized 4 bytes per point | Y: '1,2,3' ordinal; free-editable storage not located | Y: FIX_AXIS_PAR / _DIST / _LIST | ? | Y: static LABELs | P: DataSrc eUserdef, but no property for the values | Y |

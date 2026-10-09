@@ -23,6 +23,6 @@ Specification for embedding model data in an XDF comment block. Since 2026-10-07
   - `<note>` is informational only. The reader ignores it when building the model, and the writer regenerates notes on every export. Data never lives in a `<note>`.
   - Text and attribute values: any `-` immediately following another `-` is written as `&#45;`, so `a--b` becomes `a-&#45;b`. All non-ASCII is written as `&#xNNNN;`, so the payload doesn't depend on the XDF's encoding (TunerPro files are often Windows-1252).
   - Element and attribute names in the schema never contain `--`. The payload ends with `>` plus a newline, so the trailing-dash rule can't trigger.
-- One block, not one per table: there is only one extraction point, it is easy to strip, and it carries shared objects naturally. Each object in it keys on the same id used for the XDF `title`.
+- One block, not one per table: there is only one extraction point, it is easy to strip, and it carries shared objects naturally. Each object in it keys on its XDF `uniqueid`, like the metadata file.
 - Reading: the block is used like a metadata file when no `name.meta.json` exists, with the same digest-based merge rules. A warning is printed if the block's object ids no longer match the XDF tables.
 - Limitation (confirmed 2026-10-07): TunerPro loads an XDF with a 119 KB block after `XDFHEADER` normally, but a TunerPro save drops it, so the block survives only XDFs that TunerPro hasn't re-saved. The metadata file is the durable copy.

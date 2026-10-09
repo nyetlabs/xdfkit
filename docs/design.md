@@ -61,7 +61,7 @@ flowchart LR
 
 ## Repo layout
 
-- `cmd/xdfkit/` CLI: `xdfkit [-i image.bin] [--base 0x...] [-f json|yaml|kp|xdf] [--report f] input.{kp,a2l,dam,json,yaml,xdf} [out]`, with input format detected from the file contents (a leading `{` is JSON, a leading `<` is XDF, the KP signature is KP, anything else is YAML; output format from `-f`, else the output extension, `.yml` meaning YAML); `XXX2YYY` conversion commands (see Decisions, CLI naming); subcommands `xdfkit lint` and `xdfkit fix` (see Autocorrect)
+- `cmd/xdfkit/` CLI: `xdfkit [-i image.bin] [-f json|yaml|kp|csv|xdf] input.{kp,json,yaml,xdf} [out]` (planned: `--base 0x...`, `--report f`, A2L and DAMOS input), with input format detected from the file contents (a leading `{` is JSON, a leading `<` is XDF, the KP signature is KP, anything else is YAML; output format from `-f`, else the output extension, `.yml` meaning YAML); `XXX2YYY` conversion commands (see Decisions, CLI naming); subcommands `xdfkit lint` and `xdfkit fix` (see Autocorrect)
 - `api/`: the façade (typed `Convert`, `Verify`, `Version`, and the generic `Call(method, request, input)` that returns canonical JSON responses or `{"error": ...}` and recovers panics). The version string lives here (`api.Version`, set by the Makefile).
 - `internal/testenv`: test inputs (ecuxplot data, jq; skip, or fail with `XDFKIT_REQUIRE_DATA`).
 - `internal/corpus`: test access to the `ecu-corpus` submodule (manifest lookups by name or SHA-256, skip or fail when absent).
@@ -76,7 +76,7 @@ flowchart LR
 - KP to XDF matches `mapdump -x -i bin`, compared as parsed XML, for every publishable archived ecuxplot KP and its image, except the deliberate differences above (`go test ./xdf` with `XDFKIT_MAPDUMP_DIR` set to mapdump's output, as written by `make -C publish` before it switched to xdfkit).
 - KP to JSON to KP: byte-identical for v1; identical inflated block and container fields for v2 (the stage 1 gate).
 - Round trip: for every test input, input to JSON to model to JSON is identical, and JSON to YAML to JSON is identical. So is input to XDF (with embedded block) to model to JSON, including test strings containing `--`, `-->`, `<!--`, `]]>`, a trailing `-`, and non-ASCII. Notes are excluded from the comparison.
-- XDF plus metadata file to JSON equals the source JSON for every test input, with and without the image. Editing one table in the XDF flags exactly that object as edited (`go test ./xdf ./api`).
+- XDF plus metadata file to JSON equals the source JSON for every test input, with and without the image. Editing a table in the XDF makes the reader warn that the XDF is edited and reconcile each object with its metadata (`go test ./xdf ./api`).
 - Stamps: every output verifies clean under both digests; `jq -S 'del(.stamp)' f.json | shasum -a 256` equals the `jq -S .` digest and the RFC 8785 transform of `jq -c 'del(.stamp)'` hashes to the `RFC8785` one; changing any value flags `edited`; reindenting or reordering object keys doesn't; respelling a number flags `mixed`.
 - Feature-sweep samples: each variant's JSON differs from the base sample only in the field that was changed.
 - WinOLS 2.24 (checked by hand in the GUI): synthesized KP imports cleanly, by trial and error until it does. XDF checked in TunerPro.

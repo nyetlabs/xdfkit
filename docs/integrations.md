@@ -24,7 +24,7 @@ Decided 2026-10-07: Go modules use vanity paths on `go.nyet.org`, so a repo can 
 
 - The corpus tools module lives in a subdirectory so that fetching it never downloads the images. Because the repo is private, users set `GOPRIVATE=go.nyet.org/ecu-corpus` and need read access.
 - `xdfkit` is still a placeholder name; renaming the project changes its module path once more.
-- me7-logger's tags up to v0.0.2 still declare `module me7-logger`; xdfkit can depend on it once a tag with the `go.nyet.org` path exists.
+- me7-logger's tags from v0.0.3 declare `module go.nyet.org/me7-logger`; earlier tags declare `module me7-logger` and can't be imported by that path.
 - untyped's GitLab repo is private, so fetching `go.nyet.org/untyped` needs `GOPRIVATE` and GitLab access. xdfkit doesn't depend on it.
 
 ## Git clone URLs

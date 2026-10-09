@@ -58,7 +58,6 @@ Originals stay out of the corpus, but xdfkit's readers need them for regression 
 
 ### Policy
 
-- Append-only: history is never rewritten, because every consumer pins a commit.
 - Images are immutable: a changed image gets a new id. JSON files do change, through ordinary commits: hand fixes, and bulk regeneration when the schema or a reader improves. Bulk regeneration skips JSON with an edited stamp.
 - Schema versions: every JSON names its schema version. xdfkit reads older versions, or the corpus is regenerated in one commit per schema bump. Consumers pin a corpus commit and an xdfkit version that agree.
 - Canonical form (`jq -S .`, one value per line) keeps JSON diffs small and reviewable in git.
