@@ -2,9 +2,11 @@
 
 What is known about WinOLS map packs, as read by ecuxplot's mapdump (`org.nyet.mappack` in [ecuxplot](https://github.com/nyetlabs/ecuxplot)) and the Go port in `../kp/`. All integers are little-endian.
 
-Undecoded fields are named after the nearest preceding named field, plus `Unk`, plus their byte offset from the end of that field in uppercase hex, counted in the v2 layout (v1 lacks the v2-only fields but keeps the names): `YUnk29` starts 0x29 bytes after the map's Y axis record. With nothing named before them, the offset is from the start of the file (`Unk18`) or of the record (map `Unk00`). After an unnamed variable-length list the anchor is the list (`ListUnk00`, until it was named `DataHeader`). Raw regions are named for the region (`UnkHeader`, `UnkIntern`, `UnkTrailing`). JSON names start lower-case (`yUnk29`); `kp-defaults.json` uses them (`model.md`).
+Undecoded fields are named after the nearest preceding named field, plus `Unk`, plus their byte offset from the end of that field in uppercase hex, counted in the v2 layout (v1 lacks the v2-only fields but keeps the names): `StoredRowsUnk1B` starts 0x1B bytes after the map's `StoredRows`. A field named later re-anchors the placeholders after it (`YUnk29` became `StoredRowsUnk1B`). With nothing named before them, the offset is from the start of the file (`Unk18`) or of the record (map `Unk00`). After an unnamed variable-length list the anchor is the list (`ListUnk00`, until it was named `DataHeader`). Raw regions are named for the region (`UnkHeader`, `UnkIntern`, `UnkTrailing`). JSON names start lower-case (`storedRowsUnk1B`); `kp-defaults.json` uses them (`model.md`).
 
-`Unk` marks a placeholder: each should get a real name once its meaning is known. mapdump's `Parser.java` calls these fields `h`, `h1`, `h9a` and so on, and splits the map tail at different boundaries; the Go names replace those. A few named fields are still guesses and say so (`range`, `addr2`, `signatureByte`).
+`Unk` marks a placeholder: each should get a real name once its meaning is known. mapdump's `Parser.java` calls these fields `h`, `h1`, `h9a` and so on, and splits the map tail at different boundaries; the Go names replace those. A few named fields are still guesses and say so (`range`, `addr2`, `addr2ImageSize`, `signatureByte`, `viewScale`).
+
+The values quoted below for the placeholders come from a survey of the 13 archived packs (dated copies left out), `test8maps.kp` and the WinOLS 2.24 saves in `testdata/local/`, with their images: `XDFKIT_SURVEY=out.md go test ./kp -run TestSurvey` reports, per placeholder, the values per layout, how many files it varies within, and on records where it isn't the commonest value the named fields it equals and the other fields that change with it. Placeholders that are constant everywhere (`EndOffsetUnk00`, the project's `NameUnk*`, `VersionUnk*` and `MapsUnk00`, the folder's `NameUnk*`, map `IDUnk00`, `IDUnk04`, `ImageSizeUnk00`, `YUnk04`, axis `MirrorUnk00`) say nothing more until a WinOLS save changes them.
 
 ## Versions
 
@@ -34,7 +36,7 @@ Undecoded fields are named after the nearest preceding named field, plus `Unk`, 
   - v1: int32 count, then the map records.
   - v2: int32 zip length, then that many bytes of zip archive, then the folder table follows directly. (mapdump's `Project.java` rewinds to `start + zsize` and reads one int, which nets out to no extra field.) The zip holds one entry `intern`; its inflated content is one byte, int32 count, then the map records.
 - int32[3] `MapsUnk00` (the same in every pack).
-- Folders: int32 count, then per folder int32 id, int32 `IDUnk00` (0; 9000 and 9001 on one folder each in every pack), name string, 2 bytes `NameUnk00` (1, 1), int32 `NameUnk02` (0x1000000), (v2: 15 zero bytes `NameUnk06`). mapdump sorts folders by name, drops duplicate names and renumbers map folder ids; the Go reader keeps them raw.
+- Folders: int32 count, then per folder int32 id, int32 `BuiltIn` (9000 on the "My maps" folder and 9001 on "Hexdump" in every pack, 0 on all others), name string, 2 bytes `NameUnk00` (1, 1), int32 `NameUnk02` (0x1000000), (v2: 15 zero bytes `NameUnk06`). mapdump sorts folders by name, drops duplicate names and renumbers map folder ids; the Go reader keeps them raw.
 - Trailing bytes (not decoded; kept raw as `Project.UnkTrailing`).
 
 ## Round trip
@@ -65,7 +67,7 @@ Observed 2026-10-07. 8D0907551M.kp was imported into WinOLS 2.24 and exported fo
 - `Project.UnkTrailing` is the same kind of thing: 1214 bytes differ between the original and an export, about 40 between consecutive exports, and most of the changed words look like pointers. A few small values change as well, with unknown meaning.
 - Map end address: WinOLS writes start + byte length (one past the last byte) and recomputed it on 13 maps of the original whose stored ends were stale (TVCAMSR: start 90912, end 91094, rewritten as 90914). Stale ends are common in hand-edited packs (4Z7907551AA, 8D0907551K/M, 8D0907558M); lint rule R8 recomputes them (`autocorrect.md`), giving the same values as WinOLS on 8D0907551M.
 - Map `RowsUnk00` (int32[2]) changes only on maps opened during the session: KFWKSTAB went from 1, 1 to -1, 0 after its axis edit, the renamed map from 3, 3 to 1, 0, and KFNLLNST from -1, 2 to 0, 2 on import. Most values lie within the map's dimensions, so it is probably editor state such as the last cursor cell (unconfirmed).
-- WinOLS probably stores more per-map view state in the undecoded map fields (unconfirmed); its script interface has per-map `ViewMode` (text, 2D, 3D) and `RWin` (hex, bars) properties.
+- WinOLS probably stores more per-map view state in the undecoded map fields (unconfirmed): map `Unk00` and `ViewScale` (Map record) change with use; its script interface has per-map `ViewMode` (text, 2D, 3D) and `RWin` (hex, bars) properties.
 - The `intern` stream of every export is reproduced exactly by zlib at level 9, memLevel 8, as with the ecuxplot packs.
 - Exporting twice under the same name didn't replace the file: the second export was appended to the first. The file was saved over RDP drive redirection to a macOS folder, and a TunerPro save to the same folder also left the old file's tail in place, so the redirection may be at fault rather than WinOLS (unconfirmed). The value at 0x14 gave the combined length, `EndOffset` pointed at the first copy's end marker, and the second copy lacked the signature's 4-byte length prefix. `kp.Parse` reads the first copy and keeps the second in `UnkTrailing`.
 
@@ -73,40 +75,42 @@ Observed 2026-10-07. 8D0907551M.kp was imported into WinOLS 2.24 and exported fo
 
 Field order (v2-only fields marked), as declared in `kp.Map`:
 
-- byte `Unk00`; v2: int32 `Unk01` (-1), comment string, byte `CommentUnk00`
+- byte `Unk00` (0; 1 on a few dozen maps per v2 pack, and a different set in each WinOLS export of the same project, so editor state); v2: int32 `Unk01` (-1), comment string, byte `CommentUnk00` (0)
 - name string (long description)
-- int32 organisation, int32 `OrganizationUnk00`, int32 value type, int32 width, int32 display base, int32 folder id. The width equals the value type's width in bytes (1, 2, 4) on all 32,315 maps in ecuxplot's packs, so it is the element size (unconfirmed which of the two WinOLS reads).
+- int32 organisation, int32 `OrganizationUnk00` (2 in most packs; 0 on every map of 06A906032HS, 3 on most of 4D1907558, a few 0, 1 or 3 elsewhere; unknown, possibly the script's `ViewMode`), int32 value type, int32 width, int32 display base, int32 folder id. The width equals the value type's width in bytes (1, 2, 4) on all 32,315 maps in ecuxplot's packs, so it is the element size (unconfirmed which of the two WinOLS reads).
 - id string (short identifier; mapdump strips anything after a space or `?`)
-- int32 `IDUnk00`, byte `IDUnk04`; v2: int32 `IDUnk05`
-- int32[4] range (meaning unconfirmed; 0-255 on every v1 map, varies in v2)
-- int32[8] `RangeUnk00`
+- int32 `IDUnk00` (0), byte `IDUnk04` (0); v2: int32 `IDUnk05` (0 or 1, mostly the same within a pack; unknown)
+- int32[4] range (meaning unconfirmed): [low, 0, high, 0], 0 and 255 on almost every map; other pairs (0-256, 0-151, 22-178, 10-90) mostly in hand-edited packs
+- int32[8] `RangeUnk00`: two more groups. Elements 0 and 2 are 0 and 65535 on almost every map; on hand-edited maps other pairs, such as 170 and 8149, which is the raw minimum and maximum of KFMIRL's data in 8D0907551H and was copied to other maps with the map properties. Elements 6 and 7 are -1, 0 or 0, 1 (the latter on maps the user edited). Elements 1, 3 and 5 are always 0. Probably display or limit settings; unconfirmed.
 - bytes: reciprocal, signed, difference, percent
 - int32 columns, int32 rows (patchable)
 - int32[2] `RowsUnk00` (probably editor state, see WinOLS 2.24 exports), int32 precision
 - value block: description string, units string, float64 factor, float64 offset
 - int32 start address, int32 end address (start + byte length as WinOLS writes it; packs can hold stale values), int32 image size (0x100000 in most packs, 0x20000 in 8D0907558E, 0x40000 in 8D0907558M: the image length in all 16 ecuxplot packs, so taken as the image size); v2: int32[2] `ImageSizeUnk00`
-- int32 `addr2` (equals the start address on most maps, and on every map in 9 of the 16 packs), int32[2] `Addr2Unk00`, int32 `Addr2Unk08`, int32 `Addr2Unk0C`
+- int32 `addr2` (equals the start address on most maps, and on every map in 9 of the 16 packs), int32[2] `Addr2Unk00` (first -1 in every map of 8D0907551F, G, H, K and test8maps, else 0; second always 0), int32 `Addr2ImageSize` (the image length, or 0 in every map of a few packs; name guessed), int32 `Addr2ImageSizeUnk00` (0)
 - X axis record, Y axis record
 - The tail, 80 bytes in both layouts. Its fields and the values seen in ecuxplot's 32,315 maps:
 
 | Offset | Field | Type | Values |
 |---|---|---|---|
-| 0x00 | `YUnk00` | int32 | 0; 1 on 3 maps |
+| 0x00 | `YUnk00` | int32 | 0; 1 on TNMXH (8D0907551M) and KFLDS.0 (8D0907558M) |
 | 0x04 | `YUnk04` | int16 | 0 |
-| 0x06 | `YUnk06` | int32 | a dimension, see below |
-| 0x0A | `YUnk0A` | int32 | the other dimension |
-| 0x0E | `YUnk0E` | int32 | 1 or 3 |
-| 0x12 | `YUnk12` | byte[2] | 1, 1 |
-| 0x14 | `YUnk14` | float64[2] | 1.0, 1.0 on all but a few dozen maps |
-| 0x24 | `YUnk24` | int32 | -1 on all but 126 maps |
-| 0x28 | `YUnk28` | byte | 1; 0 on 10 maps |
-| 0x29 | `YUnk29` | float64[2] | 300.0, 1.0 on most maps; 0.0, 0.01 on about 1500 |
-| 0x39 | `YUnk39` | float64 | 0.0 on most maps; else values like 4.5511, 853.33, 655.36 |
-| 0x41 | `YUnk41` | int32 | -1 on 31,481 maps, as many as have `YUnk39` 0.0 (correlation unchecked) |
-| 0x45 | `YUnk45` | float64 | 0.0 on most maps; else values like -0.9, -180.0, 13.5, -0.0 |
+| 0x06 | `StoredCols` | int32 | columns in storage order, see below |
+| 0x0A | `StoredRows` | int32 | rows in storage order |
+| 0x0E | `StoredRowsUnk00` | int32 | 1 or 3 (3 on most of 8D0907551G and some hand-edited maps); unknown |
+| 0x12 | `StoredRowsUnk04` | byte[2] | 1, 1 |
+| 0x14 | `StoredRowsUnk06` | float64[2] | 1.0, 1.0 on all but a few dozen maps, all in hand-edited packs |
+| 0x24 | `StoredRowsUnk16` | int32 | -1 on all but about 80 maps (0, or values like 44415) |
+| 0x28 | `StoredRowsUnk1A` | byte | 1; 0 on 5 maps in 4D1907558 and 8D0907551M |
+| 0x29 | `StoredRowsUnk1B` | float64[2] | 300.0, 1.0 on most maps; 0.0, 0.01 on about 1700, many of them 1D maps in 06A906032HS; other pairs in hand-edited packs |
+| 0x39 | `ViewScale` | float64 | 0.0 on most maps, see below |
+| 0x41 | `ViewScaleUnk00` | int32 | -1 exactly where `ViewScale` is 0.0, else 0 or a value up to about 80000 |
+| 0x45 | `ViewOffset` | float64 | 0.0 or -0.0 on most maps, see below |
 | 0x4D | `Term2` | byte[3] | 1, 1, 1; the first two must be 1 |
 
-`YUnk06` and `YUnk0A` are the map's dimensions in ecuxplot's packs: columns then rows, except rows then columns on "2d Inverse" (18 single values hold other values). `YUnk39` and `YUnk45` look like a second factor and offset (unconfirmed). mapdump reads the tail as int32 and int16 chunks that straddle these floats.
+`StoredCols` and `StoredRows` are columns then rows, swapped on "2d Inverse" (column-major) maps: true on every map in the archived packs and the WinOLS 2.24 saves except 11 single values. xdfkit writes them that way.
+
+`ViewScale`, `ViewScaleUnk00` and `ViewOffset` are probably the display's automatic scaling, stored once a map has been shown (unconfirmed). They are non-default on exactly the same maps, mostly in hand-edited packs, and on single values follow the value: `ViewScale` is 2560 divided by a multiple of the value and `ViewOffset` -0.9 times that multiple (8D0907551M: CATR, value 1, 2560 and -0.9; CLAHSH, value 3, 853.33 and -2.7; CWGGPBKV, value 6, 426.67 and -5.4). An earlier guess that they are a second factor and offset doesn't hold. mapdump reads the tail as int32 and int16 chunks that straddle these floats.
 
 ## Axis record
 
@@ -115,8 +119,8 @@ Field order (v2-only fields marked), as declared in `kp.Map`:
 - int32 address (patchable; meaningful only for image data sources)
 - int32 value type, int32 width, int32 display base; mirror map flag (v2: int32, v1: byte; 0 or 1); v2: 9 zero bytes `MirrorUnk00`. The width equals the value type's width in bytes on all but 2 of the 64,630 axis records in ecuxplot's packs (NMAX and NMAXAL in 06A906032LP: single values with a stray defined u8 axis and width 4), so it is the element size, like the map's.
 - byte reciprocal, byte precision
-- 3 bytes `PrecisionUnk00` (zero; 0xff 0xff 0xff on some v2 unused slots), byte signed (patchable)
-- int32 byte length, then that many bytes of int32 `SignedUnk00` (always empty in v2; in v1 its length often but not always equals the axis point count)
+- 3 bytes `PrecisionUnk00` (zero; 0xff 0xff 0xff on the unused slots of 06A906032HS only), byte signed (patchable)
+- int32 byte length, then that many bytes of int32 `SignedUnk00`: always zeros. In v1 both axis records of a map hold as many as the map's `StoredRows` on almost every map; in v2 the list is empty, except on the two "free editable" Y axes of LDRXN in 4D1907558 (16 zeros). So possibly the values of a free editable axis (unconfirmed).
 - int32 `DataHeader` (was `ListUnk00`): likely the script property `DataHeader`, the number of header bytes before the axis data (surveyed 2026-10-08 over the 12 OEM pack/image pairs): it is 0, 1, 2 or 4, and where it isn't 0 the bytes just before the axis hold the point count in 215 of 217 1-byte headers on byte axes, 544 of 619 2-byte headers on byte axes (the M3.82 [variable id][count] header gives 2 on 462 of 468 such axes in 8D0907558E) and 113 of 130 2-byte headers on word axes. 4-byte headers on word axes match only 28 of 84, maybe [X count][Y count]. Many axes with a header in the image have 0, so it is a setting, not detected.
 - int32 `SignatureByte`: likely the script property `SignaturByte` (marker byte before the axis, `0xFFFFFFFF` for none; `winols-script.md`). -1 is the commonest value in every pack. In 8D0907558E (M3.82), 468 of the 477 image axes with another value have that byte two bytes before the axis, which is the variable id of the [variable id][count] header; the match is weaker in 8D0907558M (49 of 311) and in the ME7 packs, so the exact rule is unconfirmed.
 - Every map stores both axis records. The organisation says which are used: X for 1D, X and Y for 2D, none for a single value. WinOLS 2.24 goes by the organisation alone, not by what the unused slot holds (confirmed 2026-10-08): NMAXAL in 06A906032LP, a single value whose slots hold eeprom axes, shows no axes, and "16 bit KFZW load axis patch #1" in 8D0907551M, a 1D map with an ordinal Y slot, shows only its ordinal X axis. The unused slots are still stored, often with the mirror flag set (and precision 0xff in v2). The flag is WinOLS 2.24's "mirror map" axis setting, not an "undefined" marker (confirmed 2026-10-08: on in 8D0907551F for KFZW's X axis, off for its Y and for both in 8D0907551G). 8D0907551F sets it on every X axis (724), 8D0907551K on 24 and 8D0907551H on 4, and WinOLS shows those axes. `OLS_LangE.dll` labels it "&Mirror map" in both the X-Axis and Y-Axis dialogs; the script property `bRueckwaerts` ("mirror the data", `winols-script.md`) may be the same setting (unconfirmed). It doesn't mean reversed storage: the mirrored eeprom axes in 8D0907551F and 8D0907551K increase in the image like the others (664 of 704, the rest not monotonic). WinOLS shows a mirrored axis in descending order (8D0907551F KFZW: X stored 512 to 8534, shown from 8534 down; confirmed 2026-10-08), so it is a display reversal along that axis, not an X/Y swap. The map's cells are shown reversed with it, so the map displays correctly (confirmed 2026-10-08). mapdump's CSV and XDF treat the flag as "undefined" and drop those axes' units and scale, and print the scale of unused slots that don't have it, so the archived CSVs of most packs differ from CSVs made from xdfkit's KP output in those columns.

@@ -3,7 +3,7 @@
 // v2 (header 0x124/0x149, maps in a deflated zip entry named "intern").
 //
 // Undecoded fields are named after the preceding named field plus Unk plus
-// their hex byte offset from its end in the v2 layout (YUnk29), or Unk plus the
+// their hex byte offset from its end in the v2 layout (StoredRowsUnk1B), or Unk plus the
 // offset from the start of the file header or a record when nothing named
 // precedes them (Unk18); raw regions are named for the region (UnkHeader,
 // UnkTrailing). docs/kp-format.md has the details. Each should get a real name
@@ -64,7 +64,7 @@ type Project struct {
 
 type Folder struct {
 	ID        int32  `json:"id"`
-	IDUnk00   int32  `json:"idUnk00"`
+	BuiltIn   int32  `json:"builtIn"` // 9000 on "My maps", 9001 on "Hexdump", else 0
 	Name      string `json:"name"`
 	NameUnk00 Hex    `json:"nameUnk00" kp:"len=2"`
 	NameUnk02 int32  `json:"nameUnk02"`

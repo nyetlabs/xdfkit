@@ -10,11 +10,11 @@
       "nameUnk02": "0x1000000"
     },
     "map": {
+      "addr2ImageSize": "0x100000",
       "addr2Unk00": [
         -1,
         0
       ],
-      "addr2Unk08": "0x100000",
       "imageSize": "0x100000",
       "organizationUnk00": 2,
       "range": [
@@ -33,22 +33,22 @@
         -1,
         0
       ],
-      "yUnk0E": 1,
-      "yUnk12": [
+      "storedRowsUnk00": 1,
+      "storedRowsUnk04": [
         1,
         1
       ],
-      "yUnk14": [
+      "storedRowsUnk06": [
         1.0,
         1.0
       ],
-      "yUnk24": -1,
-      "yUnk28": 1,
-      "yUnk29": [
+      "storedRowsUnk16": -1,
+      "storedRowsUnk1A": 1,
+      "storedRowsUnk1B": [
         300.0,
         1.0
       ],
-      "yUnk41": -1
+      "viewScaleUnk00": -1
     },
     "slot": {
       "base": 16,
@@ -70,7 +70,7 @@
       "nameUnk02": "0x1000000"
     },
     "map": {
-      "addr2Unk08": "0x100000",
+      "addr2ImageSize": "0x100000",
       "idUnk05": 1,
       "imageSize": "0x100000",
       "organizationUnk00": 2,
@@ -90,23 +90,23 @@
         -1,
         0
       ],
-      "unk01": -1,
-      "yUnk0E": 1,
-      "yUnk12": [
+      "storedRowsUnk00": 1,
+      "storedRowsUnk04": [
         1,
         1
       ],
-      "yUnk14": [
+      "storedRowsUnk06": [
         1.0,
         1.0
       ],
-      "yUnk24": -1,
-      "yUnk28": 1,
-      "yUnk29": [
+      "storedRowsUnk16": -1,
+      "storedRowsUnk1A": 1,
+      "storedRowsUnk1B": [
         300.0,
         1.0
       ],
-      "yUnk41": -1
+      "unk01": -1,
+      "viewScaleUnk00": -1
     },
     "slot": {
       "base": 16,

@@ -3,57 +3,57 @@ package kp
 // Map is one map definition. Fields are in file order (see codec for the tags).
 // Undecoded fields are named as described in the package doc.
 type Map struct {
-	Index             int        `json:"index" kp:"-"`
-	Unk00             byte       `json:"unk00"`
-	Unk01             int32      `json:"unk01,omitzero" kp:"v2"`
-	Comment           string     `json:"comment,omitzero" kp:"v2"`
-	CommentUnk00      byte       `json:"commentUnk00,omitzero" kp:"v2"`
-	Name              string     `json:"name"`
-	Organization      Org        `json:"organization"`
-	OrganizationUnk00 int32      `json:"organizationUnk00"`
-	Type              Type       `json:"type"`
-	Width             int32      `json:"width"` // element size in bytes; equals Type's width in every known pack
-	Base              int32      `json:"base"`
-	FolderID          int32      `json:"folderId"`
-	ID                string     `json:"id"`
-	IDUnk00           int32      `json:"idUnk00"`
-	IDUnk04           byte       `json:"idUnk04"`
-	IDUnk05           int32      `json:"idUnk05,omitzero" kp:"v2"`
-	Range             [4]int32   `json:"range"` // meaning unconfirmed
-	RangeUnk00        [8]int32   `json:"rangeUnk00"`
-	Reciprocal        bool       `json:"reciprocal"`
-	Signed            bool       `json:"signed"`
-	Difference        bool       `json:"difference"`
-	Percent           bool       `json:"percent"`
-	Cols              int32      `json:"cols"`
-	Rows              int32      `json:"rows"`
-	RowsUnk00         [2]int32   `json:"rowsUnk00"` // probably editor state (docs/kp-format.md)
-	Precision         int32      `json:"precision"`
-	Value             Value      `json:"value"`
-	Start             uint32     `json:"start"`
-	End               uint32     `json:"end"`
-	ImageSize         int32      `json:"imageSize"` // matches the image length in every known pack
-	ImageSizeUnk00    [2]int32   `json:"imageSizeUnk00,omitzero" kp:"v2"`
-	Addr2             uint32     `json:"addr2"` // meaning unconfirmed
-	Addr2Unk00        [2]int32   `json:"addr2Unk00"`
-	Addr2Unk08        int32      `json:"addr2Unk08"`
-	Addr2Unk0C        int32      `json:"addr2Unk0C"`
-	X                 *Axis      `json:"x"`
-	Y                 *Axis      `json:"y"`
-	YUnk00            int32      `json:"yUnk00"`
-	YUnk04            int16      `json:"yUnk04"`
-	YUnk06            int32      `json:"yUnk06"` // with YUnk0A, the dimensions in an order that varies (docs/kp-format.md)
-	YUnk0A            int32      `json:"yUnk0A"`
-	YUnk0E            int32      `json:"yUnk0E"`
-	YUnk12            [2]byte    `json:"yUnk12"`
-	YUnk14            [2]float64 `json:"yUnk14"`
-	YUnk24            int32      `json:"yUnk24"`
-	YUnk28            byte       `json:"yUnk28"`
-	YUnk29            [2]float64 `json:"yUnk29"`
-	YUnk39            float64    `json:"yUnk39"`
-	YUnk41            int32      `json:"yUnk41"`
-	YUnk45            float64    `json:"yUnk45"`
-	Term2             Hex        `json:"term2" kp:"len=3"` // first two bytes are always 1
+	Index               int        `json:"index" kp:"-"`
+	Unk00               byte       `json:"unk00"` // editor state: changes between exports of the same project
+	Unk01               int32      `json:"unk01,omitzero" kp:"v2"`
+	Comment             string     `json:"comment,omitzero" kp:"v2"`
+	CommentUnk00        byte       `json:"commentUnk00,omitzero" kp:"v2"`
+	Name                string     `json:"name"`
+	Organization        Org        `json:"organization"`
+	OrganizationUnk00   int32      `json:"organizationUnk00"`
+	Type                Type       `json:"type"`
+	Width               int32      `json:"width"` // element size in bytes; equals Type's width in every known pack
+	Base                int32      `json:"base"`
+	FolderID            int32      `json:"folderId"`
+	ID                  string     `json:"id"`
+	IDUnk00             int32      `json:"idUnk00"`
+	IDUnk04             byte       `json:"idUnk04"`
+	IDUnk05             int32      `json:"idUnk05,omitzero" kp:"v2"`
+	Range               [4]int32   `json:"range"` // meaning unconfirmed
+	RangeUnk00          [8]int32   `json:"rangeUnk00"`
+	Reciprocal          bool       `json:"reciprocal"`
+	Signed              bool       `json:"signed"`
+	Difference          bool       `json:"difference"`
+	Percent             bool       `json:"percent"`
+	Cols                int32      `json:"cols"`
+	Rows                int32      `json:"rows"`
+	RowsUnk00           [2]int32   `json:"rowsUnk00"` // probably editor state (docs/kp-format.md)
+	Precision           int32      `json:"precision"`
+	Value               Value      `json:"value"`
+	Start               uint32     `json:"start"`
+	End                 uint32     `json:"end"`
+	ImageSize           int32      `json:"imageSize"` // matches the image length in every known pack
+	ImageSizeUnk00      [2]int32   `json:"imageSizeUnk00,omitzero" kp:"v2"`
+	Addr2               uint32     `json:"addr2"` // meaning unconfirmed
+	Addr2Unk00          [2]int32   `json:"addr2Unk00"`
+	Addr2ImageSize      int32      `json:"addr2ImageSize"` // guessed: the image length, or 0
+	Addr2ImageSizeUnk00 int32      `json:"addr2ImageSizeUnk00"`
+	X                   *Axis      `json:"x"`
+	Y                   *Axis      `json:"y"`
+	YUnk00              int32      `json:"yUnk00"`
+	YUnk04              int16      `json:"yUnk04"`
+	StoredCols          int32      `json:"storedCols"` // Cols and Rows in storage order: swapped on 2d-inverse maps
+	StoredRows          int32      `json:"storedRows"`
+	StoredRowsUnk00     int32      `json:"storedRowsUnk00"`
+	StoredRowsUnk04     [2]byte    `json:"storedRowsUnk04"`
+	StoredRowsUnk06     [2]float64 `json:"storedRowsUnk06"`
+	StoredRowsUnk16     int32      `json:"storedRowsUnk16"`
+	StoredRowsUnk1A     byte       `json:"storedRowsUnk1A"`
+	StoredRowsUnk1B     [2]float64 `json:"storedRowsUnk1B"`
+	ViewScale           float64    `json:"viewScale"` // probably view state: the display's auto scale, 0 until set
+	ViewScaleUnk00      int32      `json:"viewScaleUnk00"`
+	ViewOffset          float64    `json:"viewOffset"`       // probably view state, with ViewScale
+	Term2               Hex        `json:"term2" kp:"len=3"` // first two bytes are always 1
 }
 
 func (m *Map) check(c *codec) {

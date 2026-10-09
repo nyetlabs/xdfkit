@@ -259,12 +259,12 @@ func (o *Object) kpMap(i int) *kp.Map {
 		Addr2:        uint32(o.Address),
 		X:            o.X.kpAxis(),
 		Y:            o.Y.kpAxis(),
-		YUnk06:       int32(o.Cols),
-		YUnk0A:       int32(o.Rows),
+		StoredCols:   int32(o.Cols),
+		StoredRows:   int32(o.Rows),
 		Term2:        kp.Hex{1, 1, 1},
 	}
 	if o.Inverse {
-		km.YUnk06, km.YUnk0A = km.YUnk0A, km.YUnk06
+		km.StoredCols, km.StoredRows = km.StoredRows, km.StoredCols
 	}
 	if len(o.Categories) > 0 {
 		km.FolderID = int32(o.Categories[0])
