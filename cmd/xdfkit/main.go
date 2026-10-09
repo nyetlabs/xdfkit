@@ -27,6 +27,8 @@ const usage = `usage:
   xdfkit fix -i image (-o output | -n) [-rules R1,R2] [-only ID,...]
              [-min-confidence high|medium|low] [-findings findings.json] input
   xdfkit version
+  xdfkit xdf2kp|kp2json FILE...
+  xdfkit kp2xdf [-i image] [-m] FILE...
 
 Converts between KP, XDF and the model JSON or YAML, and writes CSV; the
 input format is detected from the contents, the output format comes from -f,
@@ -52,6 +54,13 @@ a corpus source). -tuner keeps only the maps named in a category table (the
 corpus categories.json) and the objects their axes point at, filed under the
 table's categories.
 
+xdf2kp, kp2xdf and kp2json convert each FILE to the same name with the .kp,
+.xdf or .json extension, next to it, and reject input of another format. They
+never replace an existing file. kp2xdf's -i is the flash image, as above; -m
+also writes the metadata file, without which the XDF doesn't convert back
+exactly. A link named kp2xdf (the release archives have them) is the same as
+xdfkit kp2xdf.
+
 verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
 and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
 
@@ -68,7 +77,15 @@ func main() {
 		fmt.Fprintln(os.Stderr, "xdfkit:", err)
 		os.Exit(1)
 	}
+	if name, ok := alias(os.Args[0]); ok {
+		os.Exit(runAlias(name, os.Args[1:]))
+	}
 	args := os.Args[1:]
+	if len(args) > 0 {
+		if _, ok := aliases[args[0]]; ok {
+			os.Exit(runAlias(args[0], args[1:]))
+		}
+	}
 	if len(args) == 1 && (args[0] == "version" || args[0] == "-version" || args[0] == "--version") {
 		fmt.Println(api.Version)
 		return
@@ -288,10 +305,7 @@ func convert(args []string) error {
 	if in == "-" {
 		name = ""
 	}
-	req := api.ConvertRequest{To: *format, Name: name, Origin: *origin}
-	if *format == api.XDF && out != "" && out != "-" {
-		req.Title = strings.TrimSuffix(filepath.Base(out), filepath.Ext(out))
-	}
+	req := api.ConvertRequest{To: *format, Name: name, Origin: *origin, Title: xdfTitle(*format, out)}
 	if *template != "" {
 		if req.Template, err = os.ReadFile(*template); err != nil {
 			return err
@@ -314,15 +328,13 @@ func convert(args []string) error {
 		}
 		req.Refs = append(req.Refs, api.Ref{Name: r, Data: b})
 	}
-	if *meta == "" && in != "-" && api.Detect(data) == api.XDF {
-		if _, err := os.Stat(metaName(in)); err == nil {
-			*meta = metaName(in)
-		}
-	}
 	if *meta != "" {
-		if req.Meta, err = os.ReadFile(*meta); err != nil {
-			return err
-		}
+		req.Meta, err = os.ReadFile(*meta)
+	} else if in != "-" && api.Detect(data) == api.XDF {
+		req.Meta, err = readMeta(in)
+	}
+	if err != nil {
+		return err
 	}
 	b, resp, err := api.Convert(data, req)
 	warn(in, resp.Warnings)
@@ -332,21 +344,44 @@ func convert(args []string) error {
 	if out == "" {
 		out = "-"
 	}
-	if resp.Meta == nil || out == "-" {
-		return writeOutput(out, b, *force)
-	}
-	if _, err := os.Stat(metaName(out)); err == nil && !*force {
-		return fmt.Errorf("%s exists (use -force)", metaName(out))
-	}
-	if err := writeOutput(out, b, *force); err != nil {
-		return err
-	}
-	return writeOutput(metaName(out), resp.Meta, *force)
+	return writeConverted(out, b, resp.Meta, *force)
 }
 
 // metaName is the metadata file next to an XDF: NAME.meta.json for NAME.xdf.
 func metaName(xdf string) string {
 	return strings.TrimSuffix(xdf, filepath.Ext(xdf)) + ".meta.json"
+}
+
+// readMeta reads the metadata file next to an XDF, or nil if there is none.
+func readMeta(xdf string) ([]byte, error) {
+	b, err := os.ReadFile(metaName(xdf))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	return b, err
+}
+
+// xdfTitle is the definition title of XDF output to a file: the file's name.
+func xdfTitle(format, out string) string {
+	if format != api.XDF || out == "" || out == "-" {
+		return ""
+	}
+	return strings.TrimSuffix(filepath.Base(out), filepath.Ext(out))
+}
+
+// writeConverted writes the output and, unless it goes to stdout, the
+// metadata file next to it.
+func writeConverted(out string, b, meta []byte, force bool) error {
+	if meta == nil || out == "-" {
+		return writeOutput(out, b, force)
+	}
+	if _, err := os.Stat(metaName(out)); err == nil && !force {
+		return fmt.Errorf("%s exists (use -force)", metaName(out))
+	}
+	if err := writeOutput(out, b, force); err != nil {
+		return err
+	}
+	return writeOutput(metaName(out), meta, force)
 }
 
 func verify(files []string) error {

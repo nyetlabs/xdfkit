@@ -63,6 +63,8 @@ jobs:
         run: make test
       - name: make build
         run: make build
+      - name: make check-links
+        run: make check-links
       - uses: actions/upload-artifact@v7
         with:
           name: xdfkit
