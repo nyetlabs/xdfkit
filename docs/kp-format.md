@@ -2,11 +2,11 @@
 
 What is known about WinOLS map packs, as read by ecuxplot's mapdump (`org.nyet.mappack` in [ecuxplot](https://github.com/nyetlabs/ecuxplot)) and the Go port in `../kp/`. All integers are little-endian.
 
-Undecoded fields are named after the nearest preceding named field, plus `Unk`, plus their byte offset from the end of that field in uppercase hex, counted in the v2 layout (v1 lacks the v2-only fields but keeps the names): `StoredRowsUnk1B` starts 0x1B bytes after the map's `StoredRows`. A field named later re-anchors the placeholders after it (`YUnk29` became `StoredRowsUnk1B`). With nothing named before them, the offset is from the start of the file (`Unk18`) or of the record (map `Unk00`). After an unnamed variable-length list the anchor is the list (`ListUnk00`, until it was named `DataHeader`). Raw regions are named for the region (`UnkHeader`, `UnkIntern`, `UnkTrailing`). JSON names start lower-case (`storedRowsUnk1B`); `kp-defaults.json` uses them (`model.md`).
+Undecoded fields are named after the nearest preceding named field, plus `Unk`, plus their byte offset from the end of that field in uppercase hex, counted in the v2 layout (v1 lacks the v2-only fields but keeps the names): `StoredRowsUnk1B` starts 0x1B bytes after the map's `StoredRows`. Naming a field re-anchors the placeholders after it. With nothing named before them, the offset is from the start of the file (`Unk18`) or of the record (map `Unk00`). After an unnamed variable-length list the anchor is the list. Raw regions are named for the region (`UnkHeader`, `UnkIntern`, `UnkTrailing`). JSON names start lower-case (`storedRowsUnk1B`); `kp-defaults.json` uses them (`model.md`).
 
-`Unk` marks a placeholder: each should get a real name once its meaning is known. mapdump's `Parser.java` calls these fields `h`, `h1`, `h9a` and so on, and splits the map tail at different boundaries; the Go names replace those. A few named fields are still guesses and say so (`range`, `addr2`, `addr2ImageSize`, `signatureByte`, `viewScale`).
+`Unk` names are placeholders until the meaning is known (they replace mapdump's `h`, `h1`, `h9a`, which split the map tail differently). Guessed names say so: `range`, `addr2`, `addr2ImageSize`, `signatureByte`, `viewScale`.
 
-The values quoted below for the placeholders come from a survey of the 13 archived packs (dated copies left out), `test8maps.kp` and the WinOLS 2.24 saves in `testdata/local/`, with their images: `XDFKIT_SURVEY=out.md go test ./kp -run TestSurvey` reports, per placeholder, the values per layout, how many files it varies within, and on records where it isn't the commonest value the named fields it equals and the other fields that change with it. Placeholders that are constant everywhere (`EndOffsetUnk00`, the project's `NameUnk*`, `VersionUnk*` and `MapsUnk00`, the folder's `NameUnk*`, map `IDUnk00`, `IDUnk04`, `ImageSizeUnk00`, `YUnk04`, axis `MirrorUnk00`) say nothing more until a WinOLS save changes them.
+Placeholder values below come from a survey (`XDFKIT_SURVEY=out.md go test ./kp -run TestSurvey`) of the 13 archived packs, `test8maps.kp` and the WinOLS 2.24 saves in `testdata/local/`, with their images: values per layout, how many files each varies within, and which named fields it equals or changes with. Constant everywhere, so only a WinOLS save can tell more: `EndOffsetUnk00`, project `NameUnk*`, `VersionUnk*`, `MapsUnk00`, folder `NameUnk*`, map `IDUnk00`, `IDUnk04`, `ImageSizeUnk00`, `YUnk04`, axis `MirrorUnk00`.
 
 ## Versions
 
@@ -18,7 +18,7 @@ The values quoted below for the placeholders come from a survey of the 13 archiv
 - All 11 v2 packs in ecuxplot's data use 0x124; 0x149 is accepted by mapdump but not seen in them.
 - Every KP in ecuxplot's data ends with the same 4 bytes `33 88 72 98`, so that is a constant, not a checksum.
 - WinOLS 2.24 is `2.24.00` (string in `ols_32on32.exe`). It writes v2 with header id 0x124 and the version string "OLS 5.0 (Windows)" (see WinOLS 2.24 exports).
-- WinOLS 5 KP files are known not to load in WinOLS 4. The free WinOLS 5 demo (5.87, Windows 11 ARM under UTM) imports v1 and v2 KP files, including ones written by xdfkit (confirmed 2026-10-07). The demo can't save anything, so it can check imports but produce no samples.
+- WinOLS 5 KP files are known not to load in WinOLS 4. The free WinOLS 5 demo (5.87, Windows 11 ARM under UTM) imports v1 and v2 KP files, including ones written by xdfkit (confirmed). The demo can't save anything, so it can check imports but produce no samples.
 
 ## Strings
 
@@ -30,7 +30,7 @@ The values quoted below for the placeholders come from a survey of the 13 archiv
 - Signature string ("WinOLS File"), int32 header id, int32 header length.
 - Seek to the fixed header end (0x5c or 0x60): filename string, version string.
 - Undecoded header, with three int32 `-1` terminators (four in v2), kept raw as `File.UnkHeader`. The exact walk is in `kp.walkHeader` and mapdump's `Parser.parseHeader`. The bytes from 0x18 (after the header length) to the fixed header end are kept raw as `File.Unk18`.
-- The last 16 bytes of the header, in both layouts: int32 `File.EndOffset`, the absolute offset of the end marker `33 88 72 98` (file length - 4; true in all 16 ecuxplot packs), then 12 bytes kept raw as `File.EndOffsetUnk00` (`00000000 99780042 02000000` in every pack). WinOLS 2.24 uses the offset: a file whose length changed without updating it imports, but raises WinOLS's crash-report dialog (2026-10-07).
+- The last 16 bytes of the header, in both layouts: int32 `File.EndOffset`, the absolute offset of the end marker `33 88 72 98` (file length - 4; true in all 16 ecuxplot packs), then 12 bytes kept raw as `File.EndOffsetUnk00` (`00000000 99780042 02000000` in every pack). WinOLS 2.24 uses the offset: a file whose length changed without updating it imports, but raises WinOLS's crash-report dialog.
 - Project: name string, int32[4] `NameUnk00`, (v2: 4 bytes `NameUnk10`, 0), version string, int32[4] `VersionUnk00`, (v2: 4 bytes `VersionUnk10`, 0), int32 `VersionUnk14`, (v2: one byte `VersionUnk18`). Each holds the same value in every ecuxplot pack.
 - Maps:
   - v1: int32 count, then the map records.
@@ -43,7 +43,7 @@ The values quoted below for the placeholders come from a survey of the 13 archiv
 
 `kp.Parse` and `File.Encode` share one layout walk (`kp/codec.go`), and every byte is either a field or a raw `Hex` block. The record layouts are the Go structs themselves: fields are coded in declaration order by reflection, with `kp:"..."` struct tags for layout-only fields (`v1`, `v2`), raw lengths (`len=N`), count- or byte-length-prefixed lists (`count`, `bytes`), the trailing bytes (`rest`) and hand-coded fields (`hook`: the fixed header, the header walk and the v2 map block). The tag grammar is documented at the top of `codec.go`.
 
-`File.Offsets(paths...)` returns where fields are stored, by JSON path (`project.maps[3].x.dataSource`), in one walk: in the file, or for v2 maps in the inflated map block. `File.Offset(path)` is the single-path form. It was built for a byte-patching writer, which the round-trip writer made unnecessary; nothing uses it yet. Decoding fails on anything that couldn't be re-encoded identically: a bool byte other than 0/1, a string without its NUL, an axis list length that isn't a multiple of 4, or bytes left over after the v2 maps. Encode recomputes the v2 file length at 0x14 and `EndOffset`, and stores both back into the `File`.
+`File.Offsets(paths...)` (and single-path `File.Offset`) returns where fields are stored by JSON path (`project.maps[3].x.dataSource`), in the file or the inflated v2 map block; currently unused. Decoding fails on anything that couldn't be re-encoded identically: a bool byte other than 0/1, a string without its NUL, an axis list length not a multiple of 4, bytes left after the v2 maps. Encode recomputes the v2 length at 0x14 and `EndOffset` and stores them back into the `File`.
 
 - Parse then Encode is byte-identical for all 16 ecuxplot packs. For v2 the original zip is reused while the map block is unchanged.
 - KP to JSON to KP: byte-identical for v1. For v2 the map block is re-deflated (Go `compress/flate`, level 9). The inflated block, everything before the zip (except 0x14 and `EndOffset`) and everything after it are identical. Re-deflated zips land within about 0.4% of the original size.
@@ -51,15 +51,15 @@ The values quoted below for the placeholders come from a survey of the 13 archiv
 
 ## v2 zip container
 
-Verified 2026-10-07 on all 11 v2 packs in ecuxplot's data:
+Verified on all 11 v2 packs in ecuxplot's data:
 
 - One local file entry `intern`, method 8 (deflate), general-purpose flag 2, DOS date and time zero, version 20.
 - The stored stream is reproduced exactly by zlib 1.2.x raw deflate at level 9, memLevel 8, window 15. WinOLS 2.24 links zlib 1.2.3 statically.
-- The Go implementation uses `compress/flate` (pure Go, decided), whose output differs. A re-encoded v2 file therefore has a different compressed stream, sizes and CRC; the outer zip length int, the file length at 0x14 and `EndOffset` must be updated. WinOLS 2.24 imports such files cleanly (confirmed 2026-10-07 on a re-zipped and a lint-fixed 8D0907551M; before `EndOffset` was updated, the import raised WinOLS's crash-report dialog).
+- xdfkit uses Go `compress/flate`, whose stream differs, so the zip length, the length at 0x14 and `EndOffset` must be updated. WinOLS 2.24 imports such files (re-zipped and lint-fixed 8D0907551M); with a stale `EndOffset` it raises its crash-report dialog.
 
 ## WinOLS 2.24 exports
 
-Observed 2026-10-07. 8D0907551M.kp was imported into WinOLS 2.24 and exported four times: unchanged, unchanged again, with KFWKSTAB X set to "EEPROM", and with KFLDRQ2 also renamed. A new project with no maps was exported as well. Compared with the original pack:
+8D0907551M.kp was imported into WinOLS 2.24 and exported four times: unchanged, unchanged again, with KFWKSTAB X set to "EEPROM", and with KFLDRQ2 also renamed. A new project with no maps was exported as well. Compared with the original pack:
 
 - Header id 0x124, version string "OLS 5.0 (Windows)". The filename string is the name the file was exported under, usually upper-cased (`W1.KP`).
 - The project's `NameUnk00`, `VersionUnk00`, `VersionUnk14` and `MapsUnk00` are identical in every export, including the empty project.
@@ -69,7 +69,7 @@ Observed 2026-10-07. 8D0907551M.kp was imported into WinOLS 2.24 and exported fo
 - Map `RowsUnk00` (int32[2]) changes only on maps opened during the session: KFWKSTAB went from 1, 1 to -1, 0 after its axis edit, the renamed map from 3, 3 to 1, 0, and KFNLLNST from -1, 2 to 0, 2 on import. Most values lie within the map's dimensions, so it is probably editor state such as the last cursor cell (unconfirmed).
 - WinOLS probably stores more per-map view state in the undecoded map fields (unconfirmed): map `Unk00` and `ViewScale` (Map record) change with use; its script interface has per-map `ViewMode` (text, 2D, 3D) and `RWin` (hex, bars) properties.
 - The `intern` stream of every export is reproduced exactly by zlib at level 9, memLevel 8, as with the ecuxplot packs.
-- Exporting twice under the same name didn't replace the file: the second export was appended to the first. The file was saved over RDP drive redirection to a macOS folder, and a TunerPro save to the same folder also left the old file's tail in place, so the redirection may be at fault rather than WinOLS (unconfirmed). The value at 0x14 gave the combined length, `EndOffset` pointed at the first copy's end marker, and the second copy lacked the signature's 4-byte length prefix. `kp.Parse` reads the first copy and keeps the second in `UnkTrailing`.
+- Exporting twice under one name appended the second export to the first (saved over RDP drive redirection to macOS, where a TunerPro save also left an old tail, so possibly the redirection; unconfirmed). Then 0x14 holds the combined length, `EndOffset` the first copy's marker, and `kp.Parse` reads the first copy and keeps the rest in `UnkTrailing`.
 
 ## Map record
 
@@ -110,7 +110,7 @@ Field order (v2-only fields marked), as declared in `kp.Map`:
 
 `StoredCols` and `StoredRows` are columns then rows, swapped on "2d Inverse" (column-major) maps: true on every map in the archived packs and the WinOLS 2.24 saves except 11 single values. xdfkit writes them that way.
 
-`ViewScale`, `ViewScaleUnk00` and `ViewOffset` are probably the display's automatic scaling, stored once a map has been shown (unconfirmed). They are non-default on exactly the same maps, mostly in hand-edited packs, and on single values follow the value: `ViewScale` is 2560 divided by a multiple of the value and `ViewOffset` -0.9 times that multiple (8D0907551M: CATR, value 1, 2560 and -0.9; CLAHSH, value 3, 853.33 and -2.7; CWGGPBKV, value 6, 426.67 and -5.4). An earlier guess that they are a second factor and offset doesn't hold. mapdump reads the tail as int32 and int16 chunks that straddle these floats.
+`ViewScale`, `ViewScaleUnk00` and `ViewOffset` are probably the display's automatic scaling, stored once a map has been shown (unconfirmed). They are non-default on exactly the same maps, mostly in hand-edited packs, and on single values follow the value: `ViewScale` is 2560 divided by a multiple of the value and `ViewOffset` -0.9 times that multiple (8D0907551M: CATR, value 1, 2560 and -0.9; CLAHSH, value 3, 853.33 and -2.7; CWGGPBKV, value 6, 426.67 and -5.4). They are not a second factor and offset. mapdump reads the tail as int32 and int16 chunks that straddle these floats.
 
 ## Axis record
 
@@ -121,9 +121,10 @@ Field order (v2-only fields marked), as declared in `kp.Map`:
 - byte reciprocal, byte precision
 - 3 bytes `PrecisionUnk00` (zero; 0xff 0xff 0xff on the unused slots of 06A906032HS only), byte signed (patchable)
 - int32 byte length, then that many bytes of int32 `SignedUnk00`: always zeros. In v1 both axis records of a map hold as many as the map's `StoredRows` on almost every map; in v2 the list is empty, except on the two "free editable" Y axes of LDRXN in 4D1907558 (16 zeros). So possibly the values of a free editable axis (unconfirmed).
-- int32 `DataHeader` (was `ListUnk00`): likely the script property `DataHeader`, the number of header bytes before the axis data (surveyed 2026-10-08 over the 12 OEM pack/image pairs): it is 0, 1, 2 or 4, and where it isn't 0 the bytes just before the axis hold the point count in 215 of 217 1-byte headers on byte axes, 544 of 619 2-byte headers on byte axes (the M3.82 [variable id][count] header gives 2 on 462 of 468 such axes in 8D0907558E) and 113 of 130 2-byte headers on word axes. 4-byte headers on word axes match only 28 of 84, maybe [X count][Y count]. Many axes with a header in the image have 0, so it is a setting, not detected.
+- int32 `DataHeader`: likely the script property `DataHeader`, the number of header bytes before the axis data (surveyed over the 12 OEM pack/image pairs): it is 0, 1, 2 or 4, and where it isn't 0 the bytes just before the axis hold the point count in 215 of 217 1-byte headers on byte axes, 544 of 619 2-byte headers on byte axes (the M3.82 [variable id][count] header gives 2 on 462 of 468 such axes in 8D0907558E) and 113 of 130 2-byte headers on word axes. 4-byte headers on word axes match only 28 of 84, maybe [X count][Y count]. Many axes with a header in the image have 0, so it is a setting, not detected.
 - int32 `SignatureByte`: likely the script property `SignaturByte` (marker byte before the axis, `0xFFFFFFFF` for none; `winols-script.md`). -1 is the commonest value in every pack. In 8D0907558E (M3.82), 468 of the 477 image axes with another value have that byte two bytes before the axis, which is the variable id of the [variable id][count] header; the match is weaker in 8D0907558M (49 of 311) and in the ME7 packs, so the exact rule is unconfirmed.
-- Every map stores both axis records. The organisation says which are used: X for 1D, X and Y for 2D, none for a single value. WinOLS 2.24 goes by the organisation alone, not by what the unused slot holds (confirmed 2026-10-08): NMAXAL in 06A906032LP, a single value whose slots hold eeprom axes, shows no axes, and "16 bit KFZW load axis patch #1" in 8D0907551M, a 1D map with an ordinal Y slot, shows only its ordinal X axis. The unused slots are still stored, often with the mirror flag set (and precision 0xff in v2). The flag is WinOLS 2.24's "mirror map" axis setting, not an "undefined" marker (confirmed 2026-10-08: on in 8D0907551F for KFZW's X axis, off for its Y and for both in 8D0907551G). 8D0907551F sets it on every X axis (724), 8D0907551K on 24 and 8D0907551H on 4, and WinOLS shows those axes. `OLS_LangE.dll` labels it "&Mirror map" in both the X-Axis and Y-Axis dialogs; the script property `bRueckwaerts` ("mirror the data", `winols-script.md`) may be the same setting (unconfirmed). It doesn't mean reversed storage: the mirrored eeprom axes in 8D0907551F and 8D0907551K increase in the image like the others (664 of 704, the rest not monotonic). WinOLS shows a mirrored axis in descending order (8D0907551F KFZW: X stored 512 to 8534, shown from 8534 down; confirmed 2026-10-08), so it is a display reversal along that axis, not an X/Y swap. The map's cells are shown reversed with it, so the map displays correctly (confirmed 2026-10-08). mapdump's CSV and XDF treat the flag as "undefined" and drop those axes' units and scale, and print the scale of unused slots that don't have it, so the archived CSVs of most packs differ from CSVs made from xdfkit's KP output in those columns.
+- Every map stores both axis records; the organisation says which are used (X for 1D, X and Y for 2D, none for a single value), and WinOLS 2.24 goes by it alone (confirmed: NMAXAL in 06A906032LP, a single value with eeprom slots, shows no axes). Unused slots often have the mirror flag set (and precision 0xff in v2).
+- Mirror flag: WinOLS 2.24's "&Mirror map" axis setting (`OLS_LangE.dll`), not an "undefined" marker; maybe the script's `bRueckwaerts` (unconfirmed). Set on every X axis of 8D0907551F (724), 24 in 8D0907551K, 4 in 8D0907551H. Storage is not reversed (those axes increase in the image like the others); WinOLS shows the axis and the cells along it descending (8D0907551F KFZW X: stored 512 to 8534, shown 8534 down; confirmed). mapdump treats the flag as "undefined" and drops those axes' units and scale, so most archived CSVs differ from xdfkit's in those columns.
 
 ## Enums
 
@@ -134,14 +135,14 @@ Field order (v2-only fields marked), as declared in `kp.Map`:
 | Axis data source | 0 ordinal ("1, 2, 3, ..."), 1 EEPROM, 2 EEPROM add, 3 EEPROM subtract, 4 free editable and 5 EEPROM backwards (unconfirmed) |
 | Display base | 10, 16, 2 |
 
-- 4 and 5 follow the script help's enum order, eDataSrcNone, eRom, eRomAdd, eRomSub, eUserdef, eRomBackwards, on the guess that KP stores the internal enum (decided 2026-10-08, as older mapdump read 4). `OLS_LangE.dll` lists them in UI order instead: "1, 2, 3, ...", "Eprom", "Eprom, add", "Eprom, subtract", "Eprom, backwards", "Free editable". To confirm with a KP saved from a script import that sets `eUserdef` and `eRomBackwards`. No defined axis in the ecuxplot packs uses 4 or 5; 4 appears only on unused axis slots in 4D1907558.
+- 4 and 5 follow the script help's enum order, eDataSrcNone, eRom, eRomAdd, eRomSub, eUserdef, eRomBackwards, on the guess that KP stores the internal enum (as older mapdump read 4). `OLS_LangE.dll` lists them in UI order instead: "1, 2, 3, ...", "Eprom", "Eprom, add", "Eprom, subtract", "Eprom, backwards", "Free editable". No defined axis in the ecuxplot packs uses 4 or 5; 4 appears only on unused axis slots in 4D1907558.
 - "2D inverse": mapdump's row-major reading is supported by a smoothness check against the bins (34 maps to 1, 50 ties). XDF Porter marks these column-major; don't copy that.
 
 ## Axis datasource "EEPROM, subtract"
 
 The stored values are offsets between breakpoints, counted down from the top of the value range.
 
-- Semantics (confirmed 2026-10-07 in WinOLS 2.24): for raw values raw[0] to raw[n-1], WinOLS displays point i = conversion(256 - (raw[i] + raw[i+1] + ... + raw[n-1])) for 8-bit axes, without wrapping. Each raw value is the gap to the next point, and the last one is the gap to 256. Checked on two axes:
+- Semantics (confirmed in WinOLS 2.24): for raw values raw[0] to raw[n-1], WinOLS displays point i = conversion(256 - (raw[i] + raw[i+1] + ... + raw[n-1])) for 8-bit axes, without wrapping. Each raw value is the gap to the next point, and the last one is the gap to 256. Checked on two axes:
   - FHSA.0 X in 8D0907558E (raw 27, 13, 12, 60, conversion 0.75*X-48) displays 60, 80.25, 90, 99 (raw 144, 171, 184, 196).
   - KFWKSTAB X in 8D0907551M (raw 24, 49, 50, 164, total 287) displays -71.25, -53.25, -16.50, 21.00 (raw -31, -7, 42, 92). The negative first point is how a mislabelled absolute axis shows (below).
   - 16-bit "subtract" axes are presumably counted from 65536 (unconfirmed; none seen).
@@ -151,14 +152,12 @@ The stored values are offsets between breakpoints, counted down from the top of 
   - `FKHE.0` (%, 0.390625*X): 0, 1.95, 25, 75, 99.61
   - `TADTEVT` (s, 0.5*X): 0, 4, 6.5, 9, 15, 18, 21, 25
   - `FHSA.0` ("Heißstartanhebung", hot-start enrichment, degC): 60, 80.25, 90, 99
-  - An earlier reading as a forward running sum (point i = raw[0] + ... + raw[i]) also gives increasing axes, but with odd values (TLAN 160 to 8400 rpm, FHSA.0 -27.75 to 36 degC). It is wrong.
+  - A forward running sum also increases but gives odd values (TLAN 160 to 8400 rpm), so it is wrong.
 - Layout: the two bytes before these axes are [input variable id][point count], e.g. `[164, 8]` on rpm axes, `[240, n]` on % axes, `[155, n]` on temperature. That's consistent with Motronic M3.x-style axis headers; ME7 axes have only the count byte.
 - Pack errors exist in both directions, so the label can't be trusted blindly:
   - 8D0907558E has "subtract" axes labelled plain "EEPROM" (KFFA X: raw 12, 12, 14, 16, 17, 13, ..., 36, which read as "subtract" is a clean 1.0, 1.6, 2.2, ..., 10.5, 11.0 ms/rev).
   - The 27 "subtract" axes in the ME7 packs (8D0907551G/M) are absolute and mislabelled by the pack author: read as "subtract" their totals exceed 256, so they start below zero (KFWKSTAB above). With the datasource set to "EEPROM" (`xdfkit fix`, rule R1), WinOLS 2.24 displays KFWKSTAB as -30, -11.25, -10.5, 75, the plain values.
-- Still open (cheap, needs WinOLS): what "EEPROM, add" and "Eprom, backwards" do (neither occurs in any ecuxplot pack). Feature-sweep samples are the backup.
 - Implementation:
   - KP reader/writer: the model keeps the datasource exactly as stored (`axis.stored` = absolute / add / subtract / backwards), never "corrected".
-  - XDF writer: a plain axis equation can't express this sum over the following cells, so write static LABELs computed from the bin (xdfkit computes them from `-i image`; without an image the axis is written as a plain image axis). TunerPro RT can compute the axis live instead: a helper table at the axis address with per-row equations (last row `(256 - X) * factor + offset`, the others `CELL(ROW()+1;0;FALSE) - X * factor`), linked to the map's axis ("Linked, Scaled", XDF `embedinfo type="3" linkobjid`). TunerPro's author describes this for WinOLS "EEPROM, subtract" axes, with a worked example matching the formula above ([forum](https://tunerpro.net/forum/viewtopic.php?t=3672)). The XDF encoding of per-row equations is unconfirmed. Linked axes are a TunerPro 5 feature (whether the free edition has them is unconfirmed); 5.00.8383 and 5.00.8414 (2014) fixed unresolved axis links on load and a recursion bug that broke exactly this `CELL(ROW()+1; 0; FALSE) - X` pattern, so older builds can show wrong values.
+  - XDF writer: an axis equation can't sum over following cells, so xdfkit writes static LABELs computed from `-i image` (without an image, a plain image axis), as mapdump does; TunerPro shows them correctly (FHSA.0, TLAN in 8D0907558E). Live alternative for TunerPro 5 ([forum](https://tunerpro.net/forum/viewtopic.php?t=3672)): a helper table at the axis address with per-row equations (last row `(256 - X) * factor + offset`, others `CELL(ROW()+1;0;FALSE) - X * factor`), linked as the map's axis (`embedinfo type="3" linkobjid`); its XDF encoding is unconfirmed, and builds before 5.00.8414 (2014) miscompute that pattern.
   - Lint: rules R1, R2 and R6 (`autocorrect.md`) flag axes whose label disagrees with the data.
-  - mapdump writes "subtract" axes as static labels computed from the bin with the formula above (since 2026-10-07; before, it wrote them as plain axes). TunerPro displays them correctly (FHSA.0 and TLAN in 8D0907558E, confirmed 2026-10-07).

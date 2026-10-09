@@ -1,6 +1,6 @@
 # File naming convention
 
-Decided 2026-10-07 for the shared corpus and xdfkit outputs: image names from the image's own part number and version, lowercase labels, definitions named after their image, and SHA-256 digits in place of a missing version. Original files kept for regression tests keep their original names; their identity is their SHA-256.
+For the shared corpus and xdfkit outputs: image names from the image's own part number and version, lowercase labels, definitions named after their image, and SHA-256 digits in place of a missing version. Original files kept for regression tests keep their original names; their identity is their SHA-256.
 
 ## Character rules
 
@@ -26,8 +26,8 @@ Decided 2026-10-07 for the shared corpus and xdfkit outputs: image names from th
 
 `IMAGE-STEM.json`
 
-- `IMAGE-STEM`: the stem of the image it describes (`8D0907551M-0002.json`). One definition per image: maps from other sources (me7-logger's hand XDF) are merged into it, not kept alongside (decided 2026-10-08).
-- The version stays in the name even where users treat versions of a part as one. Of the 10 corpus parts with two versions (2026-10-08), 3 differ only in their data set (`DstC1o` to `DstC2o`: about 30 KB, map addresses unchanged, the same definition fits both) and 7 are rebuilt software (260 to 640 KB across every bank, maps moved: 4D1907558's pack fits -0002 but not -0004), and the identification string doesn't reliably tell them apart. Which other images a definition fits is to be listed in `corpus.tsv`, not expressed by the name.
+- `IMAGE-STEM`: the stem of the image it describes (`8D0907551M-0002.json`). One definition per image: maps from other sources (me7-logger's hand XDF) are merged into it, not kept alongside.
+- The version stays in the name even where users treat versions of a part as one. Of the 10 corpus parts with two versions, 3 differ only in their data set (`DstC1o` to `DstC2o`: about 30 KB, map addresses unchanged, the same definition fits both) and 7 are rebuilt software (260 to 640 KB across every bank, maps moved: 4D1907558's pack fits -0002 but not -0004), and the identification string doesn't reliably tell them apart. Which other images a definition fits is to be listed in `corpus.tsv`, not expressed by the name.
 - No owner in the name. If owners ever need tracking, they get separate directories, not a name part, so scripts can keep globbing one directory.
 - No dates in names: history is in git. ecuxplot's dated KP copies (`8D0907551M-20261006`) become commits of one JSON.
 - Tool outputs that aren't curated definitions (me7info's generated maps) don't go in the corpus (see `corpus.md`).
@@ -35,7 +35,7 @@ Decided 2026-10-07 for the shared corpus and xdfkit outputs: image names from th
 ## xdfkit outputs
 
 - Default output names replace the input's extension: `foo.kp` becomes `foo.json`, `foo.xdf`, `foo.yaml`.
-- The XDF metadata file is `foo.meta.json` next to `foo.xdf` (confirmed 2026-10-07).
+- The XDF metadata file is `foo.meta.json` next to `foo.xdf`.
 - WinOLS script output: extension to be confirmed from the help file's examples.
 
 ## Hand overrides

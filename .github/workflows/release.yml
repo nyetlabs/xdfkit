@@ -1,4 +1,4 @@
-# Build and release on every vX.Y.Z tag; vX.Y.Z-rcN tags make prereleases. See README "Releases".
+# Build and release on every vX.Y.Z tag; vX.Y.Z-rcN tags make prereleases. See DEVELOPER.md "Releases".
 name: Release
 
 on:

@@ -5,7 +5,6 @@ Source: the WinOLS 2.24 help file (`HelpEn.chm`), topics "Importing with scripts
 ## Status
 
 - Not yet tested in WinOLS 2.24 or the demo.
-- Open: whether factor/offset use a locale-dependent decimal comma (the help example writes `"1,000000"`), what file extension WinOLS expects, and whether the demo accepts scripts.
 
 ## Structure
 
@@ -110,4 +109,4 @@ Prefixes: `Feldwerte.` applies to the map values, `StuetzX.` and `StuetzY.` to t
 
 ## Use in this project
 
-xdfkit writes WinOLS scripts as its route from A2L, DAMOS and XDF into WinOLS. Coverage per field: the "WinOLS script" column of `format-matrix.md`. The model's names stay format-neutral; the writer maps them (`bRueckwaerts` from axis `mirror` and `SignaturByte` from axis `signature`, both unconfirmed until a scripted import is saved as KP). Corpus fixes still pending in hand WinOLS projects, and how scripts could carry them: `winols-fixes.md`.
+xdfkit writes WinOLS scripts as its route from A2L, DAMOS and XDF into WinOLS. Coverage per field: the "WinOLS script" column of `format-matrix.md`. The model's names stay format-neutral; the writer maps them (`bRueckwaerts` from axis `mirror` and `SignaturByte` from axis `signature`, both unconfirmed until a scripted import is saved as KP).

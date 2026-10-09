@@ -1,5 +1,5 @@
 # git-cliff configuration (https://git-cliff.org/docs/configuration).
-# Same commit prefixes and template as me7-logger. Release process: README "Releases".
+# Same commit prefixes and template as me7-logger. Release process: DEVELOPER.md "Releases".
 
 [changelog]
 # group_by(group) gives the sections, group_by(message) dedups. #N links are built in the
