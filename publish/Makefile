@@ -8,9 +8,12 @@
 #   make help             this help
 #   make zips             dated and -latest zips
 #   make upload           publish, if local.mk (gitignored) defines it
-#   make import PACK=8D0907551M KP=new.kp
-#                         update the pack's corpus JSON from a KP exported by
-#                         WinOLS, if its definitions changed
+#   make import PACK=8D0907551M SRC=new.kp
+#                         update the pack's corpus JSON from a KP (WinOLS) or
+#                         an XDF (TunerPro; META=file.meta.json), if its
+#                         definitions changed
+#   make incoming         import every KP and XDF in testdata/local/incoming
+#                         (import-incoming.sh, README.md)
 #   make clean            remove build/publish
 #
 # Each pack is the model JSON in the corpus, defs/IMAGE.json, with IMAGE from
@@ -52,7 +55,7 @@ date = $(or $(firstword $(call butlast,$(call gitdates,$(1)))),$(DATE_$(1)),$(fi
 EXTS := kp xdf meta.json csv
 TARGETS := $(foreach p,$(PACKS),$(addprefix $(OUT)/$(p).,$(EXTS)))
 
-.PHONY: all help zips clean import
+.PHONY: all help zips clean import incoming
 
 all: $(TARGETS)
 	@echo "$(words $(TARGETS)) files up to date in $(OUT)"
@@ -103,11 +106,14 @@ zips: $(ZIPS)
 
 # The corpus JSON is rewritten only when the definitions differ (stamp and
 # provenance aside), so each commit of it is a new revision with its own zip date.
+# SRC is a KP or an XDF (KP= is the old name). An XDF reads META, else
+# NAME.meta.json next to it.
 MODEL = jq -S 'del(.stamp, .provenance)'
+SRC ?= $(KP)
 import: | $(OUT) $(XDFKIT)
-	@test -n "$(PACK)" -a -n "$(KP)" || { echo "usage: make import PACK=stem KP=file.kp" >&2; exit 2; }
+	@test -n "$(PACK)" -a -n "$(SRC)" || { echo "usage: make import PACK=stem SRC=file.kp|file.xdf [META=file.meta.json]" >&2; exit 2; }
 	@test -n "$(call imagename,$(PACK))" || { echo "$(PACK): no image in images.tsv" >&2; exit 1; }
-	$(XDFKIT) -force $(abspath $(KP)) $(OUT)/$(PACK).import.json
+	$(XDFKIT) -force $(if $(META),-meta $(abspath $(META))) $(abspath $(SRC)) $(OUT)/$(PACK).import.json
 	@$(MODEL) $(OUT)/$(PACK).import.json > $(OUT)/$(PACK).import.new
 	@if test -f $(call def,$(PACK)) && $(MODEL) $(call def,$(PACK)) | cmp -s - $(OUT)/$(PACK).import.new; then \
 		echo "$(PACK): unchanged"; \
@@ -115,6 +121,9 @@ import: | $(OUT) $(XDFKIT)
 		cp $(OUT)/$(PACK).import.json $(call def,$(PACK)) && echo "$(PACK): updated $(call def,$(PACK)); commit it in the corpus"; \
 	fi
 	@rm -f $(OUT)/$(PACK).import.json $(OUT)/$(PACK).import.new
+
+incoming:
+	./import-incoming.sh
 
 -include local.mk
 
