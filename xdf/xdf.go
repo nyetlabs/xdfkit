@@ -164,10 +164,14 @@ type equation struct {
 // Without an image there is no file region, and "subtract" axes are written
 // as plain image axes.
 func Write(m *model.Model, image []byte, title string) ([]byte, error) {
+	desc := trim(m.Project.Name)
+	if p := m.Provenance; p != nil && p.Subset != nil {
+		desc = strings.TrimPrefix(desc+"\n"+subsetPrefix+" "+p.Subset.Kind+" sha256:"+p.Subset.Table, "\n")
+	}
 	d := document{Version: "1.50", Header: header{
 		FileVersion: trim(m.Project.Version),
 		DefTitle:    trim(title),
-		Description: trim(m.Project.Name),
+		Description: desc,
 		Defaults:    defaults{DataSizeInBits: 8, SigDigits: 2, OutputType: 1, LSBFirst: 1},
 	}}
 	if len(image) > 0 {

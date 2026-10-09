@@ -258,21 +258,27 @@ func TestAddr(t *testing.T) {
 	}
 }
 
-// TestSchemaFile: the committed schema.json is what Schema generates
-// (go test ./model -run TestSchemaFile -update rewrites it).
+// TestSchemaFile: the committed schema.json and categories.schema.json are
+// what Schema and CategoryTableJSONSchema generate
+// (go test ./model -run TestSchemaFile -update rewrites them).
 func TestSchemaFile(t *testing.T) {
-	gen, err := Schema()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if *update {
-		if err := os.WriteFile("schema.json", gen, 0o644); err != nil {
+	for file, fn := range map[string]func() ([]byte, error){
+		"schema.json":            Schema,
+		"categories.schema.json": CategoryTableJSONSchema,
+	} {
+		gen, err := fn()
+		if err != nil {
 			t.Fatal(err)
 		}
-	}
-	committed, err := os.ReadFile("schema.json")
-	if err != nil || !bytes.Equal(committed, gen) {
-		t.Fatalf("schema.json is stale (%v): run make schema", err)
+		if *update {
+			if err := os.WriteFile(file, gen, 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		committed, err := os.ReadFile(file)
+		if err != nil || !bytes.Equal(committed, gen) {
+			t.Errorf("%s is stale (%v): run make schema", file, err)
+		}
 	}
 }
 

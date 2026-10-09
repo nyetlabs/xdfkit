@@ -20,8 +20,8 @@ import (
 
 const usage = `usage:
   xdfkit [-f json|yaml|kp|csv|xdf] [-template orig.kp] [-i image] [-r ref]...
-         [-meta file.meta.json] [-origin damos|a2l|hand] [-force]
-         input [output]
+         [-meta file.meta.json] [-origin damos|a2l|hand]
+         [-tuner categories.json] [-force] input [output]
   xdfkit verify file.json|file.yaml...
   xdfkit lint -i image [-family me7|m3] [-json findings.json] input
   xdfkit fix -i image (-o output | -n) [-rules R1,R2] [-only ID,...]
@@ -47,7 +47,9 @@ since it was written converts back to the definition exactly, and edits made
 to it are reported. -origin records where a KP or XDF input's definitions
 came from in the model's provenance: damos or a2l (exported from Bosch
 data) or hand (made by hand; the default, unless an XDF's metadata file has
-another).
+another). -tuner keeps only the maps named in a category table (the corpus
+categories.json) and the objects their axes point at, filed under the table's
+categories.
 
 verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
 and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
@@ -250,6 +252,7 @@ func convert(args []string) error {
 	image := fs.String("i", "", "flash image, for CSV value ranges and XDF")
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
 	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l or hand")
+	tuner := fs.String("tuner", "", "category table: keep only its maps and their axes")
 	var refs []string
 	fs.Func("r", "reference definition, for a CSV column of matching map names (repeatable)", func(s string) error {
 		refs = append(refs, s)
@@ -295,6 +298,11 @@ func convert(args []string) error {
 	}
 	if *image != "" {
 		if req.Image, err = os.ReadFile(*image); err != nil {
+			return err
+		}
+	}
+	if *tuner != "" {
+		if req.Tuner, err = os.ReadFile(*tuner); err != nil {
 			return err
 		}
 	}

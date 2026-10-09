@@ -7,9 +7,11 @@
 # NAME.meta.json next to it, else build/publish/PACK.meta.json. The corpus JSON
 # is rewritten only when the definitions or their origin changed; files from
 # incoming then move to incoming/imported/, so a later run can't import them
-# over newer work. A second file for one pack waits for the next run.
+# over newer work. A second file for one pack waits for the next run. A subset
+# (provenance.subset, as in PACK-tuner.xdf, even renamed) is refused.
 #
-# Environment: INCOMING (the directory), CORPUS (an ecu-corpus checkout),
+# Environment: INCOMING (the directory), CORPUS (an ecu-corpus checkout;
+# default ../ecu-corpus beside this repo, else the submodule),
 # ORIGIN (damos, a2l or hand; default the corpus JSON's, and hand becomes damos
 # from DAMOS_MAPS=3000 maps, docs/corpus.md), FORCE=1 (import over a corpus
 # JSON whose stamp is edited).
@@ -17,7 +19,7 @@ set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 in=${INCOMING:-$root/testdata/local/incoming}
 tsv=$root/testdata/archive/ecuxplot/images.tsv
-corpus=${CORPUS:-$root/corpus}
+corpus=${CORPUS:-$(cd "$root/../ecu-corpus" 2>/dev/null && pwd || echo "$root/corpus")}
 xdfkit=$root/build/xdfkit
 test -x "$xdfkit" || make -C "$root" build
 stems=$(awk -F'\t' 'NR > 1 { print length($1) "\t" $1 }' "$tsv" | sort -rn | cut -f2)
@@ -71,6 +73,11 @@ for f; do
 	origin=${ORIGIN:-}
 	test -n "$origin" || ! test -f "$def" || origin=$(jq -r '.provenance.origin // empty' "$def")
 	convert "$origin" || { status=1; continue; }
+	if jq -e '.provenance.subset' "$tmp/new.json" >/dev/null; then
+		echo "$name: skipped, a $(jq -r .provenance.subset.kind "$tmp/new.json") subset (PACK-tuner.xdf) can't replace the full definition" >&2
+		status=1
+		continue
+	fi
 	n=$(jq '.objects | length' "$tmp/new.json")
 	if test -z "${ORIGIN:-}" && test "$(jq -r .provenance.origin "$tmp/new.json")" = hand && test "$n" -ge "${DAMOS_MAPS:-3000}"; then
 		echo "$name: $n maps, origin damos"

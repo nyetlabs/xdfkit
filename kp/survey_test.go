@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.nyet.org/xdfkit/internal/corpus"
 	"go.nyet.org/xdfkit/internal/testenv"
 )
 
@@ -91,10 +92,7 @@ type sample struct {
 func surveyInputs(t *testing.T) []sample {
 	root := testenv.ModuleRoot()
 	arch := testenv.Archive(t)
-	corpus := os.Getenv("XDFKIT_CORPUS")
-	if corpus == "" {
-		corpus = filepath.Join(root, "corpus")
-	}
+	cdir := corpus.Dir()
 	names := map[string]string{}
 	tsv, _ := os.ReadFile(filepath.Join(arch, "images.tsv"))
 	for _, l := range strings.Split(string(tsv), "\n") {
@@ -106,7 +104,7 @@ func surveyInputs(t *testing.T) []sample {
 		if b, err := os.ReadFile(filepath.Join(arch, stem+".bin")); err == nil {
 			return b
 		}
-		b, _ := os.ReadFile(filepath.Join(corpus, "images", names[stem]+".bin"))
+		b, _ := os.ReadFile(filepath.Join(cdir, "images", names[stem]+".bin"))
 		return b
 	}
 	stemOf := func(file string) string {

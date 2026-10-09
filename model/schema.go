@@ -13,16 +13,30 @@ import (
 // optional fields), doc (description), enum ("a|b|c") and pattern. The
 // committed schema.json must equal it (see the tests).
 func Schema() ([]byte, error) {
+	return schemaOf(reflect.TypeFor[Model](), "schema.json", "xdfkit map definition model", true)
+}
+
+// CategoryTableJSONSchema returns the JSON Schema of the corpus category
+// table; the committed categories.schema.json must equal it.
+func CategoryTableJSONSchema() ([]byte, error) {
+	return schemaOf(reflect.TypeFor[CategoryTable](), "categories.schema.json", "xdfkit category table", false)
+}
+
+func schemaOf(t reflect.Type, file, title string, stamp bool) ([]byte, error) {
 	g := &schemaGen{defs: map[string]any{}}
-	root := g.object(reflect.TypeFor[Model]())
-	root["properties"].(map[string]any)[canon.StampKey] = map[string]any{
-		"type":        "object",
-		"description": "Edit stamp (docs/stamp-and-metadata.md).",
+	root := g.object(t)
+	if stamp {
+		root["properties"].(map[string]any)[canon.StampKey] = map[string]any{
+			"type":        "object",
+			"description": "Edit stamp (docs/stamp-and-metadata.md).",
+		}
 	}
 	root["$schema"] = "https://json-schema.org/draft/2020-12/schema"
-	root["$id"] = "https://go.nyet.org/xdfkit/model/schema.json"
-	root["title"] = "xdfkit map definition model"
-	root["$defs"] = g.defs
+	root["$id"] = "https://go.nyet.org/xdfkit/model/" + file
+	root["title"] = title
+	if len(g.defs) > 0 || stamp {
+		root["$defs"] = g.defs
+	}
 	return canon.Marshal(root)
 }
 
@@ -47,7 +61,7 @@ func (g *schemaGen) schema(t reflect.Type) map[string]any {
 	case reflect.Slice:
 		return map[string]any{"type": "array", "items": g.schema(t.Elem())}
 	case reflect.Map:
-		return map[string]any{"type": "object"}
+		return map[string]any{"type": "object", "additionalProperties": g.schema(t.Elem())}
 	case reflect.String:
 		return map[string]any{"type": "string"}
 	case reflect.Bool:

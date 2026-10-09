@@ -1,6 +1,7 @@
 // Package corpus gives tests access to the shared ecu-corpus (docs/corpus.md):
 // the corpus.tsv manifest and the images under images/. The corpus is found at
-// XDFKIT_CORPUS, else corpus/ at the module root (the git submodule). Without
+// XDFKIT_CORPUS, else ../ecu-corpus beside the module root, else corpus/ at
+// the module root (the git submodule; see Dir). Without
 // it, Open skips the test, or fails it when XDFKIT_REQUIRE_CORPUS is set (CI).
 package corpus
 
@@ -29,13 +30,29 @@ type Corpus struct {
 	byName map[string]int
 }
 
+// Dir is XDFKIT_CORPUS, else ../ecu-corpus beside the module root when it
+// has a manifest (the full clone corpus edits are made in, as publish/ uses),
+// else corpus/ at the module root.
+func Dir() string {
+	if d := os.Getenv("XDFKIT_CORPUS"); d != "" {
+		return d
+	}
+	root := testenv.ModuleRoot()
+	if d := filepath.Join(filepath.Dir(root), "ecu-corpus"); fileExists(filepath.Join(d, "corpus.tsv")) {
+		return d
+	}
+	return filepath.Join(root, "corpus")
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
+}
+
 // Open returns the corpus, or skips (or fails) the test when it isn't there.
 func Open(t testing.TB) *Corpus {
 	t.Helper()
-	dir := os.Getenv("XDFKIT_CORPUS")
-	if dir == "" {
-		dir = filepath.Join(testenv.ModuleRoot(), "corpus")
-	}
+	dir := Dir()
 	if _, err := os.Stat(filepath.Join(dir, "corpus.tsv")); err != nil {
 		msg := fmt.Sprintf("corpus not available at %s (docs/corpus.md, Access)", dir)
 		if os.Getenv("XDFKIT_REQUIRE_CORPUS") != "" {

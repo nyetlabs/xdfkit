@@ -77,6 +77,7 @@ jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
 - Where it is stored:
   - In the metadata file: `xdf.digests` (both forms, for the whole view). Implemented.
   - Best effort, in the XDF itself (not written yet; the reader already leaves it out of the view): one line `xdfkit-stamp: sha256:<digest>` in the `XDFHEADER` description, a field TunerPro shows and preserves. That line is excluded from the XDF view. Confirmed 2026-10-07: TunerPro shows the description as two lines and keeps the stamp line through a save (writing the line break as `&#010;`; it writes other description line breaks as `&#013;&#010;`, so readers accept both).
+- A tuner subset (`model.md`, `provenance.subset`) adds the line `xdfkit-subset: tuner sha256:<table>` to the same description. The reader takes it out of the project name and into `provenance.subset`, so a tuner XDF read without its metadata file, or with another XDF's, still reads as a subset.
 
 ## Metadata file
 

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -61,6 +62,59 @@ func TestConvertRoundTrip(t *testing.T) {
 				t.Fatalf("xdf with metadata to json: %v %+v", err, resp)
 			}
 		})
+	}
+}
+
+// TestConvertTuner: a tuner XDF holds only the table's maps, round-trips
+// through its metadata file, and a bad table is an error.
+func TestConvertTuner(t *testing.T) {
+	in, err := os.ReadFile(filepath.Join(testenv.Archive(t), "8D0907551G.kp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	table := []byte(`{"schema": 1, "categories": {"KFZW": "Timing", "LDRXN": "Boost"}}`)
+	x, resp, err := Convert(in, ConvertRequest{To: XDF, Tuner: table})
+	if err != nil {
+		t.Fatal(err)
+	}
+	js, _, err := Convert(x, ConvertRequest{To: JSON, Meta: resp.Meta})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m struct {
+		Categories []struct{ Name string }
+		Objects    []struct{ ID string }
+	}
+	if err := json.Unmarshal(js, &m); err != nil {
+		t.Fatal(err)
+	}
+	ids := map[string]bool{}
+	for _, o := range m.Objects {
+		ids[strings.Fields(o.ID)[0]] = true
+	}
+	if !ids["KFZW"] || !ids["LDRXN"] || len(m.Categories) != 2 {
+		t.Errorf("objects %v, categories %v", ids, m.Categories)
+	}
+	// Without its metadata file, or with the full XDF's, the tuner XDF still
+	// reads as a subset.
+	_, full, err := Convert(in, ConvertRequest{To: XDF})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, meta := range [][]byte{nil, full.Meta} {
+		js, resp, err := Convert(x, ConvertRequest{To: JSON, Meta: meta})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Contains(js, []byte(`"subset"`)) || !slices.ContainsFunc(resp.Warnings, func(w string) bool { return strings.Contains(w, "subset") }) {
+			t.Errorf("meta %v: subset not marked: %v", meta != nil, resp.Warnings)
+		}
+	}
+	if _, _, err := Convert(in, ConvertRequest{To: XDF, Tuner: []byte(`{"schema": 1}`)}); err == nil {
+		t.Error("empty table: no error")
+	}
+	if _, _, err := Convert(in, ConvertRequest{To: KP, Tuner: table}); err == nil {
+		t.Error("kp to kp with a table: no error")
 	}
 }
 

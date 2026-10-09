@@ -47,7 +47,9 @@ const (
 // its extension). Meta is the metadata file of an XDF input
 // (docs/stamp-and-metadata.md). Origin, for KP or XDF input, is where its
 // definitions came from (model.Origins), recorded in the provenance; it
-// defaults to hand, or for an XDF to its metadata file's.
+// defaults to hand, or for an XDF to its metadata file's. Tuner is a category
+// table (the corpus categories.json): only its maps and the objects their
+// axes point at are kept, filed under its categories.
 type ConvertRequest struct {
 	To       string `json:"to"`
 	Name     string `json:"name,omitempty"`
@@ -57,6 +59,7 @@ type ConvertRequest struct {
 	Title    string `json:"title,omitempty"`
 	Meta     []byte `json:"meta,omitempty"`
 	Origin   string `json:"origin,omitempty"`
+	Tuner    []byte `json:"tuner,omitempty"`
 }
 
 // Ref is a reference definition for CSV output; Name heads its column.
@@ -101,6 +104,16 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	if req.Origin != "" && resp.From != XDF && (resp.From != KP || req.To == KP) {
 		return nil, resp, errors.New("an origin applies only to a model converted from KP or XDF")
 	}
+	var tuner *model.CategoryTable
+	if req.Tuner != nil {
+		if req.To == KP && resp.From == KP {
+			return nil, resp, errors.New("a category table applies only to a converted model")
+		}
+		var err error
+		if tuner, err = model.ParseCategoryTable(req.Tuner); err != nil {
+			return nil, resp, err
+		}
+	}
 	if resp.From == KP && req.To == KP {
 		f, err := kp.Parse(in)
 		if err != nil {
@@ -117,6 +130,11 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	if req.Origin != "" {
 		m.Provenance.Origin = req.Origin
 		if err := m.Check(); err != nil {
+			return nil, resp, err
+		}
+	}
+	if tuner != nil {
+		if err := m.Tuner(tuner); err != nil {
 			return nil, resp, err
 		}
 	}
@@ -173,14 +191,18 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 		if err != nil {
 			return m, warnings, err
 		}
-		if meta == nil || m.Provenance == nil {
+		if meta == nil || m.Provenance == nil || m.Provenance.SHA256 == "" {
 			sum := sha256.Sum256(in)
-			m.Provenance = &model.Provenance{Format: XDF, File: name, SHA256: hex.EncodeToString(sum[:])}
+			p := &model.Provenance{Format: XDF, File: name, SHA256: hex.EncodeToString(sum[:])}
+			if m.Provenance != nil {
+				p.Subset = m.Provenance.Subset
+			}
+			m.Provenance = p
 		}
 		if m.Provenance.Origin == "" {
 			m.Provenance.Origin = "hand"
 		}
-		return m, warnings, nil
+		return m, subsetWarning(m, warnings), nil
 	}
 	in, err := asJSON(in)
 	if err != nil {
@@ -198,7 +220,16 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 	if err := canon.Unmarshal(in, m); err != nil {
 		return nil, warnings, err
 	}
-	return m, warnings, m.Check()
+	return m, subsetWarning(m, warnings), m.Check()
+}
+
+// subsetWarning adds a warning when m is a subset (provenance.subset), which
+// must not replace the full definition in the corpus.
+func subsetWarning(m *model.Model, warnings []string) []string {
+	if m.Provenance != nil && m.Provenance.Subset != nil {
+		warnings = append(warnings, m.Provenance.Subset.Kind+" subset of the original definition, not a corpus source")
+	}
+	return warnings
 }
 
 // asJSON returns a model document as JSON, converting YAML.

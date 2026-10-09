@@ -261,11 +261,37 @@
           "description": "SHA-256 of the original file, lowercase hex.",
           "pattern": "^[0-9a-f]{64}$",
           "type": "string"
+        },
+        "subset": {
+          "$ref": "#/$defs/Subset",
+          "description": "Set when the definition is a subset of the original file's, which must not replace it in the corpus."
         }
       },
       "required": [
         "format",
         "sha256"
+      ],
+      "type": "object"
+    },
+    "Subset": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "description": "tuner: the maps of a category table and their axes (Model.Tuner).",
+          "enum": [
+            "tuner"
+          ],
+          "type": "string"
+        },
+        "table": {
+          "description": "SHA-256 of the category table, lowercase hex.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "table"
       ],
       "type": "object"
     },

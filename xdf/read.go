@@ -57,6 +57,11 @@ type raxis struct {
 // view leaves out (docs/stamp-and-metadata.md).
 const stampPrefix = "xdfkit-stamp:"
 
+// subsetPrefix starts the line in the header description that marks a subset
+// ("xdfkit-subset: tuner sha256:<table>"); the view reads it into
+// provenance.subset, so the mark survives without the metadata file.
+const subsetPrefix = "xdfkit-subset:"
+
 // view is the XDF view: the model read from the XDF elements alone, objects
 // in uniqueid order (numeric; others after them, in file order), with the
 // uniqueid of each object. Label values are not read: the model has no
@@ -75,6 +80,11 @@ func view(b []byte) (m *model.Model, uids, warnings []string, err error) {
 	m = &model.Model{Schema: model.SchemaID, Objects: []*model.Object{}}
 	var desc []string
 	for _, l := range strings.Split(trim(h.Description), "\n") {
+		if s, ok := strings.CutPrefix(strings.TrimSuffix(l, "\r"), subsetPrefix); ok {
+			kind, table, _ := strings.Cut(strings.TrimSpace(s), " sha256:")
+			m.Provenance = &model.Provenance{Subset: &model.Subset{Kind: kind, Table: table}}
+			continue
+		}
 		if !strings.HasPrefix(l, stampPrefix) {
 			desc = append(desc, l)
 		}

@@ -1,0 +1,27 @@
+{
+  "$id": "https://go.nyet.org/xdfkit/model/categories.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "categories": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Category of each map name in the tuner set.",
+      "type": "object"
+    },
+    "schema": {
+      "description": "Schema version.",
+      "enum": [
+        1
+      ],
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema",
+    "categories"
+  ],
+  "title": "xdfkit category table",
+  "type": "object"
+}
