@@ -8,13 +8,8 @@
 #   make help             this help
 #   make zips             dated and -latest zips
 #   make upload           publish, if local.mk (gitignored) defines it
-#   make import PACK=8D0907551M SRC=new.kp
-#                         update the pack's corpus JSON from a KP (WinOLS) or
-#                         an XDF (TunerPro; META=file.meta.json), if its
-#                         definitions changed; ORIGIN=damos|a2l|hand sets
-#                         where they came from (default: unchanged)
 #   make incoming         import every KP and XDF in testdata/local/incoming
-#                         (import-incoming.sh, README.md)
+#                         into the corpus JSON (import-incoming.sh, README.md)
 #   make clean            remove build/publish
 #
 # Each pack is the model JSON in the corpus, defs/IMAGE.json, with IMAGE from
@@ -43,20 +38,13 @@ image = $(or $(wildcard $(ARCHIVE)/$(1).bin),$(CORPUS)/images/$(call imagename,$
 def = $(CORPUS)/defs/$(call imagename,$(1)).json
 source = $(or $(wildcard $(call def,$(1))),$(ARCHIVE)/$(1).kp)
 
-# Zip dates: the last corpus commit of each pack's JSON after the one that
-# imported it, else the date of the archived KP's last change in ecuxplot, else
-# the import commit. Commits whose message starts with chore(schema) (model
-# changes that don't change the definitions) don't count.
-DATE_8D0907551M := 20261006
-DATE_4D1907558 := 20200707
-gitdates = $(shell git -C $(CORPUS) log --invert-grep --grep='^chore(schema)' --format=%cd --date=format:%Y%m%d -- defs/$(call imagename,$(1)).json 2>/dev/null)
-butlast = $(wordlist 2,$(words $(1)),x $(1))
-date = $(or $(firstword $(call butlast,$(call gitdates,$(1)))),$(DATE_$(1)),$(firstword $(call gitdates,$(1))))
+# A zip is dated by its pack JSON's last corpus commit.
+date = $(shell git -C $(CORPUS) log -1 --format=%cd --date=format:%Y%m%d -- defs/$(call imagename,$(1)).json)
 
 EXTS := kp xdf meta.json csv
 TARGETS := $(foreach p,$(PACKS),$(addprefix $(OUT)/$(p).,$(EXTS)))
 
-.PHONY: all help zips clean import incoming
+.PHONY: all help zips clean incoming
 
 all: $(TARGETS)
 	@echo "$(words $(TARGETS)) files up to date in $(OUT)"
@@ -104,27 +92,6 @@ endef
 $(foreach p,$(ZIP_BINS),$(eval $(call ZIP_template,$(p))))
 
 zips: $(ZIPS)
-
-# The corpus JSON is rewritten only when the definitions or their origin
-# differ (stamp and the rest of the provenance aside), so each commit of it is
-# a new revision with its own zip date. SRC is a KP or an XDF (KP= is the old
-# name). An XDF reads META, else NAME.meta.json next to it. ORIGIN (damos, a2l
-# or hand) defaults to the corpus JSON's, else xdfkit's default.
-MODEL = jq -S 'del(.stamp, .provenance.format, .provenance.file, .provenance.sha256)'
-SRC ?= $(KP)
-import: | $(OUT) $(XDFKIT)
-	@test -n "$(PACK)" -a -n "$(SRC)" || { echo "usage: make import PACK=stem SRC=file.kp|file.xdf [META=file.meta.json] [ORIGIN=origin]" >&2; exit 2; }
-	@test -n "$(call imagename,$(PACK))" || { echo "$(PACK): no image in images.tsv" >&2; exit 1; }
-	$(XDFKIT) -force $(if $(META),-meta $(abspath $(META))) \
-		-origin "$(or $(ORIGIN),$(if $(wildcard $(call def,$(PACK))),$(shell jq -r '.provenance.origin // empty' $(call def,$(PACK)))))" \
-		$(abspath $(SRC)) $(OUT)/$(PACK).import.json
-	@$(MODEL) $(OUT)/$(PACK).import.json > $(OUT)/$(PACK).import.new
-	@if test -f $(call def,$(PACK)) && $(MODEL) $(call def,$(PACK)) | cmp -s - $(OUT)/$(PACK).import.new; then \
-		echo "$(PACK): unchanged"; \
-	else \
-		cp $(OUT)/$(PACK).import.json $(call def,$(PACK)) && echo "$(PACK): updated $(call def,$(PACK)); commit it in the corpus"; \
-	fi
-	@rm -f $(OUT)/$(PACK).import.json $(OUT)/$(PACK).import.new
 
 incoming:
 	./import-incoming.sh

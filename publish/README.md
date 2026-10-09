@@ -2,20 +2,33 @@
 
 The published packs (KP, CSV map list, XDF with its metadata file, and dated zips) are generated from the model JSON in ecu-corpus `defs/IMAGE.json`. That JSON is the source of truth: a correction goes into it, never into the generated files. `make help` lists the targets; outputs go to `build/publish/`.
 
-## Bringing in a corrected definition
+## Workflow
 
-Edit the published KP in WinOLS, or the published XDF in TunerPro, and save it under a name that starts with the pack's stem from `testdata/archive/ecuxplot/images.tsv`, followed by `.` or `-`: `8D0907551K.kp`, `8D0907551K-kfvpdksd.xdf`. Then:
+```mermaid
+flowchart TD
+  edit["Edit the published KP in WinOLS<br/>or XDF in TunerPro"] --> save["Save it in testdata/local/incoming/<br/>as PACK.kp, PACK-note.xdf, ..."]
+  save --> incoming["make -C publish incoming"]
+  incoming --> edited{"Corpus JSON<br/>stamp edited?"}
+  edited -- "yes, without FORCE=1" --> skip["Skipped"]
+  edited -- no --> import
+  single["publish/import-incoming.sh file..."] --> edited
+  import["Convert the KP or XDF<br/>to model JSON"]
+  import --> origin{"ORIGIN= given?"}
+  origin -- yes --> changed
+  origin -- no --> keep["Keep the corpus JSON's origin;<br/>hand with 3000+ maps becomes damos"]
+  keep --> changed{"Definitions or<br/>origin changed?"}
+  changed -- no --> unchanged["Unchanged"]
+  changed -- yes --> write["Rewrite corpus defs/IMAGE.json"]
+  write --> commit["Commit and push in corpus/"]
+  commit --> gen["make -C publish<br/>make -C publish zips<br/>make -C publish upload"]
+  commit --> bump["make corpus-bump here<br/>and in me7-logger"]
+```
 
-- Put the file in `testdata/local/incoming/` (gitignored). For an XDF, keep `NAME.meta.json` beside it if you have it. Without one, the script uses `build/publish/PACK.meta.json`, which matches the published XDF, so edits to that XDF are reconciled against it.
-- Run `make -C publish incoming` (`import-incoming.sh`). For each file it runs `make import`, which rewrites the corpus JSON only when the definitions or their origin changed, stamp and the rest of the provenance aside. The origin (`damos`, `a2l` or `hand`, docs/corpus.md) stays the corpus JSON's; set `ORIGIN=` to change it. The file, and a metadata file next to it, then move to `incoming/imported/`, so a later run can't import it over newer work.
-- A corpus JSON whose stamp is edited (a person changed the JSON itself) is skipped. `FORCE=1` imports over it.
-- A single file can be imported with `make -C publish import PACK=8D0907551K SRC=file.kp`, or `SRC=file.xdf META=file.meta.json`, plus `ORIGIN=damos` for a definition exported from DAMOS.
-
-## After an import
-
-- Commit the changed `defs/IMAGE.json` in the corpus checkout (`corpus/`, or `CORPUS=dir`) and push it. The corpus is append-only, so a correction is a normal commit; the zip date comes from that commit.
-- Run `make -C publish` to regenerate the pack, `make -C publish zips` for the packs in `ZIP_BINS`, and `make -C publish upload` if `local.mk` defines it.
-- Bump the `corpus` submodule here (`make corpus-bump`) and in the projects that read the corpus, such as me7-logger, whose parity oracles follow the same definitions.
+- PACK is the pack's stem in `testdata/archive/ecuxplot/images.tsv`; the file name starts with it, followed by `.` or `-`.
+- An XDF needs its metadata file to keep what XDF can't hold: `NAME.meta.json` next to it, else `build/publish/PACK.meta.json`, which matches the published XDF.
+- `make incoming` runs `import-incoming.sh` on every KP and XDF in `incoming/`; the script also takes files as arguments. Files from `incoming/` (and their metadata files) move to `incoming/imported/`, so a later run can't import them over newer work. One file per pack per run.
+- The comparison ignores the stamp and the rest of the provenance. The origin is `damos`, `a2l` or `hand` (docs/corpus.md); set `ORIGIN=damos` for a smaller DAMOS export, `DAMOS_MAPS=` changes the cutoff, `FORCE=1` imports over a hand-edited corpus JSON.
+- A pack's zip is dated by its JSON's last corpus commit, whatever the commit changed.
 
 ## Packs
 
