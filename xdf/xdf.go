@@ -8,8 +8,9 @@
 // Deliberate differences from mapdump: no "Written <date>" comment, so the
 // output is reproducible; no units on axes the model doesn't have; float cells
 // get TunerPro's float type flag; and a category repeated by name keeps its
-// objects instead of moving them to the first category. The axis mirror flag is
-// ignored (docs/design.md).
+// objects instead of moving them to the first category; an image axis whose
+// breakpoints are another curve links to it. The axis mirror flag is ignored
+// (docs/design.md).
 package xdf
 
 import (
@@ -29,6 +30,11 @@ import (
 
 // maxDigits is the most digits TunerPro shows.
 const maxDigits = 6
+
+// minOffset is the smallest conversion offset written: smaller ones can't
+// visibly change a shown value, and in plain notation they can exceed the 255
+// bytes TunerPro reads from an attribute, which crashes it on load.
+const minOffset = 0.5e-6
 
 // EMBEDDEDDATA mmedtypeflags bits. flagFloat is unconfirmed.
 const (
@@ -135,8 +141,11 @@ type embedded struct {
 	MajorStrideBits int    `xml:"mmedmajorstridebits,attr,omitempty"`
 }
 
+// embedInfo is type 1 for breakpoints read from the image, or type 3 with the
+// uniqueid of the object holding them (a linked axis).
 type embedInfo struct {
-	Type int `xml:"type,attr"`
+	Type   int    `xml:"type,attr"`
+	LinkID string `xml:"linkobjid,attr,omitempty"`
 }
 
 // link is the data type, unit type and DA link that TunerPro writes.
@@ -185,11 +194,21 @@ func Write(m *model.Model, image []byte, title string) ([]byte, error) {
 		d.Header.Categories = append(d.Header.Categories, category{hex(i), trim(n)})
 	}
 	index := map[*model.Object]int{}
+	at := map[model.Addr][]*model.Object{}
 	for i, o := range m.Objects {
 		index[o] = i
+		at[o.Address] = append(at[o.Address], o)
+	}
+	link := func(self *model.Object, x *model.Axis, n int) string {
+		for _, t := range at[*x.Address] {
+			if t != self && linkable(t, x, n) {
+				return hex(index[t] + 1)
+			}
+		}
+		return ""
 	}
 	for _, o := range byAddress(m) {
-		obj, err := object(o, index[o], catIndex, image)
+		obj, err := object(o, index[o], catIndex, link, image)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", o.Key, err)
 		}
@@ -245,8 +264,9 @@ func byAddress(m *model.Model) []*model.Object {
 }
 
 // object is the XDFCONSTANT or XDFTABLE of o; index is its position in the
-// source, which numbers it.
-func object(o *model.Object, index int, catIndex map[int]int, image []byte) (any, error) {
+// source, which numbers it. link returns the uniqueid of the curve an image
+// axis of n points links to, or "".
+func object(o *model.Object, index int, catIndex map[int]int, link func(*model.Object, *model.Axis, int) string, image []byte) (any, error) {
 	title, desc := text(o)
 	cat := 0
 	if len(o.Categories) > 0 {
@@ -275,6 +295,11 @@ func object(o *model.Object, index int, catIndex map[int]int, image []byte) (any
 		if err != nil {
 			return nil, err
 		}
+		if x.EmbedInfo != nil {
+			if id := link(o, a.x, a.size); id != "" {
+				x.EmbedInfo = &embedInfo{Type: 3, LinkID: id}
+			}
+		}
 		t.Axes = append(t.Axes, x)
 	}
 	z := axis{
@@ -297,6 +322,18 @@ func object(o *model.Object, index int, catIndex map[int]int, image []byte) (any
 	}
 	t.Axes = append(t.Axes, z)
 	return t, nil
+}
+
+// linkable says whether t, an object at the address of image axis x, holds
+// exactly x's n breakpoints: a curve of n cells stored and converted as x is.
+// Factors match to 1e-4 relative, the rounding KP factors carry; offsets to
+// minOffset, below which they aren't written.
+func linkable(t *model.Object, x *model.Axis, n int) bool {
+	c, d := t.Value.Conversion, x.Value.Conversion
+	return t.Shape == "1d" && t.Rows*t.Cols == n && x.Data != nil && t.Data == *x.Data &&
+		c.Reciprocal == d.Reciprocal &&
+		math.Abs(c.Factor-d.Factor) <= 1e-4*max(math.Abs(c.Factor), math.Abs(d.Factor)) &&
+		math.Abs(c.Offset-d.Offset) < minOffset
 }
 
 // text is the XDF title and description of o: the first word of its id and
@@ -410,13 +447,14 @@ func decimalPl(prec int) *int {
 
 func formula(c model.Conversion) equation {
 	e := equation{Equation: "X"}
-	if c.Reciprocal || c.Factor != 1 || c.Offset != 0 {
+	offset := math.Abs(c.Offset) >= minOffset
+	if c.Reciprocal || c.Factor != 1 || offset {
 		op := " * X"
 		if c.Reciprocal {
 			op = " / X"
 		}
 		e.Equation = plain(c.Factor) + op
-		if c.Offset != 0 {
+		if offset {
 			e.Equation += "+ " + plain(c.Offset)
 		}
 	}

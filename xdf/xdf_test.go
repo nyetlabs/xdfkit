@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -71,6 +73,22 @@ func diff(path string, got, want *node, out *[]string, limit int) {
 	if len(*out) >= limit {
 		return
 	}
+	if got.Name == "embedinfo" && got.Attrs["type"] == "3" {
+		// mapdump didn't link axes
+		got = &node{Name: got.Name, Attrs: map[string]string{"type": "1"}}
+	}
+	if e, ok := want.Attrs["equation"]; ok && got.Name == "MATH" {
+		// mapdump wrote offsets too small to show
+		if i := strings.LastIndex(e, "+ "); i >= 0 {
+			if f, err := strconv.ParseFloat(e[i+2:], 64); err == nil && math.Abs(f) < minOffset {
+				want = &node{Name: want.Name, Attrs: maps.Clone(want.Attrs), Text: want.Text, Kids: want.Kids}
+				want.Attrs["equation"] = e[:i]
+				if e[:i] == "1 * X" {
+					want.Attrs["equation"] = "X"
+				}
+			}
+		}
+	}
 	if got.String() != want.String() {
 		*out = append(*out, fmt.Sprintf("%s: got %s, want %s", path, got, want))
 		return
@@ -115,6 +133,10 @@ func readModel(t *testing.T, dir, stem string) *model.Model {
 	return m
 }
 
+// maxAttr is the longest attribute value TunerPro reads: it copies each into
+// a 256-byte buffer with strcpy_s and crashes on longer ones.
+const maxAttr = 255
+
 // TestArchive writes every archived pack: the XDF must parse, be ASCII, and
 // hold one table or constant per object.
 func TestArchive(t *testing.T) {
@@ -142,7 +164,66 @@ func TestArchive(t *testing.T) {
 			if n := len(root.Kids[0].Kids) - 1; n != len(m.Objects) {
 				t.Errorf("%d objects, want %d", n, len(m.Objects))
 			}
+			var long func(*node)
+			long = func(n *node) {
+				for k, v := range n.Attrs {
+					if len(v) > maxAttr {
+						t.Errorf("%s %s: %d bytes, TunerPro reads at most %d", n.Name, k, len(v), maxAttr)
+					}
+				}
+				for _, c := range n.Kids {
+					long(c)
+				}
+			}
+			long(root)
 		})
+	}
+}
+
+// TestLinkedAxis: an image axis links to the curve at its address that holds
+// its breakpoints (same count, storage and conversion up to KP rounding) and
+// keeps its own location; any other axis stays embedded.
+func TestLinkedAxis(t *testing.T) {
+	addr := func(a model.Addr) *model.Addr { return &a }
+	d := &model.Data{Bits: 8}
+	v := func(f float64) model.Value { return model.Value{Conversion: model.Conversion{Factor: f}} }
+	curve := func(key string, a model.Addr, n int, f float64) *model.Object {
+		return &model.Object{Key: key, ID: key, Shape: "1d", Address: a, Rows: 1, Cols: n, Data: *d, Value: v(f)}
+	}
+	axis := func(a model.Addr, f float64) *model.Axis {
+		return &model.Axis{Source: "image", Stored: "absolute", Address: addr(a), Data: d, Value: v(f)}
+	}
+	kf := func(key string, a model.Addr, x, y *model.Axis) *model.Object {
+		return &model.Object{Key: key, ID: key, Shape: "2d", Address: a, Rows: 4, Cols: 4, Data: *d, X: x, Y: y}
+	}
+	hdr := axis(0x202, 1)
+	hdr.Header = 2
+	m := &model.Model{Schema: model.SchemaID, Objects: []*model.Object{
+		curve("SNM", 0x100, 4, 0.0234375),
+		curve("SNH", 0x200, 4, 1),
+		curve("SN8", 0x600, 8, 1),
+		curve("SNC", 0x700, 4, 40),
+		kf("KF", 0x300, axis(0x100, 0.023438), hdr),
+		kf("KF2", 0x400, axis(0x600, 1), axis(0x700, 0.75)),
+		kf("KF3", 0x500, axis(0x300, 1), axis(0x800, 1)),
+	}}
+	b, err := Write(m, nil, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	if !strings.Contains(s, `<embedinfo type="3" linkobjid="0x1">`) {
+		t.Error("missing link to SNM")
+	}
+	if n := strings.Count(s, `type="3"`); n != 1 {
+		t.Errorf("%d links, want 1", n)
+	}
+	r, _, err := Read(b, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if x := r.Objects[4].X; x == nil || x.Address == nil || *x.Address != 0x100 {
+		t.Errorf("linked x axis read back as %+v", x)
 	}
 }
 

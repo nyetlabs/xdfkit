@@ -51,6 +51,8 @@ flowchart LR
 
 Core packages work on bytes, without file or console I/O, and use no cgo; the CLI does the I/O. Details: `docs/design.md`.
 
+me7-logger imports `model`, `xdf` and `canon` (`docs/integrations.md`): after changing them, run `make check-pinned` in me7-logger before pushing it.
+
 ## Published definitions
 
 The ecuxplot map packs are model JSON in ecu-corpus `defs/`. `publish/` generates every format from it and imports corrections made in WinOLS or TunerPro (`publish/README.md`).

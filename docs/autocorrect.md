@@ -23,10 +23,10 @@ Fixing KP files mechanically, instead of hand-editing each axis in WinOLS. Evide
 | R4 | M3.x/M5.x 8-bit axis whose count byte disagrees with the axis size | report only; planned: set the point count (map size follows) when the count gives a monotonic axis, medium, manual review | n/a |
 | R5 | a valid header plus monotonic axis exists a few bytes away from the stored address | planned: move the address, low, report only unless `-only` | |
 | R6 | all values identical; or no reading is monotonic (ME7); or a "subtract" or "add" axis that, read as "subtract", doesn't increase from 0 or more (M3.x/M5.x) | none; report only | n/a |
-| R7 | ME7 only, using me7-logger's located maps (`integrations.md`): a map whose address matches no located map, a located map whose axis address or point count differs from the definition, or a located map missing from the definition | planned: propose the located axis address and point count; missing maps are reported as additions | medium; report only unless `-only` |
+| R7 | ME7 only, using the maps me7info located in the image (model JSON with origin `located`, `integrations.md`): a map whose address matches no located map, a located map whose axis address or point count differs from the definition, or a located map missing from the definition | planned: propose the located axis address and point count; missing maps are reported as additions | medium; report only unless `-only` |
 | R8 | map end address other than start + byte length (WinOLS 2.24 writes that value and recomputes it on export; `kp-format.md`, WinOLS 2.24 exports) | set the end address | high |
 
 - Only axes whose datasource reads the image and that have at least two integer points are checked; float axes are skipped. R8 checks every map and doesn't read the image.
 - Family: from the Bosch identification string in the image (`40/1/ME7.1/5/...` is ME7, `5655/1/M3.82/...` and `9655/1/M5.92/...` are delta). Images without one need `-family`.
-- R7 depends on the me7-logger integration and is implemented with it.
+- R7 is not implemented yet.
 - R1 changes what WinOLS displays: WinOLS shows a "subtract" axis as 256 minus the sum of the remaining raw values (confirmed in WinOLS 2.24; see the axis datasource section of `kp-format.md`), so a mislabelled absolute axis shows wrong values until fixed.

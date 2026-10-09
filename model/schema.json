@@ -241,24 +241,26 @@
           "type": "string"
         },
         "format": {
-          "description": "Source format.",
+          "description": "Source format; image: located in a flash image by a program such as me7info.",
           "enum": [
             "kp",
-            "xdf"
+            "xdf",
+            "image"
           ],
           "type": "string"
         },
         "origin": {
-          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are).",
+          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are), located (found in the image by a program; never a corpus source).",
           "enum": [
             "damos",
             "a2l",
-            "hand"
+            "hand",
+            "located"
           ],
           "type": "string"
         },
         "sha256": {
-          "description": "SHA-256 of the original file, lowercase hex.",
+          "description": "SHA-256 of the original file (the image, for format image), lowercase hex.",
           "pattern": "^[0-9a-f]{64}$",
           "type": "string"
         },

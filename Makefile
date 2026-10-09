@@ -36,9 +36,12 @@ test:
 schema:
 	go test ./model -run "TestSchemaFile|TestKPDefaultsFile" -update
 
+# build replaces build/xdfkit only when it changed, so publish/ rebuilds
+# outputs only after a real change.
 build:
 	mkdir -p build
-	go build $(LDFLAGS) -o build/xdfkit ./cmd/xdfkit
+	go build $(LDFLAGS) -o build/xdfkit.new ./cmd/xdfkit
+	if cmp -s build/xdfkit.new build/xdfkit; then rm build/xdfkit.new; else mv build/xdfkit.new build/xdfkit; fi
 
 version:
 	@echo $(VERSION)

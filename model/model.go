@@ -28,10 +28,10 @@ type Model struct {
 
 // Provenance identifies the original file, which the corpus doesn't hold.
 type Provenance struct {
-	Format string  `json:"format" doc:"Source format." enum:"kp|xdf"`
-	Origin string  `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are)." enum:"damos|a2l|hand"`
+	Format string  `json:"format" doc:"Source format; image: located in a flash image by a program such as me7info." enum:"kp|xdf|image"`
+	Origin string  `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are), located (found in the image by a program; never a corpus source)." enum:"damos|a2l|hand|located"`
 	File   string  `json:"file,omitempty" doc:"Original file name."`
-	SHA256 string  `json:"sha256" doc:"SHA-256 of the original file, lowercase hex." pattern:"^[0-9a-f]{64}$"`
+	SHA256 string  `json:"sha256" doc:"SHA-256 of the original file (the image, for format image), lowercase hex." pattern:"^[0-9a-f]{64}$"`
 	Subset *Subset `json:"subset,omitempty" doc:"Set when the definition is a subset of the original file's, which must not replace it in the corpus."`
 }
 
@@ -42,7 +42,7 @@ type Subset struct {
 }
 
 // Origins are the values of Provenance.Origin.
-var Origins = []string{"damos", "a2l", "hand"}
+var Origins = []string{"damos", "a2l", "hand", "located"}
 
 // Project is file-level metadata.
 type Project struct {

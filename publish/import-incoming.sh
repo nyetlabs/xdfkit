@@ -8,7 +8,8 @@
 # is rewritten only when the definitions or their origin changed; files from
 # incoming then move to incoming/imported/, so a later run can't import them
 # over newer work. A second file for one pack waits for the next run. A subset
-# (provenance.subset, as in PACK-tuner.xdf, even renamed) is refused.
+# (provenance.subset, as in PACK-tuner.xdf, even renamed) is refused, and so
+# is origin located (maps found by a program such as me7info).
 #
 # Environment: INCOMING (the directory), CORPUS (an ecu-corpus checkout;
 # default ../ecu-corpus beside this repo, else the submodule),
@@ -75,6 +76,11 @@ for f; do
 	convert "$origin" || { status=1; continue; }
 	if jq -e '.provenance.subset' "$tmp/new.json" >/dev/null; then
 		echo "$name: skipped, a $(jq -r .provenance.subset.kind "$tmp/new.json") subset (PACK-tuner.xdf) can't replace the full definition" >&2
+		status=1
+		continue
+	fi
+	if test "$(jq -r .provenance.origin "$tmp/new.json")" = located; then
+		echo "$name: skipped, maps located by a program (origin located) aren't a corpus source" >&2
 		status=1
 		continue
 	fi

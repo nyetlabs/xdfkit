@@ -73,6 +73,31 @@ func TestTuner(t *testing.T) {
 	}
 }
 
+// TestCategorize: every object is kept, the unlisted ones under rest.
+func TestCategorize(t *testing.T) {
+	addr := func(a Addr) *Addr { return &a }
+	m := &Model{Objects: []*Object{
+		{Key: "KFZW", ID: "KFZW", Categories: []int{3}, Address: 0x300, X: &Axis{Address: addr(0x100)}},
+		{Key: "SNM12ZWUW", ID: "SNM12ZWUW", Address: 0x100},
+		{Key: "UNLISTED", ID: "UNLISTED", Address: 0x500},
+	}}
+	tab, err := ParseCategoryTable([]byte(`{"schema": 1, "categories": {"KFZW": "Timing"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m.Categorize(tab, "Other")
+	var keys []string
+	for _, o := range m.Objects {
+		keys = append(keys, o.Key+"="+m.Categories[o.Categories[0]].Name)
+	}
+	if want := []string{"KFZW=Timing", "SNM12ZWUW=Timing", "UNLISTED=Other"}; !slices.Equal(keys, want) {
+		t.Errorf("got %v, want %v", keys, want)
+	}
+	if m.Provenance != nil {
+		t.Error("Categorize set a provenance")
+	}
+}
+
 // TestCorpusCategoryTable: the corpus categories.json is canonical, valid
 // under categories.schema.json and loads.
 func TestCorpusCategoryTable(t *testing.T) {

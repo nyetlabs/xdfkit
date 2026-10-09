@@ -73,7 +73,7 @@ TOP := $(foreach p,$(HAND),$(call files,$(p),$(EXTS),$(call date,$(p)))) \
 FULLDIR := $(foreach p,$(FULL),$(call files,$(p),$(EXTS),$(call date,$(p))))
 ZIPS := $(filter %.zip,$(TOP) $(FULLDIR))
 
-.PHONY: all help zips stage upload clean incoming
+.PHONY: all help zips stage upload clean incoming FORCE
 
 all: $(filter-out %.zip,$(TOP) $(FULLDIR))
 	@echo "files up to date in $(OUT)"
@@ -91,30 +91,34 @@ clean:
 $(OUT):
 	mkdir -p $@
 
-$(XDFKIT):
+# Every output depends on the binary, which the root build replaces only when
+# it changed.
+$(XDFKIT): FORCE
 	$(MAKE) -C $(ROOT) build
 
+FORCE:
+
 .SECONDEXPANSION:
-$(OUT)/%.json: $$(call source,$$*) | $(OUT) $(XDFKIT)
+$(OUT)/%.json: $$(call source,$$*) $(XDFKIT) | $(OUT)
 	$(XDFKIT) -force $(if $(ORIGIN_$*),-origin $(ORIGIN_$*)) $< $@
 
-$(OUT)/%.kp: $(OUT)/%.json | $(XDFKIT)
+$(OUT)/%.kp: $(OUT)/%.json $(XDFKIT)
 	$(XDFKIT) -force $< $@
 
 # The tuner rules come before the full ones, which make 3.81 would pick first
 # for PACK-tuner.*. One XDF run writes both files.
-$(OUT)/%-tuner.csv: $(OUT)/%.json $(CATEGORIES) | $(XDFKIT)
+$(OUT)/%-tuner.csv: $(OUT)/%.json $(CATEGORIES) $(XDFKIT)
 	$(XDFKIT) -f csv -force -tuner $(CATEGORIES) -i $(call image,$*) $< $@
 
-$(OUT)/%-tuner.xdf $(OUT)/%-tuner.meta.json: $(OUT)/%.json $(CATEGORIES) | $(XDFKIT)
+$(OUT)/%-tuner.xdf $(OUT)/%-tuner.meta.json: $(OUT)/%.json $(CATEGORIES) $(XDFKIT)
 	$(XDFKIT) -f xdf -force -tuner $(CATEGORIES) -i $(call image,$*) $< $(OUT)/$*-tuner.xdf
 
 $(OUT)/8D0907551H.csv $(OUT)/8D0907551M.csv: $(addprefix $(OUT)/,$(addsuffix .json,$(REFS)))
 
-$(OUT)/%.csv: $(OUT)/%.json | $(XDFKIT)
+$(OUT)/%.csv: $(OUT)/%.json $(XDFKIT)
 	cd $(OUT) && $(XDFKIT) -f csv -force -i $(call image,$*) $(REFS_$*) $*.json $*.csv
 
-$(OUT)/%.xdf $(OUT)/%.meta.json: $(OUT)/%.json | $(XDFKIT)
+$(OUT)/%.xdf $(OUT)/%.meta.json: $(OUT)/%.json $(XDFKIT)
 	$(XDFKIT) -f xdf -force -i $(call image,$*) $< $(OUT)/$*.xdf
 
 # ZIP_template STEM,EXTS,DATE: the zip holds the files renamed STEM-DATE.EXT,

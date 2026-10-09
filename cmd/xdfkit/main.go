@@ -20,7 +20,7 @@ import (
 
 const usage = `usage:
   xdfkit [-f json|yaml|kp|csv|xdf] [-template orig.kp] [-i image] [-r ref]...
-         [-meta file.meta.json] [-origin damos|a2l|hand]
+         [-meta file.meta.json] [-origin damos|a2l|hand|located]
          [-tuner categories.json] [-force] input [output]
   xdfkit verify file.json|file.yaml...
   xdfkit lint -i image [-family me7|m3] [-json findings.json] input
@@ -46,10 +46,11 @@ holding what XDF can't express. XDF input reads the metadata file given by
 since it was written converts back to the definition exactly, and edits made
 to it are reported. -origin records where a KP or XDF input's definitions
 came from in the model's provenance: damos or a2l (exported from Bosch
-data) or hand (made by hand; the default, unless an XDF's metadata file has
-another). -tuner keeps only the maps named in a category table (the corpus
-categories.json) and the objects their axes point at, filed under the table's
-categories.
+data), hand (made by hand; the default, unless an XDF's metadata file has
+another) or located (found in the image by a program such as me7info; never
+a corpus source). -tuner keeps only the maps named in a category table (the
+corpus categories.json) and the objects their axes point at, filed under the
+table's categories.
 
 verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
 and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
@@ -251,7 +252,7 @@ func convert(args []string) error {
 	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
 	image := fs.String("i", "", "flash image, for CSV value ranges and XDF")
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
-	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l or hand")
+	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, hand or located")
 	tuner := fs.String("tuner", "", "category table: keep only its maps and their axes")
 	var refs []string
 	fs.Func("r", "reference definition, for a CSV column of matching map names (repeatable)", func(s string) error {

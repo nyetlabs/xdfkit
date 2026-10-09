@@ -57,10 +57,8 @@ func (o *Object) Name() string {
 }
 
 // Tuner keeps the objects whose name is in the table and the objects their
-// image axes point at (at the axis address, or before its header), replaces
-// the categories with the table's, and marks the provenance as a tuner
-// subset. Axis objects get the category of the first kept map that uses
-// them. The table must come from ParseCategoryTable.
+// image axes point at, filed as by Categorize, and marks the provenance as a
+// tuner subset. The table must come from ParseCategoryTable.
 func (m *Model) Tuner(t *CategoryTable) error {
 	if m.Provenance == nil {
 		return errors.New("a tuner subset needs the model's provenance")
@@ -68,6 +66,17 @@ func (m *Model) Tuner(t *CategoryTable) error {
 	if t.sum == "" {
 		return errors.New("category table not read by ParseCategoryTable")
 	}
+	m.Categorize(t, "")
+	m.Objects = slices.DeleteFunc(m.Objects, func(o *Object) bool { return len(o.Categories) == 0 })
+	m.Provenance.Subset = &Subset{Kind: "tuner", Table: t.sum}
+	return nil
+}
+
+// Categorize replaces the categories with the table's: an object whose name
+// is in the table gets its category, and an object its image axes point at
+// (at the axis address, or before its header) gets the category of the first
+// such map. Every other object gets rest, or no category when rest is "".
+func (m *Model) Categorize(t *CategoryTable, rest string) {
 	cat := map[*Object]string{}
 	at := map[Addr][]*Object{}
 	for _, o := range m.Objects {
@@ -98,6 +107,13 @@ func (m *Model) Tuner(t *CategoryTable) error {
 			}
 		}
 	}
+	if rest != "" {
+		for _, o := range m.Objects {
+			if _, ok := cat[o]; !ok {
+				cat[o] = rest
+			}
+		}
+	}
 	var names []string
 	for _, c := range cat {
 		if !slices.Contains(names, c) {
@@ -109,13 +125,10 @@ func (m *Model) Tuner(t *CategoryTable) error {
 	for i, n := range names {
 		m.Categories[i] = &Category{ID: i, Name: n}
 	}
-	m.Objects = slices.DeleteFunc(m.Objects, func(o *Object) bool {
-		c, ok := cat[o]
-		if ok {
+	for _, o := range m.Objects {
+		o.Categories = nil
+		if c, ok := cat[o]; ok {
 			o.Categories = []int{slices.Index(names, c)}
 		}
-		return !ok
-	})
-	m.Provenance.Subset = &Subset{Kind: "tuner", Table: t.sum}
-	return nil
+	}
 }
