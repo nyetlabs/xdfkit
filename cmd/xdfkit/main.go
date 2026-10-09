@@ -20,7 +20,8 @@ import (
 
 const usage = `usage:
   xdfkit [-f json|yaml|kp|csv|xdf] [-template orig.kp] [-i image] [-r ref]...
-         [-meta file.meta.json] [-force] input [output]
+         [-meta file.meta.json] [-origin damos|a2l|hand] [-force]
+         input [output]
   xdfkit verify file.json|file.yaml...
   xdfkit lint -i image [-family me7|m3] [-json findings.json] input
   xdfkit fix -i image (-o output | -n) [-rules R1,R2] [-only ID,...]
@@ -43,7 +44,10 @@ output file comes with its metadata file, NAME.meta.json next to NAME.xdf,
 holding what XDF can't express. XDF input reads the metadata file given by
 -meta, else NAME.meta.json next to it if it exists; with it, an XDF unchanged
 since it was written converts back to the definition exactly, and edits made
-to it are reported.
+to it are reported. -origin records where a KP or XDF input's definitions
+came from in the model's provenance: damos or a2l (exported from Bosch
+data) or hand (made by hand; the default, unless an XDF's metadata file has
+another).
 
 verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
 and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
@@ -245,6 +249,7 @@ func convert(args []string) error {
 	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
 	image := fs.String("i", "", "flash image, for CSV value ranges and XDF")
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
+	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l or hand")
 	var refs []string
 	fs.Func("r", "reference definition, for a CSV column of matching map names (repeatable)", func(s string) error {
 		refs = append(refs, s)
@@ -279,7 +284,7 @@ func convert(args []string) error {
 	if in == "-" {
 		name = ""
 	}
-	req := api.ConvertRequest{To: *format, Name: name}
+	req := api.ConvertRequest{To: *format, Name: name, Origin: *origin}
 	if *format == api.XDF && out != "" && out != "-" {
 		req.Title = strings.TrimSuffix(filepath.Base(out), filepath.Ext(out))
 	}

@@ -45,7 +45,9 @@ const (
 // are reference definitions (KP or model JSON) whose matching map names fill
 // one column each. Title is the XDF definition title (default: Name without
 // its extension). Meta is the metadata file of an XDF input
-// (docs/stamp-and-metadata.md).
+// (docs/stamp-and-metadata.md). Origin, for KP or XDF input, is where its
+// definitions came from (model.Origins), recorded in the provenance; it
+// defaults to hand, or for an XDF to its metadata file's.
 type ConvertRequest struct {
 	To       string `json:"to"`
 	Name     string `json:"name,omitempty"`
@@ -54,6 +56,7 @@ type ConvertRequest struct {
 	Refs     []Ref  `json:"refs,omitempty"`
 	Title    string `json:"title,omitempty"`
 	Meta     []byte `json:"meta,omitempty"`
+	Origin   string `json:"origin,omitempty"`
 }
 
 // Ref is a reference definition for CSV output; Name heads its column.
@@ -95,6 +98,9 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	if req.Title != "" && req.To != XDF {
 		return nil, resp, errors.New("a title applies only to XDF output")
 	}
+	if req.Origin != "" && resp.From != XDF && (resp.From != KP || req.To == KP) {
+		return nil, resp, errors.New("an origin applies only to a model converted from KP or XDF")
+	}
 	if resp.From == KP && req.To == KP {
 		f, err := kp.Parse(in)
 		if err != nil {
@@ -107,6 +113,12 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	resp.Warnings = warnings
 	if err != nil {
 		return nil, resp, err
+	}
+	if req.Origin != "" {
+		m.Provenance.Origin = req.Origin
+		if err := m.Check(); err != nil {
+			return nil, resp, err
+		}
 	}
 	if req.To == CSV {
 		refs := make([]mapcsv.Ref, len(req.Refs))
@@ -158,11 +170,17 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 		return m, nil, err
 	case XDF:
 		m, warnings, err := xdf.Read(in, meta)
-		if err == nil && meta == nil {
+		if err != nil {
+			return m, warnings, err
+		}
+		if meta == nil || m.Provenance == nil {
 			sum := sha256.Sum256(in)
 			m.Provenance = &model.Provenance{Format: XDF, File: name, SHA256: hex.EncodeToString(sum[:])}
 		}
-		return m, warnings, err
+		if m.Provenance.Origin == "" {
+			m.Provenance.Origin = "hand"
+		}
+		return m, warnings, nil
 	}
 	in, err := asJSON(in)
 	if err != nil {

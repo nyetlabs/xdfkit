@@ -9,6 +9,7 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -28,9 +29,13 @@ type Model struct {
 // Provenance identifies the original file, which the corpus doesn't hold.
 type Provenance struct {
 	Format string `json:"format" doc:"Source format." enum:"kp|xdf"`
+	Origin string `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP projects usually are)." enum:"damos|a2l|hand"`
 	File   string `json:"file,omitempty" doc:"Original file name."`
 	SHA256 string `json:"sha256" doc:"SHA-256 of the original file, lowercase hex." pattern:"^[0-9a-f]{64}$"`
 }
+
+// Origins are the values of Provenance.Origin.
+var Origins = []string{"damos", "a2l", "hand"}
 
 // Project is file-level metadata.
 type Project struct {
@@ -157,6 +162,9 @@ func (m *Model) AssignKeys() {
 func (m *Model) Check() error {
 	if m.Schema != SchemaID {
 		return fmt.Errorf("schema %q, want %q", m.Schema, SchemaID)
+	}
+	if p := m.Provenance; p != nil && p.Origin != "" && !slices.Contains(Origins, p.Origin) {
+		return fmt.Errorf("provenance origin %q, want one of %s", p.Origin, strings.Join(Origins, ", "))
 	}
 	keys := map[string]bool{}
 	for i, o := range m.Objects {

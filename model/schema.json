@@ -248,6 +248,15 @@
           ],
           "type": "string"
         },
+        "origin": {
+          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP projects usually are).",
+          "enum": [
+            "damos",
+            "a2l",
+            "hand"
+          ],
+          "type": "string"
+        },
         "sha256": {
           "description": "SHA-256 of the original file, lowercase hex.",
           "pattern": "^[0-9a-f]{64}$",

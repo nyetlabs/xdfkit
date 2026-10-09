@@ -7,9 +7,9 @@ The published packs (KP, CSV map list, XDF with its metadata file, and dated zip
 Edit the published KP in WinOLS, or the published XDF in TunerPro, and save it under a name that starts with the pack's stem from `testdata/archive/ecuxplot/images.tsv`, followed by `.` or `-`: `8D0907551K.kp`, `8D0907551K-kfvpdksd.xdf`. Then:
 
 - Put the file in `testdata/local/incoming/` (gitignored). For an XDF, keep `NAME.meta.json` beside it if you have it. Without one, the script uses `build/publish/PACK.meta.json`, which matches the published XDF, so edits to that XDF are reconciled against it.
-- Run `make -C publish incoming` (`import-incoming.sh`). For each file it runs `make import`, which rewrites the corpus JSON only when the definitions changed, stamp and provenance aside. The file, and a metadata file next to it, then move to `incoming/imported/`, so a later run can't import it over newer work.
+- Run `make -C publish incoming` (`import-incoming.sh`). For each file it runs `make import`, which rewrites the corpus JSON only when the definitions or their origin changed, stamp and the rest of the provenance aside. The origin (`damos`, `a2l` or `hand`, docs/corpus.md) stays the corpus JSON's; set `ORIGIN=` to change it. The file, and a metadata file next to it, then move to `incoming/imported/`, so a later run can't import it over newer work.
 - A corpus JSON whose stamp is edited (a person changed the JSON itself) is skipped. `FORCE=1` imports over it.
-- A single file can be imported with `make -C publish import PACK=8D0907551K SRC=file.kp`, or `SRC=file.xdf META=file.meta.json`.
+- A single file can be imported with `make -C publish import PACK=8D0907551K SRC=file.kp`, or `SRC=file.xdf META=file.meta.json`, plus `ORIGIN=damos` for a definition exported from DAMOS.
 
 ## After an import
 

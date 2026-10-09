@@ -15,7 +15,7 @@ Decided 2026-10-07:
 ## Document
 
 - `schema`: `xdfkit-model/1`.
-- `provenance`: source `format` (`kp`, or `xdf` for an XDF read without its metadata file), original `file` name, and its `sha256`. The writing tool and version are in the stamp.
+- `provenance`: source `format` (`kp`, or `xdf` for an XDF read without its metadata file), the definitions' `origin` (`damos`, `a2l` or `hand`; `corpus.md`), original `file` name, and its `sha256`. The writing tool and version are in the stamp.
 - `project`: `name`, `version`.
 - `categories`: `id`, `name` (KP folders).
 - `objects`: in source order. Each has `key`, `id`, `description`, `comment`, `categories` (ids), `shape` (`value`, `1d`, `2d`), `inverse` (KP "2d Inverse", meaning unconfirmed), `address`, `rows`, `cols`, `data` (`bits` 8/16/32, `endian` big/little for wider cells, `signed`, `float`), `value` (`description`, `units`, `precision`, `conversion`: `factor`, `offset`, `reciprocal`), `view` (`base`, `difference`, `percent`), and the axes `x` and `y`.

@@ -131,10 +131,36 @@ func TestCall(t *testing.T) {
 	if _, m := call("convert", `{"to": "json", "meta": "`+meta+`"}`, js); m["error"] == nil {
 		t.Errorf("metadata file with json input: %v", m)
 	}
+	type prov struct {
+		Provenance struct{ Format, Origin, File string }
+	}
 	v, m := call("convert", `{"to": "json", "name": "a.xdf"}`, x)
-	var vm struct{ Provenance struct{ Format, File string } }
-	if err := json.Unmarshal(v, &vm); err != nil || vm.Provenance.Format != "xdf" || vm.Provenance.File != "a.xdf" {
+	var vm prov
+	if err := json.Unmarshal(v, &vm); err != nil || vm.Provenance.Format != "xdf" || vm.Provenance.Origin != "hand" || vm.Provenance.File != "a.xdf" {
 		t.Errorf("xdf alone to json: %v %v %+v", err, m, vm)
+	}
+	for _, c := range []struct {
+		req  string
+		in   []byte
+		want string // "": an error
+	}{
+		{`{"to": "json"}`, in, "hand"},
+		{`{"to": "json", "origin": "kp"}`, in, ""},
+		{`{"to": "json", "origin": "damos"}`, in, "damos"},
+		{`{"to": "json", "origin": "damos"}`, x, "damos"},
+		{`{"to": "json", "origin": "bogus"}`, in, ""},
+		{`{"to": "kp", "origin": "damos"}`, in, ""},
+		{`{"to": "json", "origin": "a2l"}`, js, ""},
+	} {
+		out, m := call("convert", c.req, c.in)
+		var pm prov
+		if c.want == "" {
+			if m["error"] == nil {
+				t.Errorf("%s: no error", c.req)
+			}
+		} else if err := json.Unmarshal(out, &pm); err != nil || pm.Provenance.Origin != c.want {
+			t.Errorf("%s: origin %q, want %q (%v %v)", c.req, pm.Provenance.Origin, c.want, err, m)
+		}
 	}
 }
 

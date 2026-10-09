@@ -11,7 +11,8 @@
 #   make import PACK=8D0907551M SRC=new.kp
 #                         update the pack's corpus JSON from a KP (WinOLS) or
 #                         an XDF (TunerPro; META=file.meta.json), if its
-#                         definitions changed
+#                         definitions changed; ORIGIN=damos|a2l|hand sets
+#                         where they came from (default: unchanged)
 #   make incoming         import every KP and XDF in testdata/local/incoming
 #                         (import-incoming.sh, README.md)
 #   make clean            remove build/publish
@@ -104,16 +105,19 @@ $(foreach p,$(ZIP_BINS),$(eval $(call ZIP_template,$(p))))
 
 zips: $(ZIPS)
 
-# The corpus JSON is rewritten only when the definitions differ (stamp and
-# provenance aside), so each commit of it is a new revision with its own zip date.
-# SRC is a KP or an XDF (KP= is the old name). An XDF reads META, else
-# NAME.meta.json next to it.
-MODEL = jq -S 'del(.stamp, .provenance)'
+# The corpus JSON is rewritten only when the definitions or their origin
+# differ (stamp and the rest of the provenance aside), so each commit of it is
+# a new revision with its own zip date. SRC is a KP or an XDF (KP= is the old
+# name). An XDF reads META, else NAME.meta.json next to it. ORIGIN (damos, a2l
+# or hand) defaults to the corpus JSON's, else xdfkit's default.
+MODEL = jq -S 'del(.stamp, .provenance.format, .provenance.file, .provenance.sha256)'
 SRC ?= $(KP)
 import: | $(OUT) $(XDFKIT)
-	@test -n "$(PACK)" -a -n "$(SRC)" || { echo "usage: make import PACK=stem SRC=file.kp|file.xdf [META=file.meta.json]" >&2; exit 2; }
+	@test -n "$(PACK)" -a -n "$(SRC)" || { echo "usage: make import PACK=stem SRC=file.kp|file.xdf [META=file.meta.json] [ORIGIN=origin]" >&2; exit 2; }
 	@test -n "$(call imagename,$(PACK))" || { echo "$(PACK): no image in images.tsv" >&2; exit 1; }
-	$(XDFKIT) -force $(if $(META),-meta $(abspath $(META))) $(abspath $(SRC)) $(OUT)/$(PACK).import.json
+	$(XDFKIT) -force $(if $(META),-meta $(abspath $(META))) \
+		-origin "$(or $(ORIGIN),$(if $(wildcard $(call def,$(PACK))),$(shell jq -r '.provenance.origin // empty' $(call def,$(PACK)))))" \
+		$(abspath $(SRC)) $(OUT)/$(PACK).import.json
 	@$(MODEL) $(OUT)/$(PACK).import.json > $(OUT)/$(PACK).import.new
 	@if test -f $(call def,$(PACK)) && $(MODEL) $(call def,$(PACK)) | cmp -s - $(OUT)/$(PACK).import.new; then \
 		echo "$(PACK): unchanged"; \

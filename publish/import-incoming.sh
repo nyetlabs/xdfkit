@@ -9,7 +9,7 @@
 # JSON whose stamp is edited is skipped unless FORCE=1. A second file for
 # one pack waits for the next run.
 #
-# INCOMING overrides the directory. CORPUS is passed on to make.
+# INCOMING overrides the directory. CORPUS and ORIGIN are passed on to make.
 set -eu
 cd "$(dirname "$0")"
 root=$(cd .. && pwd)

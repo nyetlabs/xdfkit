@@ -22,7 +22,7 @@ func ReadKP(data []byte, name string) (*Model, error) {
 	}
 	m := FromKP(f)
 	sum := sha256.Sum256(data)
-	m.Provenance = &Provenance{Format: "kp", File: name, SHA256: hex.EncodeToString(sum[:])}
+	m.Provenance = &Provenance{Format: "kp", Origin: "hand", File: name, SHA256: hex.EncodeToString(sum[:])}
 	return m, nil
 }
 
