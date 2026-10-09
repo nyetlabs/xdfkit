@@ -29,7 +29,7 @@ trap 'rm -rf "$tmp"' EXIT
 
 # The definitions and origin, without the stamp and the rest of the provenance.
 model() { jq -S 'del(.stamp, .provenance.format, .provenance.file, .provenance.sha256)' "$1"; }
-convert() { "$xdfkit" -force ${meta:+-meta "$meta"} -origin "$1" "$f" "$tmp/new.json"; }
+convert() { "$xdfkit" --force ${meta:+--meta "$meta"} --origin "$1" "$f" "$tmp/new.json"; }
 
 test $# -gt 0 || set -- "$in"/*.kp "$in"/*.KP "$in"/*.xdf "$in"/*.XDF
 status=0

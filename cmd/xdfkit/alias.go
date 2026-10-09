@@ -1,11 +1,13 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/spf13/pflag"
 	"go.nyet.org/xdfkit/api"
 )
 
@@ -34,52 +36,41 @@ type aliasOpts struct {
 // runAlias converts each file to the same name with the new extension, next
 // to it. An existing file is never replaced. An XDF input reads
 // NAME.meta.json beside it when present; XDF output writes one only with -m.
-// Options are single letters after one dash; long options take two.
 func runAlias(name string, args []string) int {
 	from, to := aliases[name][0], aliases[name][1]
-	usage := func(rc int) int {
-		opts, help := "", ""
-		if to == api.XDF {
-			opts = "[-i image] [-m] "
-			help = "-i adds the file region and the labels of \"subtract\" axes from the flash\nimage. -m also writes FILE.meta.json, without which the XDF doesn't convert\nback exactly.\n"
-		}
-		fmt.Fprintf(os.Stderr, "usage: %s %sFILE.%s...\n\nWrites FILE.%s next to each input. An existing file is not replaced.\n%s", name, opts, from, to, help)
-		return rc
-	}
+	fs := pflag.NewFlagSet(name, pflag.ContinueOnError)
+	version := fs.Bool("version", false, "print the version")
 	var opt aliasOpts
-	var files []string
-	for i := 0; i < len(args); i++ {
-		a := args[i]
-		switch {
-		case a == "--":
-			files = append(files, args[i+1:]...)
-			i = len(args)
-		case a == "-h" || a == "--help":
-			return usage(0)
-		case a == "--version":
-			fmt.Println(api.Version)
-			return 0
-		case a == "-i" && to == api.XDF:
-			if i++; i == len(args) {
-				fmt.Fprintf(os.Stderr, "%s: -i needs a file\n", name)
-				return usage(2)
-			}
-			var err error
-			if opt.image, err = os.ReadFile(args[i]); err != nil {
-				fmt.Fprintf(os.Stderr, "%s: %v\n", name, err)
-				return 1
-			}
-		case a == "-m" && to == api.XDF:
-			opt.meta = true
-		case len(a) > 1 && a[0] == '-':
-			fmt.Fprintf(os.Stderr, "%s: unknown option %s\n", name, a)
-			return usage(2)
-		default:
-			files = append(files, a)
-		}
+	var image, opts, help string
+	if to == api.XDF {
+		fs.StringVarP(&image, "image", "i", "", "flash image")
+		fs.BoolVarP(&opt.meta, "write-meta", "m", false, "also write the metadata file")
+		opts = "[-i image] [-m] "
+		help = "-i (--image) adds the file region and the labels of \"subtract\" axes from\nthe flash image. -m (--write-meta) also writes FILE.meta.json, without which\nthe XDF doesn't convert back exactly.\n"
 	}
-	if len(files) == 0 {
-		return usage(2)
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "usage: %s %sFILE.%s...\n\nWrites FILE.%s next to each input. An existing file is not replaced.\n%s", name, opts, from, to, help)
+	}
+	files, err := parse(fs, args)
+	switch {
+	case errors.Is(err, pflag.ErrHelp):
+		return 0
+	case err != nil:
+		fmt.Fprintf(os.Stderr, "%s: %v\n", name, err)
+		fs.Usage()
+		return 2
+	case *version:
+		fmt.Println(api.Version)
+		return 0
+	case len(files) == 0:
+		fs.Usage()
+		return 2
+	}
+	if image != "" {
+		if opt.image, err = os.ReadFile(image); err != nil {
+			fmt.Fprintf(os.Stderr, "%s: %v\n", name, err)
+			return 1
+		}
 	}
 	rc := 0
 	for _, in := range files {

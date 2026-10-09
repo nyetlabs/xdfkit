@@ -62,7 +62,7 @@ func aliasInput(t *testing.T, dir string) []byte {
 
 // TestAliasConvert: each alias writes beside its input, never replaces a
 // file, writes a metadata file only with -m, and refuses the wrong input
-// format and unknown options.
+// format, unknown options and long options with one hyphen.
 func TestAliasConvert(t *testing.T) {
 	dir := t.TempDir()
 	src := aliasInput(t, dir)
@@ -93,13 +93,31 @@ func TestAliasConvert(t *testing.T) {
 		{"kp2xdf", []string{filepath.Join(dir, "p.json")}, 1},
 		{"kp2json", nil, 2},
 		{"kp2xdf", []string{"-force", kp}, 2},
+		{"kp2xdf", []string{"--force", kp}, 2},
+		{"kp2xdf", []string{"-version"}, 2},
 		{"kp2xdf", []string{"-i"}, 2},
 		{"kp2json", []string{"-m", kp}, 2},
 		{"kp2xdf", []string{"-h"}, 0},
+		{"kp2xdf", []string{"--help"}, 0},
+		{"kp2xdf", []string{"--version"}, 0},
 	} {
 		if rc := runAlias(s.name, s.args); rc != s.rc {
 			t.Errorf("%s %q: rc %d, want %d", s.name, s.args, rc, s.rc)
 		}
+	}
+	q := filepath.Join(dir, "q.kp")
+	img := filepath.Join(dir, "empty.bin")
+	if err := os.WriteFile(q, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(img, nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rc := runAlias("kp2xdf", []string{q, "-mi", img}); rc != 0 {
+		t.Fatalf("kp2xdf q.kp -mi image: rc %d", rc)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "q.meta.json")); err != nil {
+		t.Errorf("kp2xdf -mi: %v", err)
 	}
 }
 

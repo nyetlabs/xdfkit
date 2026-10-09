@@ -5,7 +5,6 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -13,30 +12,35 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/pflag"
 	"go.nyet.org/xdfkit/api"
 	"go.nyet.org/xdfkit/canon"
 	"go.nyet.org/xdfkit/lint"
 )
 
 const usage = `usage:
-  xdfkit [-f json|yaml|kp|csv|xdf] [-template orig.kp] [-i image] [-r ref]...
-         [-meta file.meta.json] [-origin damos|a2l|hand|located]
-         [-tuner categories.json] [-force] input [output]
+  xdfkit [-f json|yaml|kp|csv|xdf] [--template orig.kp] [-i image] [-r ref]...
+         [--meta file.meta.json] [--origin damos|a2l|hand|located]
+         [--tuner categories.json] [--force] input [output]
   xdfkit verify file.json|file.yaml...
-  xdfkit lint -i image [-family me7|m3] [-json findings.json] input
-  xdfkit fix -i image (-o output | -n) [-rules R1,R2] [-only ID,...]
-             [-min-confidence high|medium|low] [-findings findings.json] input
+  xdfkit lint -i image [--family me7|m3] [--json findings.json] input
+  xdfkit fix -i image (-o output | -n) [--rules R1,R2] [--only ID,...]
+             [--min-confidence high|medium|low] [--findings findings.json] input
   xdfkit version
   xdfkit xdf2kp|kp2json FILE...
   xdfkit kp2xdf [-i image] [-m] FILE...
+
+A single hyphen is for single-letter options, which also have long names:
+-f --format, -i --image, -r --ref, -o --output, -n --dry-run, -m --write-meta.
+Long options take two hyphens. Options may come before or after the files.
 
 Converts between KP, XDF and the model JSON or YAML, and writes CSV; the
 input format is detected from the contents, the output format comes from -f,
 else the output extension (.yml is yaml), else json. YAML is the model JSON in
 YAML syntax, with the same typed numbers and stamp. Input "-" reads stdin;
 output other than KP without an output file goes to stdout. Existing output
-files are not overwritten unless -force is given. KP output from JSON or YAML
-fills the KP fields the model doesn't carry from -template (the KP file the
+files are not overwritten unless --force is given. KP output from JSON or YAML
+fills the KP fields the model doesn't carry from --template (the KP file the
 JSON came from reproduces it), else from defaults. CSV output is
 mapdump's map list: -i adds the value ranges from the image, and each -r adds a
 column with the names of the matching maps in that KP, JSON or YAML definition.
@@ -44,13 +48,13 @@ XDF output is TunerPro's format; -i adds the file region and the labels of
 "subtract" axes, and the definition title is the output file's name. An XDF
 output file comes with its metadata file, NAME.meta.json next to NAME.xdf,
 holding what XDF can't express. XDF input reads the metadata file given by
--meta, else NAME.meta.json next to it if it exists; with it, an XDF unchanged
+--meta, else NAME.meta.json next to it if it exists; with it, an XDF unchanged
 since it was written converts back to the definition exactly, and edits made
-to it are reported. -origin records where a KP or XDF input's definitions
+to it are reported. --origin records where a KP or XDF input's definitions
 came from in the model's provenance: damos or a2l (exported from Bosch
 data), hand (made by hand; the default, unless an XDF's metadata file has
 another) or located (found in the image by a program such as me7info; never
-a corpus source). -tuner keeps only the maps named in a category table (the
+a corpus source). --tuner keeps only the maps named in a category table (the
 corpus categories.json) and the objects their axes point at, filed under the
 table's categories.
 
@@ -65,15 +69,18 @@ verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
 and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
 
 lint checks the KP file's image axes against the flash image and prints one
-line per finding; -json also writes them as JSON ("-" for stdout). It exits 1
+line per finding; --json also writes them as JSON ("-" for stdout). It exits 1
 when there are findings. fix applies the findings that have a fix: by default
-those of high confidence, or those chosen by -only, -rules and
--min-confidence. With -findings it applies the fixes in a (possibly edited)
-lint -json file instead of linting. -o - writes to stdout; -n only reports.
+those of high confidence, or those chosen by --only, --rules and
+--min-confidence. With --findings it applies the fixes in a (possibly edited)
+lint --json file instead of linting. -o - writes to stdout; -n only reports.
 `
 
 func main() {
 	log := func(err error) {
+		if errors.Is(err, pflag.ErrHelp) {
+			os.Exit(0)
+		}
 		fmt.Fprintln(os.Stderr, "xdfkit:", err)
 		os.Exit(1)
 	}
@@ -86,7 +93,7 @@ func main() {
 			os.Exit(runAlias(args[0], args[1:]))
 		}
 	}
-	if len(args) == 1 && (args[0] == "version" || args[0] == "-version" || args[0] == "--version") {
+	if len(args) == 1 && (args[0] == "version" || args[0] == "--version") {
 		fmt.Println(api.Version)
 		return
 	}
@@ -100,24 +107,30 @@ func main() {
 	}
 }
 
-func newFlags(name string) *flag.FlagSet {
-	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+func newFlags(name string) *pflag.FlagSet {
+	fs := pflag.NewFlagSet(name, pflag.ContinueOnError)
 	fs.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 	return fs
 }
 
-// parse parses flags anywhere among the arguments and returns the others.
-func parse(fs *flag.FlagSet, args []string) ([]string, error) {
-	var pos []string
-	for {
-		if err := fs.Parse(args); err != nil {
-			return nil, err
+// parse parses options anywhere among the arguments and returns the others.
+// One hyphen is for single-letter options only: a long option spelled with
+// one (-force) is an error naming the right spelling, since pflag would
+// read it as -f orce.
+func parse(fs *pflag.FlagSet, args []string) ([]string, error) {
+	for _, a := range args {
+		if a == "--" {
+			break
 		}
-		if fs.NArg() == 0 {
-			return pos, nil
+		name, _, _ := strings.Cut(strings.TrimPrefix(a, "-"), "=")
+		if len(a) > 2 && a[0] == '-' && a[1] != '-' && (fs.Lookup(name) != nil || name == "help" || name == "version") {
+			return nil, fmt.Errorf("%s: long options take two hyphens: --%s", a, name)
 		}
-		pos, args = append(pos, fs.Arg(0)), fs.Args()[1:]
 	}
+	if err := fs.Parse(args); err != nil {
+		return nil, err
+	}
+	return fs.Args(), nil
 }
 
 func list(s string) []string {
@@ -129,7 +142,7 @@ func list(s string) []string {
 
 func lintCmd(args []string) error {
 	fs := newFlags("lint")
-	image := fs.String("i", "", "flash image")
+	image := fs.StringP("image", "i", "", "flash image")
 	family := fs.String("family", "", "ECU family: me7 or m3 (default: from the image)")
 	jsonOut := fs.String("json", "", "also write the findings as JSON to this file")
 	force := fs.Bool("force", false, "overwrite an existing JSON file")
@@ -175,14 +188,14 @@ func lintCmd(args []string) error {
 
 func fix(args []string) error {
 	fs := newFlags("fix")
-	image := fs.String("i", "", "flash image")
+	image := fs.StringP("image", "i", "", "flash image")
 	family := fs.String("family", "", "ECU family: me7 or m3 (default: from the image)")
-	out := fs.String("o", "", "output file")
+	out := fs.StringP("output", "o", "", "output file")
 	rules := fs.String("rules", "", "comma-separated rules to apply")
 	only := fs.String("only", "", "comma-separated finding IDs to apply")
 	minConf := fs.String("min-confidence", "", "lowest confidence to apply (default high)")
-	findings := fs.String("findings", "", "apply the fixes in this lint -json file")
-	dry := fs.Bool("n", false, "report what would be fixed without writing")
+	findings := fs.String("findings", "", "apply the fixes in this lint --json file")
+	dry := fs.BoolP("dry-run", "n", false, "report what would be fixed without writing")
 	force := fs.Bool("force", false, "overwrite an existing output file")
 	pos, err := parse(fs, args)
 	if err != nil {
@@ -264,26 +277,26 @@ func warn(name string, ws []string) {
 
 func convert(args []string) error {
 	fs := newFlags("xdfkit")
-	format := fs.String("f", "", "output format: json, yaml, kp, csv or xdf")
+	format := fs.StringP("format", "f", "", "output format: json, yaml, kp, csv or xdf")
 	force := fs.Bool("force", false, "overwrite an existing output file")
 	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
-	image := fs.String("i", "", "flash image, for CSV value ranges and XDF")
+	image := fs.StringP("image", "i", "", "flash image, for CSV value ranges and XDF")
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
 	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, hand or located")
 	tuner := fs.String("tuner", "", "category table: keep only its maps and their axes")
-	var refs []string
-	fs.Func("r", "reference definition, for a CSV column of matching map names (repeatable)", func(s string) error {
-		refs = append(refs, s)
-		return nil
-	})
-	if err := fs.Parse(args); err != nil {
+	refs := fs.StringArrayP("ref", "r", nil, "reference definition, for a CSV column of matching map names (repeatable)")
+	pos, err := parse(fs, args)
+	if err != nil {
 		return err
 	}
-	if fs.NArg() < 1 || fs.NArg() > 2 {
+	if len(pos) < 1 || len(pos) > 2 {
 		fs.Usage()
 		os.Exit(2)
 	}
-	in, out := fs.Arg(0), fs.Arg(1)
+	in, out := pos[0], ""
+	if len(pos) == 2 {
+		out = pos[1]
+	}
 	if *format == "" {
 		*format = strings.TrimPrefix(filepath.Ext(out), ".")
 		switch *format {
@@ -321,7 +334,7 @@ func convert(args []string) error {
 			return err
 		}
 	}
-	for _, r := range refs {
+	for _, r := range *refs {
 		b, err := os.ReadFile(r)
 		if err != nil {
 			return err
@@ -376,7 +389,7 @@ func writeConverted(out string, b, meta []byte, force bool) error {
 		return writeOutput(out, b, force)
 	}
 	if _, err := os.Stat(metaName(out)); err == nil && !force {
-		return fmt.Errorf("%s exists (use -force)", metaName(out))
+		return fmt.Errorf("%s exists (use --force)", metaName(out))
 	}
 	if err := writeOutput(out, b, force); err != nil {
 		return err
@@ -425,7 +438,7 @@ func writeOutput(name string, b []byte, force bool) error {
 	}
 	w, err := os.OpenFile(name, flags, 0o644)
 	if errors.Is(err, os.ErrExist) {
-		return fmt.Errorf("%s exists (use -force)", name)
+		return fmt.Errorf("%s exists (use --force)", name)
 	} else if err != nil {
 		return err
 	}

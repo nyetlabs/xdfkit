@@ -29,7 +29,7 @@ make build && sudo make install
 
 ```sh
 xdfkit -f xdf -i image.bin in.kp out.xdf    # KP to XDF, plus out.meta.json
-xdfkit -template in.kp out.xdf back.kp      # XDF back to KP
+xdfkit --template in.kp out.xdf back.kp     # XDF back to KP
 xdfkit lint -i image.bin in.kp              # report axis mistakes
 xdfkit fix -i image.bin -o fixed.kp in.kp   # fix them
 xdfkit -f csv -i image.bin in.kp            # map list with value ranges
@@ -37,7 +37,7 @@ xdfkit in.kp out.json                       # KP to JSON (or out.yaml)
 xdfkit verify out.json                      # has it been edited by hand?
 ```
 
-The input format is detected from the file; the output format comes from `-f`, else the output file's extension. Existing files are not overwritten without `-force`. `xdfkit -h` lists every option.
+The input format is detected from the file; the output format comes from `-f`, else the output file's extension. Existing files are not overwritten without `--force`. Options of one letter take one hyphen (`-f`), longer ones two (`--force`). `xdfkit -h` lists every option.
 
 ### Quick converters
 
@@ -61,7 +61,7 @@ flowchart LR
   kp["in.kp"] --> xdf["out.xdf +<br/>out.meta.json"]
   tp["edit in TunerPro"] --> xdf
   xdf --> kp2["back.kp"]
-  kp -. "-template" .-> kp2
+  kp -. "--template" .-> kp2
 ```
 
 ## Fixing KP files
