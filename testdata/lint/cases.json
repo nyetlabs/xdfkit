@@ -1,0 +1,43 @@
+{
+  "about": "Synthetic lint fixtures (lint/fixture_test.go, docs/autocorrect.md): no OEM data. Each case builds an image holding its Bosch ident and the raw axis values (8-bit axes get a count byte before them unless count is given), and a KP file from the maps. want lists every finding: rule ID, confidence, and the map axes it names (MAP/x, or MAP/ for R8).",
+  "cases": [
+    {
+      "name": "me7",
+      "ident": "40/1/ME7.1/5/6005.01//22m/DstC2o/011200/",
+      "maps": [
+        {"id": "PLAIN", "addr": "0x8000", "x": {"addr": "0x1000", "values": [10, 20, 30, 40]}},
+        {"id": "WORDS", "addr": "0x8010", "x": {"addr": "0x1100", "bits": 16, "values": [1000, 2000, 3000, 4000]}},
+        {"id": "SHARED_A", "addr": "0x8020", "x": {"addr": "0x1010", "stored": "subtract", "values": [1, 2, 3, 4]}},
+        {"id": "SHARED_B", "addr": "0x8030", "x": {"addr": "0x1010", "stored": "subtract", "values": [1, 2, 3, 4]}},
+        {"id": "SIGNED_SUB", "addr": "0x8040", "x": {"addr": "0x1020", "stored": "subtract", "values": [240, 248, 0, 8]}},
+        {"id": "SIGNED", "addr": "0x8050", "x": {"addr": "0x1030", "values": [240, 248, 0, 8]}},
+        {"id": "CONST", "addr": "0x8060", "x": {"addr": "0x1040", "values": [5, 5, 5, 5]}},
+        {"id": "ZIGZAG", "addr": "0x8070", "x": {"addr": "0x1050", "values": [1, 9, 3, 7]}},
+        {"id": "STALE", "addr": "0x8080", "end": "0x8090", "x": {"addr": "0x1000", "values": [10, 20, 30, 40]}, "y": {"addr": "0x1060", "values": [1, 2]}}
+      ],
+      "want": [
+        {"id": "R1@0x1010:4", "confidence": "high", "maps": ["SHARED_A/x", "SHARED_B/x"]},
+        {"id": "R1@0x1020:4", "confidence": "medium", "maps": ["SIGNED_SUB/x"]},
+        {"id": "R3@0x1030:4", "confidence": "medium", "maps": ["SIGNED/x"]},
+        {"id": "R6@0x1040:4", "confidence": "n/a", "maps": ["CONST/x"]},
+        {"id": "R6@0x1050:4", "confidence": "n/a", "maps": ["ZIGZAG/x"]},
+        {"id": "R8@0x8080:8", "confidence": "high", "maps": ["STALE/"]}
+      ]
+    },
+    {
+      "name": "m3",
+      "ident": "5655/1/M3.82/03/400600/DAMOS3N2/",
+      "maps": [
+        {"id": "SUB", "addr": "0x8000", "x": {"addr": "0x1000", "stored": "subtract", "values": [40, 10, 30, 20]}},
+        {"id": "PLAIN_SUB", "addr": "0x8010", "x": {"addr": "0x1010", "values": [40, 10, 30, 20]}},
+        {"id": "COUNT", "addr": "0x8020", "x": {"addr": "0x1020", "count": 5, "values": [10, 20, 30, 40]}},
+        {"id": "OVERFLOW", "addr": "0x8030", "x": {"addr": "0x1030", "stored": "subtract", "values": [100, 100, 100, 10]}}
+      ],
+      "want": [
+        {"id": "R2@0x1010:4", "confidence": "high", "maps": ["PLAIN_SUB/x"]},
+        {"id": "R4@0x1020:4", "confidence": "n/a", "maps": ["COUNT/x"]},
+        {"id": "R6@0x1030:4", "confidence": "n/a", "maps": ["OVERFLOW/x"]}
+      ]
+    }
+  ]
+}

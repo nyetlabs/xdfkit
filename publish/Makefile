@@ -130,9 +130,9 @@ $(foreach p,$(TUNER),$(eval $(call ZIP_template,$(p)-tuner,$(TUNER_EXTS),$(call 
 
 zips: $(ZIPS)
 
-stage: $(TOP) $(FULLDIR)
+stage: README.txt $(TOP) $(FULLDIR)
 	rm -rf $(STAGE) && mkdir -p $(STAGE)/full
-	cp -p $(TOP) $(STAGE)/
+	cp -p README.txt $(TOP) $(STAGE)/
 	$(if $(FULLDIR),cp -p $(FULLDIR) $(STAGE)/full/)
 
 upload: stage

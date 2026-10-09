@@ -37,6 +37,8 @@ flowchart TD
 - Full (origin `damos`, the known DAMOS packs): the same files in `full/`.
 - Tuner: a full pack whose image is ME7 (corpus.tsv family) also gets, at the top level, `PACK-tuner.xdf`, `.meta.json`, `.csv` and `PACK-tuner-DATE.zip`: only the maps named in the corpus `categories.json` (`CATEGORIES=` overrides it; docs/corpus.md) and the objects their axes point at, filed under its categories. No tuner KP (untested in WinOLS) and no model JSON (a subset is not a definition). None are built when the table is missing. Non-ME7 DAMOS packs (8D0907558E, 8D0907558M) are in `full/` only.
 
+`README.txt` explains the layout to downloaders and is published at the top level.
+
 Inside a zip the files are renamed `STEM-DATE.EXT`, so an XDF and its metadata file keep one stem and xdfkit finds the metadata file next to the XDF. A zip is dated by the last commit of its pack's source (the corpus JSON, or the archived KP), and a tuner zip also by `categories.json`'s, whichever is later. Only the current zip is published: the date tells users the pack changed, and `make upload` (`rsync --delete` to `UPLOAD_DEST`, set in the gitignored `local.mk`) removes older ones and anything else not in the tree. A tuner XDF is marked as a subset (`provenance.subset`, docs/model.md), so `import-incoming.sh` refuses it, even renamed.
 
 A pack without corpus JSON is converted from its archived KP in `testdata/archive/ecuxplot/`: 8N0906018CB, whose pack fits only the archive's non-OEM image; the Makefile gives it origin `damos` and family ME7.5. The archive is never edited, so that pack can't be corrected through `incoming` until an OEM image of its software is in the corpus.

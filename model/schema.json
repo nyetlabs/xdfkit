@@ -249,7 +249,7 @@
           "type": "string"
         },
         "origin": {
-          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP projects usually are).",
+          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are).",
           "enum": [
             "damos",
             "a2l",

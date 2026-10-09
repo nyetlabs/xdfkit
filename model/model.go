@@ -29,7 +29,7 @@ type Model struct {
 // Provenance identifies the original file, which the corpus doesn't hold.
 type Provenance struct {
 	Format string  `json:"format" doc:"Source format." enum:"kp|xdf"`
-	Origin string  `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP projects usually are)." enum:"damos|a2l|hand"`
+	Origin string  `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are)." enum:"damos|a2l|hand"`
 	File   string  `json:"file,omitempty" doc:"Original file name."`
 	SHA256 string  `json:"sha256" doc:"SHA-256 of the original file, lowercase hex." pattern:"^[0-9a-f]{64}$"`
 	Subset *Subset `json:"subset,omitempty" doc:"Set when the definition is a subset of the original file's, which must not replace it in the corpus."`
