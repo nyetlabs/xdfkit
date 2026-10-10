@@ -2,7 +2,7 @@
 
 `ecu-corpus` (`github.com/nyetlabs/ecu-corpus`, private): OEM flash images and their map definitions as canonical JSON, shared by xdfkit, ME7Sum and me7-logger as a git submodule (`corpus/`). Its tools (`tools/`, Go module `go.nyet.org/ecu-corpus/tools`): `corpus-manifest` builds, checks and classifies; `corpus-links` makes the root symlinks.
 
-Contents: 99 OEM images seeded from the source repos, the manifest, CI check, the ecuxplot definitions as JSON and `categories.json`. Consumers fetch it in CI and run the weekly bump workflow (`.github/workflows/corpus-bump.yml`; each repo must allow Actions to create pull requests). Test access: xdfkit `internal/corpus`, me7-logger `internal/ecucorpus`, ME7Sum `scripts/test.sh`; none commits corpus images any more (ME7Sum keeps its non-OEM ones in `testdata/`). ecuxplot has no images and no submodule.
+Contents: 100 OEM images (99 seeded from the source repos), the manifest, CI check, the ecuxplot definitions as JSON and `categories.json`. Consumers fetch it in CI and run the weekly bump workflow (`.github/workflows/corpus-bump.yml`; each repo must allow Actions to create pull requests). Test access: xdfkit `internal/corpus`, me7-logger `internal/ecucorpus`, ME7Sum `scripts/test.sh`; none commits corpus images any more (ME7Sum keeps its non-OEM ones in `testdata/`). ecuxplot has no images and no submodule.
 
 ## Specification
 

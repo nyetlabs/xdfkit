@@ -147,7 +147,7 @@ The stored values are offsets between breakpoints, counted down from the top of 
   - FHSA.0 X in 8D0907558E (raw 27, 13, 12, 60, conversion 0.75*X-48) displays 60, 80.25, 90, 99 (raw 144, 171, 184, 196).
   - KFWKSTAB X in 8D0907551M (raw 24, 49, 50, 164, total 287) displays -71.25, -53.25, -16.50, 21.00 (raw -31, -7, 42, 92). The negative first point is how a mislabelled absolute axis shows (below).
   - 16-bit "subtract" axes are counted from 65536 (unconfirmed; none seen).
-- Evidence that this is the ECU's meaning, not only WinOLS's (8D0907558E/M, 128 KB Motronic images with axes around 0x8xxx, 273 and 285 axis entries labelled "subtract"): read this way, every "subtract" axis in 8D0907558E increases from 0 or more, and the breakpoints are round numbers in the operating range:
+- Evidence that this is the ECU's meaning, not only WinOLS's (8D0907558E/M, 128 KB Motronic images with axes around 0x8xxx, 273 and 285 axis entries labelled "subtract" in ecuxplot's packs, 506 and 361 in the corpus JSON with lint R2 applied): read this way, every "subtract" axis in 8D0907558E increases from 0 or more, and the breakpoints are round numbers in the operating range:
   - `TLAN` (rpm, 40*X): 1840, 2000, 3000, 4000, 4520, 5520, 6000, 6800
   - `KFZW.0` Y (rpm): 600, 800, 1000, 1480, ..., 5520, 6000, 6800
   - `FKHE.0` (%, 0.390625*X): 0, 1.95, 25, 75, 99.61
@@ -156,7 +156,7 @@ The stored values are offsets between breakpoints, counted down from the top of 
   - A forward running sum also increases but gives odd values (TLAN 160 to 8400 rpm), so it is wrong.
 - Layout: the two bytes before these axes are [input variable id][point count], e.g. `[164, 8]` on rpm axes, `[240, n]` on % axes, `[155, n]` on temperature. That's consistent with Motronic M3.x-style axis headers; ME7 axes have only the count byte.
 - Pack errors exist in both directions, so the label can't be trusted blindly:
-  - 8D0907558E has "subtract" axes labelled plain "EEPROM" (KFFA X: raw 12, 12, 14, 16, 17, 13, ..., 36, which read as "subtract" is a clean 1.0, 1.6, 2.2, ..., 10.5, 11.0 ms/rev).
+  - ecuxplot's 8D0907558E and 8D0907558M packs have "subtract" axes labelled plain "EEPROM" (KFFA X: raw 12, 12, 14, 16, 17, 13, ..., 36, which read as "subtract" is a clean 1.0, 1.6, 2.2, ..., 10.5, 11.0 ms/rev, as WinOLS 2.24 displays it once relabelled). The corpus JSON has them relabelled (lint R2).
   - The 27 "subtract" axes in the ME7 packs (8D0907551G/M) are absolute and mislabelled by the pack author: read as "subtract" their totals exceed 256, so they start below zero (KFWKSTAB above). With the datasource set to "EEPROM" (`xdfkit fix`, rule R1), WinOLS 2.24 displays KFWKSTAB as -30, -11.25, -10.5, 75, the plain values.
 - Implementation:
   - KP reader/writer: the model keeps the datasource exactly as stored (`axis.stored` = absolute / add / subtract / backwards), never "corrected".
