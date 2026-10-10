@@ -7,7 +7,7 @@
 # NAME.meta.json next to it, else build/publish/PACK.meta.json. The corpus JSON
 # is rewritten only when the definitions or their origin changed; files from
 # incoming then move to incoming/imported/, so a later run can't import them
-# over newer work. A second file for one pack waits for the next run. A subset
+# over newer work. A second file for one definition waits for the next run. A subset
 # (provenance.subset, as in PACK-tuner.xdf, even renamed) is refused. Origin
 # located (maps found by a program such as me7info, as model JSON) is written
 # only where the corpus JSON is missing or located too, never over a hand or
@@ -54,14 +54,14 @@ for f; do
 		status=1
 		continue
 	fi
-	case " $seen " in *" $pack "*)
-		echo "$name: skipped, another file for $pack was imported in this run" >&2
+	def=$corpus/defs/$(awk -F'\t' -v p="$pack" '$1 == p { print $2 }' "$tsv").json
+	case " $seen " in *" $def "*)
+		echo "$name: skipped, another file for $(basename "$def") was imported in this run" >&2
 		status=1
 		continue
 		;;
 	esac
-	seen="$seen $pack"
-	def=$corpus/defs/$(awk -F'\t' -v p="$pack" '$1 == p { print $2 }' "$tsv").json
+	seen="$seen $def"
 	if test -f "$def" && test "${FORCE:-}" != 1 && "$xdfkit" verify "$def" | grep -Eq ': (edited|mixed)'; then
 		echo "$name: skipped, $def is hand edited (FORCE=1 imports anyway)" >&2
 		status=1
