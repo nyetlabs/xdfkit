@@ -2,13 +2,10 @@
 // layouts ecuxplot's mapdump understands: v1 (header 0x71/0x74, maps inline) and
 // v2 (header 0x124/0x149, maps in a deflated zip entry named "intern").
 //
-// Undecoded fields are named after the preceding named field plus Unk plus
-// their hex byte offset from its end in the v2 layout (StoredRowsUnk1B), or Unk plus the
-// offset from the start of the file header or a record when nothing named
-// precedes them (Unk18); raw regions are named for the region (UnkHeader,
-// UnkTrailing). docs/kp-format.md has the details. Each should get a real name
-// once its meaning is known. Undecoded runs are kept as Hex blocks so Encode
-// reproduces the input.
+// Fields whose meaning isn't known get the most likely name, marked
+// "(unconfirmed)" in a comment; constants with no known meaning are named Pad
+// (zeros), Flag or Tag after the field they follow. docs/kp-format.md has the
+// details. Undecoded runs are kept as Hex blocks so Encode reproduces the input.
 package kp
 
 import (
@@ -31,44 +28,44 @@ const (
 
 // File is a parsed map pack. Fields are in file order (see codec for the tags).
 type File struct {
-	Signature      string  `json:"signature"`
-	HeaderID       int32   `json:"headerId"`        // 0x71/0x74 (v1) or 0x124/0x149 (v2)
-	HeaderLen      int32   `json:"headerLen"`       // v2: total file length (recomputed by Encode); v1: 0
-	Unk18          Hex     `json:"unk18" kp:"hook"` // from 0x18 to the end of the fixed header, 0x5c (v1) or 0x60 (v2)
-	Filename       string  `json:"filename"`
-	Version        string  `json:"version"`
-	UnkHeader      Hex     `json:"unkHeader" kp:"hook"` // between Version and EndOffset
-	EndOffset      int32   `json:"endOffset"`           // offset of the end marker, file length - 4 (recomputed by Encode)
-	EndOffsetUnk00 Hex     `json:"endOffsetUnk00" kp:"len=12"`
-	Project        Project `json:"project"`
+	Signature   string  `json:"signature"`
+	HeaderID    int32   `json:"headerId"`              // 0x71/0x74 (v1) or 0x124/0x149 (v2)
+	HeaderLen   int32   `json:"headerLen"`             // v2: total file length (recomputed by Encode); v1: 0
+	FixedHeader Hex     `json:"fixedHeader" kp:"hook"` // from 0x18 to the end of the fixed header, 0x5c (v1) or 0x60 (v2); zeros
+	Filename    string  `json:"filename"`
+	Version     string  `json:"version"`
+	HeaderBody  Hex     `json:"headerBody" kp:"hook"` // between Version and EndOffset; partly uninitialized memory
+	EndOffset   int32   `json:"endOffset"`            // offset of the end marker, file length - 4 (recomputed by Encode)
+	EndTag      Hex     `json:"endTag" kp:"len=12"`   // constant: a format tag (unconfirmed)
+	Project     Project `json:"project"`
 }
 
 type Project struct {
-	Name         string    `json:"name"`
-	NameUnk00    [4]int32  `json:"nameUnk00"`
-	NameUnk10    Hex       `json:"nameUnk10,omitzero" kp:"v2,len=4"`
-	Version      string    `json:"version"`
-	VersionUnk00 [4]int32  `json:"versionUnk00"`
-	VersionUnk10 Hex       `json:"versionUnk10,omitzero" kp:"v2,len=4"`
-	VersionUnk14 int32     `json:"versionUnk14"`
-	VersionUnk18 Hex       `json:"versionUnk18,omitzero" kp:"v2,len=1"`
-	UnkIntern    byte      `json:"unkIntern,omitzero" kp:"-"` // v2: first byte of the map block
-	Maps         []*Map    `json:"maps" kp:"hook"`
-	MapsUnk00    [3]int32  `json:"mapsUnk00"`
-	Folders      []*Folder `json:"folders" kp:"count"`
-	UnkTrailing  Hex       `json:"unkTrailing" kp:"rest"`
+	Name       string    `json:"name"`
+	NameTag    [4]int32  `json:"nameTag"` // constant: a type tag (unconfirmed)
+	NamePad    Hex       `json:"namePad,omitzero" kp:"v2,len=4"`
+	Version    string    `json:"version"`
+	VersionTag [4]int32  `json:"versionTag"` // constant, equals NameTag: a type tag (unconfirmed)
+	VersionPad Hex       `json:"versionPad,omitzero" kp:"v2,len=4"`
+	Build      int32     `json:"build"`                            // constant: a build or format id (unconfirmed)
+	BuildFlag  Hex       `json:"buildFlag,omitzero" kp:"v2,len=1"` // constant 1 (unconfirmed)
+	InternFlag byte      `json:"internFlag,omitzero" kp:"-"`       // v2: first byte of the map block, 0 (unconfirmed)
+	Maps       []*Map    `json:"maps" kp:"hook"`
+	MapsTag    [3]int32  `json:"mapsTag"` // constant: a type tag (unconfirmed)
+	Folders    []*Folder `json:"folders" kp:"count"`
+	Trailing   Hex       `json:"trailing" kp:"rest"` // mostly uninitialized memory
 
 	intern, zip []byte // v2 as read: inflated map block and its zip archive
 	zipOff      int    // v2 as read: offset of the zip length
 }
 
 type Folder struct {
-	ID        int32  `json:"id"`
-	BuiltIn   int32  `json:"builtIn"` // 9000 on "My maps", 9001 on "Hexdump", else 0
-	Name      string `json:"name"`
-	NameUnk00 Hex    `json:"nameUnk00" kp:"len=2"`
-	NameUnk02 int32  `json:"nameUnk02"`
-	NameUnk06 Hex    `json:"nameUnk06,omitzero" kp:"v2,len=15"`
+	ID      int32  `json:"id"`
+	BuiltIn int32  `json:"builtIn"` // 9000 on "My maps", 9001 on "Hexdump", else 0
+	Name    string `json:"name"`
+	Flags   Hex    `json:"flags" kp:"len=2"` // 1, 1: expanded and visible (unconfirmed)
+	Style   int32  `json:"style"`            // 0x1000000 (unconfirmed)
+	Pad     Hex    `json:"pad,omitzero" kp:"v2,len=15"`
 }
 
 const headerLenOff = 0x14
@@ -134,15 +131,15 @@ func (f *File) Layout() Layout {
 
 func (f *File) hook(c *codec, field string) {
 	switch field {
-	case "Unk18":
+	case "FixedHeader":
 		c.layout = f.Layout()
 		end := map[Layout]int{V1: 0x5c, V2: 0x60}[c.layout]
 		if end == 0 {
 			c.fail("unknown kp header 0x%x", f.HeaderID)
 		}
-		c.raw(&f.Unk18, end-c.pos)
-	case "UnkHeader":
-		c.opaque(&f.UnkHeader, func() { walkHeader(c, c.layout) })
+		c.raw(&f.FixedHeader, end-c.pos)
+	case "HeaderBody":
+		c.opaque(&f.HeaderBody, func() { walkHeader(c, c.layout) })
 	}
 }
 
@@ -176,7 +173,7 @@ func walkHeader(c *codec, l Layout) {
 }
 
 // hook codes the maps: inline in v1; in v2 an int length, then a zip holding
-// "intern" (UnkIntern, then the maps).
+// "intern" (InternFlag, then the maps).
 func (p *Project) hook(c *codec, _ string) {
 	maps := func(c *codec) {
 		c.list(&p.Maps)
@@ -198,7 +195,7 @@ func (p *Project) hook(c *codec, _ string) {
 		}
 		p.intern = intern
 		ic := c.sub(intern)
-		ic.u8(&p.UnkIntern)
+		ic.u8(&p.InternFlag)
 		maps(ic)
 		if ic.pos != len(intern) {
 			c.fail("v2 map block: %d bytes after the maps", len(intern)-ic.pos)
@@ -206,7 +203,7 @@ func (p *Project) hook(c *codec, _ string) {
 		return
 	}
 	ic := c.sub(nil)
-	ic.u8(&p.UnkIntern)
+	ic.u8(&p.InternFlag)
 	maps(ic)
 	z := p.zip
 	if z == nil || !bytes.Equal(ic.b, p.intern) {

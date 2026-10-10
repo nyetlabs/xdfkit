@@ -15,23 +15,25 @@ type Type int32
 type DataSource int32
 
 const (
-	OrgSingle        Org        = 2
-	OrgOneD          Org        = 3
-	OrgTwoD          Org        = 4
-	OrgTwoDInv       Org        = 5
-	DSOrdinal        DataSource = 0
-	DSEeprom         DataSource = 1
-	DSEepromAdd      DataSource = 2
-	DSEepromSubtract DataSource = 3
+	OrgSingle         Org        = 2
+	OrgOneD           Org        = 3
+	OrgTwoD           Org        = 4
+	OrgTwoDInv        Org        = 5
+	DSOrdinal         DataSource = 0
+	DSEeprom          DataSource = 1
+	DSEepromAdd       DataSource = 2
+	DSEepromSubtract  DataSource = 3
+	DSFreeEditable    DataSource = 4
+	DSEepromBackwards DataSource = 5
 )
 
 var orgNames = map[Org]string{OrgSingle: "single", OrgOneD: "1d", OrgTwoD: "2d", OrgTwoDInv: "2d-inverse"}
 
-// Names follow OLS_LangE.dll. Values 4 and 5 are unconfirmed (docs/kp-format.md,
-// Enums): 4 free editable and 5 backwards in the script enum order, the reverse
-// of the DLL's UI order.
+// Names follow OLS_LangE.dll; 4 and 5 are in the script enum order, the reverse
+// of the DLL's UI order (docs/kp-format.md, Enums).
 var dsNames = map[DataSource]string{
 	DSOrdinal: "ordinal", DSEeprom: "eeprom", DSEepromAdd: "eeprom-add", DSEepromSubtract: "eeprom-subtract",
+	DSFreeEditable: "free-editable", DSEepromBackwards: "eeprom-backwards",
 }
 
 var typeNames = map[Type]string{

@@ -307,15 +307,14 @@ func kpValue(v Value) kp.Value {
 	return kp.Value{Description: v.Description, Units: v.Units, Factor: v.Conversion.Factor, Offset: v.Conversion.Offset}
 }
 
-// Axis sources and storage by KP datasource (docs/kp-format.md). 4 and 5
-// follow the WinOLS script enum order, unconfirmed.
+// Axis sources and storage by KP datasource (docs/kp-format.md).
 var axisSources = []struct{ source, stored string }{
-	kp.DSOrdinal:        {"ordinal", ""},
-	kp.DSEeprom:         {"image", "absolute"},
-	kp.DSEepromAdd:      {"image", "add"},
-	kp.DSEepromSubtract: {"image", "subtract"},
-	4:                   {"editable", ""},
-	5:                   {"image", "backwards"},
+	kp.DSOrdinal:         {"ordinal", ""},
+	kp.DSEeprom:          {"image", "absolute"},
+	kp.DSEepromAdd:       {"image", "add"},
+	kp.DSEepromSubtract:  {"image", "subtract"},
+	kp.DSFreeEditable:    {"editable", ""},
+	kp.DSEepromBackwards: {"image", "backwards"},
 }
 
 const noSignature = -1
@@ -348,7 +347,7 @@ func axisFromKP(a *kp.Axis) *Axis {
 // kpAxis rebuilds the axis record from the model. Width is derived from the
 // type, as WinOLS stores it (docs/kp-format.md).
 func (x *Axis) kpAxis() *kp.Axis {
-	a := &kp.Axis{PrecisionUnk00: kp.Hex{0, 0, 0}, SignedUnk00: []int32{}}
+	a := &kp.Axis{Values: kp.Hex{}}
 	if x == nil {
 		a.Value = kp.Value{Description: "-", Units: "-"} // as WinOLS fills unused slots
 		return a
@@ -362,7 +361,7 @@ func (x *Axis) kpAxis() *kp.Axis {
 	}
 	a.Value = kpValue(x.Value)
 	a.Reciprocal = x.Value.Conversion.Reciprocal
-	a.Precision = byte(x.Value.Precision)
+	a.Precision = int32(x.Value.Precision)
 	a.Base = int32(x.View.Base)
 	for ds, s := range axisSources {
 		if s.source == x.Source && s.stored == x.Stored {

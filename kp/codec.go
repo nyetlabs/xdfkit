@@ -195,6 +195,10 @@ func (c *codec) value(v reflect.Value, f field) {
 		x := uint32(v.Uint())
 		c.u32(&x)
 		v.SetUint(uint64(x))
+	case reflect.Int64:
+		x := v.Int()
+		c.i64(&x)
+		v.SetInt(x)
 	case reflect.Float64:
 		x := v.Float()
 		c.f64(&x)
@@ -289,7 +293,7 @@ func (c *codec) put(v ...byte) {
 	c.pos = len(c.b)
 }
 
-// Hex is an undecoded byte run, shown as hex in JSON. All zeros counts as
+// Hex is a raw byte run, shown as hex in JSON. All zeros counts as
 // zero (omitzero); a fixed-length run encodes empty as zeros.
 type Hex []byte
 
@@ -376,12 +380,24 @@ func (c *codec) i32(p *int32) {
 	*p = int32(v)
 }
 
-func (c *codec) f64(p *float64) {
+func (c *codec) u64(p *uint64) {
 	if c.enc {
-		c.put(binary.LittleEndian.AppendUint64(nil, math.Float64bits(*p))...)
+		c.put(binary.LittleEndian.AppendUint64(nil, *p)...)
 	} else {
-		*p = math.Float64frombits(binary.LittleEndian.Uint64(c.take(8)))
+		*p = binary.LittleEndian.Uint64(c.take(8))
 	}
+}
+
+func (c *codec) i64(p *int64) {
+	v := uint64(*p)
+	c.u64(&v)
+	*p = int64(v)
+}
+
+func (c *codec) f64(p *float64) {
+	v := math.Float64bits(*p)
+	c.u64(&v)
+	*p = math.Float64frombits(v)
 }
 
 // count codes an element count: written from n, returned when read.

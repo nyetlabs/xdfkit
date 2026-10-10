@@ -5,7 +5,7 @@ Converts map definitions between WinOLS KP, A2L, DAMOS, TunerPro XDF, WinOLS scr
 ## Formats
 
 - Outputs:
-  - Canonical JSON: the first-class dump of the shared model, defined by a JSON Schema (`model.md`). It holds no format-specific residue; KP output takes the undecoded fields from a template KP or from defaults.
+  - Canonical JSON: the first-class dump of the shared model, defined by a JSON Schema (`model.md`). It holds no format-specific residue; KP output takes the KP-only fields from a template KP or from defaults.
   - YAML: an alternate encoding of the same model with the same schema. It is a syntax layer over the canonical JSON (converted node for node, numbers keep their spelling, so typed numbers and the stamp work the same), with no YAML-only features (anchors, tags, multiple documents).
   - KP in the WinOLS 2.24 format (MVP, unless the feasibility gate fails): the only known lossless way into WinOLS, and the only writer that can be tested end to end, by trial imports into 2.24.
   - XDF (TunerPro XML 1.50): lossy, always written with a metadata file (`name.meta.json`) holding what XDF can't express, so the pair is lossless; embedding it in a comment block is optional (`stamp-and-metadata.md`, `xdf-embedding.md`). Implemented in `xdf/` (`xdfkit -f xdf -i image`, `--tuner` for the subset in `model.md`) with `encoding/xml`, plus a reader that merges the metadata file back; the stamp line is not written yet. TunerPro facts behind the writer (confirmed in 5.00.10305 unless noted):

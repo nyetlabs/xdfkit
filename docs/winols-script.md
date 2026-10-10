@@ -110,3 +110,5 @@ Prefixes: `Feldwerte.` applies to the map values, `StuetzX.` and `StuetzY.` to t
 ## Use in this project
 
 xdfkit writes WinOLS scripts as its route from A2L, DAMOS and XDF into WinOLS. Coverage per field: the "WinOLS script" column of `format-matrix.md`. The model's names stay format-neutral; the writer maps them (`bRueckwaerts` from axis `mirror` and `SignaturByte` from axis `signature`, both unconfirmed until a scripted import is saved as KP).
+
+KP counterparts found so far (`kp-format.md`): `ViewMode` is the KP map's `ViewMode` (1 text, 2 2D, 3 3D; confirmed in WinOLS 2.24 saves). `DataSrc` in enum order is the KP axis datasource number, `eUserdef` 4 and `eRomBackwards` 5 included (confirmed). `RWin` is taken as the KP map's `RightPane`, `bKehrwert`, `bVorzeichen`, `bDelta` and `bProzent` as its `reciprocal`, `signed`, `difference` and `percent` flags, `DataHeader` and `SignaturByte` as the axis's `DataHeader` and `SignatureByte` (all unconfirmed). Where `bOriginalWerte` ("original values", the original version rather than the current one) and `bOriginal` (raw display) are stored, if at all, is unknown.

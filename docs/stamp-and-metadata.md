@@ -8,11 +8,12 @@ Every JSON and XDF output carries a stamp that tells whether its data was hand e
 - `canon/` computes `C` itself (no jq at runtime); tests require identical bytes from real jq. Unedited files are therefore a `jq -S .` fixed point.
 - Unlike Go's `encoding/json`, jq doesn't escape `<`, `>`, `&`, U+2028 or U+2029, writes exponents as `1E-7` (jq 1.8; 1.6 differs again), and struct fields come out sorted like map keys.
 - Numbers are spelled as jq 1.8 reprints them, by Go type (Typed numbers): integers as integers, floats as shortest round-trip decimals with `.0` on whole values (`-30.0`, `1000000000000000000000.0`), plain decimals from 1e-6 up, and jq's exponent form below (`4.7E-7`), since jq 1.8 rewrites `0.00000047` that way. Addresses stay below 2^53.
-- Real cases: factors `4.7E-7` (FMDWAT) and `5.96E-8` (FVERZDYN) in five ecuxplot packs, offset `-7.31383E-307` (probably junk) on DELTATA in three. Their `jq -S .` digest assumes jq 1.8's spelling (RFC 8785 is unaffected).
+- Real cases: factors `4.7E-7` (FMDWAT) and `5.96E-8` (FVERZDYN) in five ecuxplot packs, offset `-7.31383E-307` (junk, unconfirmed) on DELTATA in three. Their `jq -S .` digest assumes jq 1.8's spelling (RFC 8785 is unaffected).
 
 ## Typed numbers
 
 Implemented in `canon/typed.go` (`Marshal`, `MarshalStamped`, `Unmarshal`). JSON has one number type: Go rejects `16.0` for an integer field, a whole float written `1` looks like an integer (YAML infers type from spelling), and the `jq -S .` digest tells `1` from `1.0` while RFC 8785 doesn't. So `canon` codes JSON by reflection over the Go types (like the KP codec), and the CLI reads and writes JSON only through it.
+
 - Writing:
   - Integer kinds: integer literals.
   - Floats: shortest round-trip digits, jq 1.8's exponent form below 1e-6, and whole values always with `.0` (`1.0`, `-30.0`, `-0.0`), so the type is visible in the file. jq 1.7+ keeps `1.0` as written, so `jq -S .` stays a fixed point; RFC 8785 is unaffected.

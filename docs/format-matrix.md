@@ -21,7 +21,7 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Data layout | Strings | N | N | Y: ASCII | ? | P: outputtype 4 | N | N | Y |
 | Data layout | Integer 8/16/32, signed | Y | Y | Y: also 64-bit | Y | Y | Y: DataOrg + bVorzeichen | Y: bits 8/16/32, signed | Y |
 | Data layout | Float | Y: 32-bit only | Y: 32-bit only | Y: 16/32/64-bit | ? | Y: float flag, 32-bit; 64-bit unconfirmed. Added in 5.00.8008 (2012) with no equations on float data (only `X`); whether that limit still holds is unconfirmed | Y: eFloatLoHi / eFloatHiLo, 32-bit | Y: 32-bit | Y |
-| Data layout | Endianness per object | Y: HiLo/LoHi in type enum | Y | Y: BYTE_ORDER, module default | ?: likely global | Y: mmedtypeflags | Y: DataOrg | Y: endian | Y |
+| Data layout | Endianness per object | Y: HiLo/LoHi in type enum | Y | Y: BYTE_ORDER, module default | ?: global (unconfirmed) | Y: mmedtypeflags | Y: DataOrg | Y: endian | Y |
 | Data layout | Row vs column major | Y: '2d Inverse' (252 of 4170 maps in 8D0907551G) | Y: '2d Inverse' (99 of 471 in 8D0907551M) | Y: RECORD_LAYOUT | ? | Y: major stride / flags | Y: Typ eZweiInv | P: `inverse` flag (KP) | Y |
 | Data layout | Gaps, alignment, interleaved records | N | N | Y: RECORD_LAYOUT positions, ALIGNMENT_* | ? | P: stride only | P: SkipBytes on axes only | N | Y |
 | Data layout | Bit mask / sub-byte fields | ?: not decoded; may be in an unknown block | ? | Y: BIT_MASK | ? | P: XDFFLAG, single bit | N | N | Y |
@@ -33,12 +33,12 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Conversion | Units | Y | Y | Y: COMPU_METHOD unit / PHYS_UNIT | Y | Y | Y: Einheit | Y | Y |
 | Conversion | Display precision | Y | Y | Y: FORMAT | ? | Y: decimalpl | Y: Nachkommastellen | Y | Y |
 | Conversion | Display base dec / hex / binary | Y: base field | Y: base 10/16/2; binary on codewords, e.g. CWMSRCAN | N | ? | P: dec/hex only | P: Radix 10 / 16; binary not documented | Y: view base | Y |
-| Conversion | Min / max limits | ?: range is 0-255 on almost every map; `rangeUnk00` holds two more pairs (`kp-format.md`) | ?: same; other pairs on hand-edited maps; limits or display range unconfirmed | Y: limits + EXTENDED_LIMITS | ? | Y: min / max | N: no property | N | Y |
+| Conversion | Min / max limits | Y: `range`, the map properties' value range, one low/high pair per element width (8-bit 0-255 on almost every map); raw or displayed units unconfirmed (`kp-format.md`) | Y: same | Y: limits + EXTENDED_LIMITS | ? | Y: min / max | N: no property | N | Y |
 | Conversion | Difference / percent view vs original | Y: flags | Y: flags D, P | N | N | N | Y: bDelta / bProzent | Y: view difference / percent | Y |
-| Conversion | Unidentified per-map doubles | P: `viewScale` and `viewOffset` are probably display scaling, not conversion; `storedRowsUnk06` and `storedRowsUnk1B` (300.0, 1.0) unknown (`kp-format.md`) | P: same | - | - | - | - | N | N: not in the model until identified; KP output takes them from a template KP or defaults |
+| Conversion | Unidentified per-map doubles | P: `viewScale` and `viewOffset` are taken as the 3D view's scaling, not conversion; `view2DScale` and `view3DRotation` (300.0, 1.0) taken as view state (all unconfirmed, `kp-format.md`) | P: same | - | - | - | - | N | N: not in the model until identified; KP output takes them from a template KP or defaults |
 | Axes | Axis read from image | Y: datasource EEPROM | Y | Y: STD_AXIS / COM_AXIS | Y | Y: EMBEDDEDDATA | Y: DataSrc eRom | Y: source image | Y |
 | Axes | Per-axis type, sign, units, conversion | Y | Y | Y | Y | Y | Y: StuetzX/Y.* | Y | Y |
-| Axes | Fixed axis values (not in image) | Y: '1,2,3' ordinal or 'Free editable'; axis block sized 4 bytes per point | Y: '1,2,3' ordinal; free-editable storage possibly the axis `signedUnk00` list (zeros in the only sample) | Y: FIX_AXIS_PAR / _DIST / _LIST | ? | Y: static LABELs | P: DataSrc eUserdef, but no property for the values | P: source editable; the values aren't stored | Y |
+| Axes | Fixed axis values (not in image) | Y: '1,2,3' ordinal or 'Free editable'; axis block sized 4 bytes per point | Y: '1,2,3' ordinal; 'Free editable' (datasource 4) with its values in the axis `values` list, in the axis type | Y: FIX_AXIS_PAR / _DIST / _LIST | ? | Y: static LABELs | P: DataSrc eUserdef, but no property for the values | P: source editable; the values aren't stored | Y |
 | Axes | Shared axis object | N: address repeated per map | N | Y: COM_AXIS -> AXIS_PTS | ? | Y: axis linked to another table (`embedinfo type="3" linkobjid`, the table's uniqueid; TunerPro 5) | N | N: address repeated per axis (the XDF writer links an axis to a matching curve at its address) | Y |
 | Axes | Axis point count read from image | ? | ? | Y: NO_AXIS_PTS in record layout | ? | N | ?: DataHeader marks header bytes; whether the count is read is undocumented | N: `header` counts header bytes; the count isn't read | Y |
 | Axes | Axis stored as differences | Y: 'EEPROM, subtract' = gaps between breakpoints, counted down from 256 (`kp-format.md`); 273 axes in 8D0907558E; 'add' and 'backwards' still unknown | Y: same datasource field; ME7 packs have mislabelled absolute axes | Y: DEPOSIT DIFFERENCE | ? | P: static LABELs computed from the bin; or live, through a linked helper table with `CELL()` equations (`kp-format.md`; XML unconfirmed) | Y: DataSrc eRomAdd / eRomSub; also eRomBackwards | Y: stored absolute / add / subtract / backwards (add and backwards semantics unknown) | Y |
@@ -50,8 +50,8 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 
 | Format | Y | P | N | ? |
 |---|---|---|---|---|
-| KP v1 | 20 | 2 | 13 | 4 |
-| KP v2 | 21 | 2 | 12 | 4 |
+| KP v1 | 21 | 3 | 13 | 2 |
+| KP v2 | 22 | 3 | 12 | 2 |
 | A2L | 31 | 2 | 5 | 0 |
 | DAMOS | 8 | 2 | 9 | 19 |
 | XDF | 22 | 10 | 6 | 0 |

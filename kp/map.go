@@ -3,57 +3,56 @@ package kp
 // Map is one map definition. Fields are in file order (see codec for the tags).
 // Undecoded fields are named as described in the package doc.
 type Map struct {
-	Index               int        `json:"index" kp:"-"`
-	Unk00               byte       `json:"unk00"` // editor state: changes between exports of the same project
-	Unk01               int32      `json:"unk01,omitzero" kp:"v2"`
-	Comment             string     `json:"comment,omitzero" kp:"v2"`
-	CommentUnk00        byte       `json:"commentUnk00,omitzero" kp:"v2"`
-	Name                string     `json:"name"`
-	Organization        Org        `json:"organization"`
-	OrganizationUnk00   int32      `json:"organizationUnk00"`
-	Type                Type       `json:"type"`
-	Width               int32      `json:"width"` // element size in bytes; equals Type's width in every known pack
-	Base                int32      `json:"base"`
-	FolderID            int32      `json:"folderId"`
-	ID                  string     `json:"id"`
-	IDUnk00             int32      `json:"idUnk00"`
-	IDUnk04             byte       `json:"idUnk04"`
-	IDUnk05             int32      `json:"idUnk05,omitzero" kp:"v2"`
-	Range               [4]int32   `json:"range"` // meaning unconfirmed
-	RangeUnk00          [8]int32   `json:"rangeUnk00"`
-	Reciprocal          bool       `json:"reciprocal"`
-	Signed              bool       `json:"signed"`
-	Difference          bool       `json:"difference"`
-	Percent             bool       `json:"percent"`
-	Cols                int32      `json:"cols"`
-	Rows                int32      `json:"rows"`
-	RowsUnk00           [2]int32   `json:"rowsUnk00"` // probably editor state (docs/kp-format.md)
-	Precision           int32      `json:"precision"`
-	Value               Value      `json:"value"`
-	Start               uint32     `json:"start"`
-	End                 uint32     `json:"end"`
-	ImageSize           int32      `json:"imageSize"` // matches the image length in every known pack
-	ImageSizeUnk00      [2]int32   `json:"imageSizeUnk00,omitzero" kp:"v2"`
-	Addr2               uint32     `json:"addr2"` // meaning unconfirmed
-	Addr2Unk00          [2]int32   `json:"addr2Unk00"`
-	Addr2ImageSize      int32      `json:"addr2ImageSize"` // guessed: the image length, or 0
-	Addr2ImageSizeUnk00 int32      `json:"addr2ImageSizeUnk00"`
-	X                   *Axis      `json:"x"`
-	Y                   *Axis      `json:"y"`
-	YUnk00              int32      `json:"yUnk00"`
-	YUnk04              int16      `json:"yUnk04"`
-	StoredCols          int32      `json:"storedCols"` // Cols and Rows in storage order: swapped on 2d-inverse maps
-	StoredRows          int32      `json:"storedRows"`
-	StoredRowsUnk00     int32      `json:"storedRowsUnk00"`
-	StoredRowsUnk04     [2]byte    `json:"storedRowsUnk04"`
-	StoredRowsUnk06     [2]float64 `json:"storedRowsUnk06"`
-	StoredRowsUnk16     int32      `json:"storedRowsUnk16"`
-	StoredRowsUnk1A     byte       `json:"storedRowsUnk1A"`
-	StoredRowsUnk1B     [2]float64 `json:"storedRowsUnk1B"`
-	ViewScale           float64    `json:"viewScale"` // probably view state: the display's auto scale, 0 until set
-	ViewScaleUnk00      int32      `json:"viewScaleUnk00"`
-	ViewOffset          float64    `json:"viewOffset"`       // probably view state, with ViewScale
-	Term2               Hex        `json:"term2" kp:"len=3"` // first two bytes are always 1
+	Index          int         `json:"index" kp:"-"`
+	Selected       byte        `json:"selected"`                // selected in the map list (unconfirmed): changes between exports of the same project
+	LinkID         int32       `json:"linkId,omitzero" kp:"v2"` // -1: id of a linked map, -1 for none (unconfirmed)
+	Comment        string      `json:"comment,omitzero" kp:"v2"`
+	CommentFlag    byte        `json:"commentFlag,omitzero" kp:"v2"` // 0 (unconfirmed)
+	Name           string      `json:"name"`
+	Organization   Org         `json:"organization"`
+	RightPane      int32       `json:"rightPane"` // the script's RWin: 0 none, 1 hex, 2 bars, 3 both (unconfirmed)
+	Type           Type        `json:"type"`
+	Width          int32       `json:"width"` // element size in bytes; equals Type's width in every known pack
+	Base           int32       `json:"base"`
+	FolderID       int32       `json:"folderId"`
+	ID             string      `json:"id"`
+	IDPad          int32       `json:"idPad"`                   // 0 (unconfirmed)
+	IDFlag         byte        `json:"idFlag"`                  // 0 (unconfirmed)
+	Marked         int32       `json:"marked,omitzero" kp:"v2"` // 0 or 1, mostly per pack (unconfirmed)
+	Range          [3][2]int64 `json:"range"`                   // map properties value range, low and high, for 8-, 16- and 32-bit data (32-bit unconfirmed)
+	Reciprocal     bool        `json:"reciprocal"`              // the script's bKehrwert (unconfirmed)
+	Signed         bool        `json:"signed"`                  // bVorzeichen (unconfirmed)
+	Difference     bool        `json:"difference"`              // bDelta: map window "difference" toggle (unconfirmed)
+	Percent        bool        `json:"percent"`                 // bProzent: map window "percent" toggle (unconfirmed)
+	Cols           int32       `json:"cols"`
+	Rows           int32       `json:"rows"`
+	Cursor         [2]int32    `json:"cursor"` // editor state, the last cursor cell (unconfirmed)
+	Precision      int32       `json:"precision"`
+	Value          Value       `json:"value"`
+	Start          uint32      `json:"start"`
+	End            uint32      `json:"end"`
+	ImageSize      int32       `json:"imageSize"`                     // matches the image length in every known pack
+	ImageSizePad   [2]int32    `json:"imageSizePad,omitzero" kp:"v2"` // 0 (unconfirmed)
+	Addr2          uint32      `json:"addr2"`                         // location as of the last properties edit (unconfirmed)
+	Addr2Flags     [2]int32    `json:"addr2Flags"`                    // first -1 or 0 per pack, second 0 (unconfirmed)
+	Addr2ImageSize int32       `json:"addr2ImageSize"`                // the image length, or 0 (unconfirmed)
+	Addr2Pad       int32       `json:"addr2Pad"`                      // 0 (unconfirmed)
+	X              *Axis       `json:"x"`
+	Y              *Axis       `json:"y"`
+	YFlag          int32       `json:"yFlag"`      // 0, 1 on two maps (unconfirmed)
+	YPad           int16       `json:"yPad"`       // 0 (unconfirmed)
+	StoredCols     int32       `json:"storedCols"` // Cols and Rows in storage order: swapped on 2d-inverse maps
+	StoredRows     int32       `json:"storedRows"`
+	ViewMode       int32       `json:"viewMode"`         // 1 text, 2 2D, 3 3D (the script's ViewMode)
+	ViewFlags      [2]byte     `json:"viewFlags"`        // 1, 1 (unconfirmed)
+	View2DScale    [2]float64  `json:"view2DScale"`      // 2D view scaling, 1.0, 1.0 by default (unconfirmed)
+	View2DRef      int32       `json:"view2DRef"`        // -1 until the view mode is first changed, then 0 (unconfirmed meaning)
+	ViewFlag       byte        `json:"viewFlag"`         // 1, 0 on a few maps (unconfirmed)
+	View3DRotation [2]float64  `json:"view3DRotation"`   // 3D view angle and zoom, 300.0, 1.0 by default (unconfirmed)
+	ViewScale      float64     `json:"viewScale"`        // the 3D view's auto scale, 0 until first shown in 3D (unconfirmed)
+	ViewScaleRef   int32       `json:"viewScaleRef"`     // -1 exactly where ViewScale is 0 (unconfirmed)
+	ViewOffset     float64     `json:"viewOffset"`       // view state, with ViewScale (unconfirmed)
+	Term2          Hex         `json:"term2" kp:"len=3"` // first two bytes are always 1
 }
 
 func (m *Map) check(c *codec) {
@@ -78,22 +77,21 @@ type Value struct {
 // its organisation implies (X for 1D, X and Y for 2D). The unused slots (the second
 // axis of a 1D map, both axes of a single value) are still parsed.
 type Axis struct {
-	Defined        bool       `json:"defined" kp:"-"`
-	Value          Value      `json:"value"`
-	DataSource     DataSource `json:"dataSource"`
-	Addr           uint32     `json:"addr"`
-	Type           Type       `json:"type"`
-	Width          int32      `json:"width"` // element size in bytes; equals Type's width on all but 2 known axes
-	Base           int32      `json:"base"`
-	Mirror         bool       `json:"mirror" kp:"hook"` // "mirror map": shown in descending order; v2: int32, v1: byte
-	MirrorUnk00    Hex        `json:"mirrorUnk00,omitzero" kp:"v2,len=9"`
-	Reciprocal     bool       `json:"reciprocal"`
-	Precision      byte       `json:"precision"`
-	PrecisionUnk00 Hex        `json:"precisionUnk00" kp:"len=3"`
-	Signed         bool       `json:"signed"`
-	SignedUnk00    []int32    `json:"signedUnk00" kp:"bytes"`
-	DataHeader     int32      `json:"dataHeader"`    // likely the script's DataHeader: header bytes before the axis data
-	SignatureByte  int32      `json:"signatureByte"` // likely the script's SignaturByte (marker byte before the axis); -1 when none
+	Defined       bool       `json:"defined" kp:"-"`
+	Value         Value      `json:"value"`
+	DataSource    DataSource `json:"dataSource"`
+	Addr          uint32     `json:"addr"`
+	Type          Type       `json:"type"`
+	Width         int32      `json:"width"` // element size in bytes; equals Type's width on all but 2 known axes
+	Base          int32      `json:"base"`
+	Mirror        bool       `json:"mirror" kp:"hook"`                 // "mirror map": shown in descending order; v2: int32, v1: byte
+	MirrorPad     Hex        `json:"mirrorPad,omitzero" kp:"v2,len=9"` // zeros (unconfirmed)
+	Reciprocal    bool       `json:"reciprocal"`
+	Precision     int32      `json:"precision"` // -1 on some unused slots
+	Signed        bool       `json:"signed"`
+	Values        Hex        `json:"values" kp:"bytes"` // free editable values in the axis type, 4 bytes per point
+	DataHeader    int32      `json:"dataHeader"`        // the script's DataHeader: header bytes before the axis data (unconfirmed)
+	SignatureByte int32      `json:"signatureByte"`     // the script's SignaturByte (marker byte before the axis), -1 for none (unconfirmed)
 }
 
 // hook codes Mirror: an int32 in v2, a byte in v1, 0 or 1 in both.
