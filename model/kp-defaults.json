@@ -67,7 +67,6 @@
       "addr2ImageSize": "0x100000",
       "imageSize": "0x100000",
       "linkId": -1,
-      "marked": 1,
       "range": [
         [
           0,

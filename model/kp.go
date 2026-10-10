@@ -207,6 +207,7 @@ func objectFromKP(km *kp.Map, inFolder bool) *Object {
 		Comment:     km.Comment,
 		Shape:       shapes[km.Organization],
 		Inverse:     km.Organization == kp.OrgTwoDInv,
+		Marked:      km.Marked != 0,
 		Address:     Addr(km.Start),
 		Rows:        int(km.Rows),
 		Cols:        int(km.Cols),
@@ -268,6 +269,9 @@ func (o *Object) kpMap(i int) *kp.Map {
 	}
 	if len(o.Categories) > 0 {
 		km.FolderID = int32(o.Categories[0])
+	}
+	if o.Marked {
+		km.Marked = 1
 	}
 	return km
 }

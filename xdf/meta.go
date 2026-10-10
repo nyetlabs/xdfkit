@@ -174,7 +174,7 @@ func merge(v *model.Model, uids []string, mf *metaFile) (*model.Model, []string,
 // what the XDF holds. The caller sets the categories.
 func reconcile(v, c *model.Object) *model.Object {
 	o := *v
-	o.Key, o.Inverse, o.View = c.Key, c.Inverse, c.View
+	o.Key, o.Inverse, o.Marked, o.View = c.Key, c.Inverse, c.Marked, c.View
 	if t, d := text(c); t == v.ID && d == v.Description {
 		o.ID, o.Description, o.Comment = c.ID, c.Description, c.Comment
 	}

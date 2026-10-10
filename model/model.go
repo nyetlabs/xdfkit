@@ -65,6 +65,7 @@ type Object struct {
 	Categories  []int  `json:"categories,omitempty" doc:"Category ids."`
 	Shape       string `json:"shape" doc:"value: one cell; 1d: a row of cols cells; 2d: rows by cols cells." enum:"value|1d|2d"`
 	Inverse     bool   `json:"inverse,omitzero" doc:"KP \"2d Inverse\" organisation; its meaning is unconfirmed (docs/kp-format.md)."`
+	Marked      bool   `json:"marked,omitzero" doc:"Marked in the WinOLS map list (KP v2 Marked; unconfirmed, docs/kp-format.md)."`
 	Address     Addr   `json:"address" doc:"File offset of the first cell."`
 	Rows        int    `json:"rows" doc:"Number of rows."`
 	Cols        int    `json:"cols" doc:"Number of columns."`

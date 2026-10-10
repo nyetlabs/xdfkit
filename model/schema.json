@@ -176,6 +176,10 @@
           "description": "Unique within the file: the source id, with #2, #3 appended to repeats in source order, or obj-N when the id is blank.",
           "type": "string"
         },
+        "marked": {
+          "description": "Marked in the WinOLS map list (KP v2 Marked; unconfirmed, docs/kp-format.md).",
+          "type": "boolean"
+        },
         "rows": {
           "description": "Number of rows.",
           "type": "integer"

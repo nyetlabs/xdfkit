@@ -43,6 +43,7 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Axes | Axis point count read from image | ? | ? | Y: NO_AXIS_PTS in record layout | ? | N | ?: DataHeader marks header bytes; whether the count is read is undocumented | N: `header` counts header bytes; the count isn't read | Y |
 | Axes | Axis stored as differences | Y: 'EEPROM, subtract' = gaps between breakpoints, counted down from 256 (`kp-format.md`); 506 axes in 8D0907558E's corpus JSON; 'add' and 'backwards' still unknown | Y: same datasource field; ME7 packs have mislabelled absolute axes | Y: DEPOSIT DIFFERENCE | ? | P: static LABELs computed from the bin; or live, through a linked helper table with `CELL()` equations (`kp-format.md`; XML unconfirmed) | Y: DataSrc eRomAdd / eRomSub; also eRomBackwards | Y: stored absolute / add / subtract / backwards (add and backwards semantics unknown) | Y |
 | Axes | Rescale / curve axes | N | N | Y: RES_AXIS, CURVE_AXIS | N | P: axis "Normalized" through a function (XDFFUNCTION, Ford-style normalizer); how closely it matches CURVE_AXIS is unconfirmed | N | N | Y |
+| Tool-specific | Map list mark / visibility level | N | Y: `Marked`, taken as the map list marker (unconfirmed, `kp-format.md`) | N | ? | P: `vislevel`, a numbered level per item for the parameter tree filter ("Show Up To" / "Show Only" a level; from TunerPro's strings), not a mark; attribute or element, range and default unconfirmed; not written | N | Y: `marked`; XDF keeps it in the metadata file | Y |
 | Tool-specific | Patches | N | N | N | N | Y: XDFPATCH | N | N | Y |
 | Tool-specific | Measurements (logging channels) | N | N | Y: MEASUREMENT; useful for ecuxplot | N | N | N | N | Y |
 
@@ -50,11 +51,11 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 
 | Format | Y | P | N | ? |
 |---|---|---|---|---|
-| KP v1 | 21 | 3 | 13 | 2 |
-| KP v2 | 22 | 3 | 12 | 2 |
-| A2L | 31 | 2 | 5 | 0 |
-| DAMOS | 8 | 2 | 9 | 19 |
-| XDF | 22 | 10 | 6 | 0 |
-| WinOLS script | 17 | 6 | 14 | 1 |
-| Model (schema 1) | 16 | 6 | 17 | 0 |
-| Model (target) | 38 | 0 | 1 | 0 |
+| KP v1 | 21 | 3 | 14 | 2 |
+| KP v2 | 23 | 3 | 12 | 2 |
+| A2L | 31 | 2 | 6 | 0 |
+| DAMOS | 8 | 2 | 9 | 20 |
+| XDF | 22 | 11 | 6 | 0 |
+| WinOLS script | 17 | 6 | 15 | 1 |
+| Model (schema 1) | 17 | 6 | 17 | 0 |
+| Model (target) | 39 | 0 | 1 | 0 |
