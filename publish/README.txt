@@ -1,7 +1,9 @@
 Map definitions for Bosch ME7 and related ECUs
 
-Each pack is named after the ECU part number it was made for, and fits
-one software version only. Check that your image matches before using it.
+Each pack is named after the ECU part number it was made for, plus the
+software version where a part has packs for more than one (4D1907558-0002,
+4D1907558-0004). Each fits one software version only. Check that your
+image matches before using it.
 
 Files
 
@@ -18,7 +20,8 @@ Files
 
 Packs
 
-  Top level        hand-made definitions, and tuner subsets
+  Top level        hand-made definitions (and a few found in the image by
+                   a program), and tuner subsets
   PACK-tuner.*     the tuning maps of a full definition, filed by
                    category (XDF, metadata and CSV only)
   full/            complete definitions from Bosch data, thousands of

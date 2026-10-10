@@ -42,7 +42,7 @@ The schema is meant to represent everything any of the projects needs. Other for
 Readers need originals for regression tests (DAMOS and A2L have no writers; exact KP bytes need the file).
 
 - Private originals (DAMOS, A2L, OLS and their hex files) live only in a checkout's gitignored `testdata/local/`, never committed or pushed anywhere. Tests that need them skip when they are absent.
-- Public originals are read from the repos that publish them or copied into xdfkit `testdata/`. ecuxplot's packs and mapdump CSVs are in `testdata/archive/ecuxplot/`: never edited, the KP reader's oracle; their definitions are maintained as corpus JSON.
+- Public originals are read from the repos that publish them or copied into xdfkit `testdata/`. ecuxplot's packs and mapdump CSVs are in `testdata/archive/ecuxplot/`: never edited (except pack rows in its `images.tsv`), the KP reader's oracle; their definitions are maintained as corpus JSON.
 - Each original is checked against the provenance hash in its corpus JSON, where one exists.
 
 ### Layout and ids

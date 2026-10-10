@@ -56,20 +56,21 @@ me7-logger imports `model`, `xdf` and `canon` (`docs/integrations.md`): after ch
 
 ## Published definitions
 
-The ecuxplot map packs are model JSON in ecu-corpus `defs/`. `publish/` generates every format from it and imports corrections made in WinOLS or TunerPro (`publish/README.md`).
+The ecuxplot map packs are model JSON in ecu-corpus `defs/`, as is one model me7info located (4D1907558-0004). `publish/` generates every format from it and imports corrections made in WinOLS or TunerPro, and me7info's models (`publish/README.md`).
 
 ```mermaid
 flowchart LR
   corpus[("ecu-corpus")] --> publish["make -C publish upload"]
   publish --> users["WinOLS / TunerPro users"]
   users -- "corrected KP or XDF" --> incoming["make -C publish incoming"]
+  me7info["me7-logger me7info"] -- "located model JSON" --> incoming
   incoming --> corpus
 ```
 
 ## Rules
 
 - Commit messages start with a prefix that `cliff.toml` groups: `feat`/`add`, `fix`, `docs`, `refactor`, `chore`, `ci`, `build`, `test`, `style`, `chore(deps)`.
-- Never edit or regenerate `testdata/archive/ecuxplot/` (see its README).
+- Never edit or regenerate `testdata/archive/ecuxplot/` (see its README); the one exception is pack rows in its `images.tsv`, the pack list `publish/` reads.
 - Private definition files (DAMOS, A2L, OLS) go only in the gitignored `testdata/local/`; never commit them.
 - `docs/` describes how things are, including spec not implemented yet; plans are kept outside the repo.
 
