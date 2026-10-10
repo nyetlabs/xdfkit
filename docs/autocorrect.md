@@ -30,3 +30,4 @@ Fixing KP files mechanically, instead of hand-editing each axis in WinOLS. Evide
 - Family: from the Bosch identification string in the image (`40/1/ME7.1/5/...` is ME7, `5655/1/M3.82/...` and `9655/1/M5.92/...` are delta). Images without one need `--family`.
 - R7 is not implemented yet.
 - R1 changes what WinOLS displays: WinOLS shows a "subtract" axis as 256 minus the sum of the remaining raw values (confirmed in WinOLS 2.24; see the axis datasource section of `kp-format.md`), so a mislabelled absolute axis shows wrong values until fixed.
+- R2 fixes display as intended in WinOLS 2.24 (confirmed on KFFA X in 8D0907558E: 1.0, 1.6, 2.2, ..., 10.5, 11.0 ms/rev). The corpus JSON of 8D0907558E and 8D0907558M has every R2 fix applied, so their published KPs have no R2 findings.
