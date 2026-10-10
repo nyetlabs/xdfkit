@@ -1,6 +1,6 @@
 #!/bin/sh
-# Import KP and XDF files into their packs' corpus JSON: the files given, else
-# every one in testdata/local/incoming. See README.md.
+# Import KP, XDF and model JSON files into their packs' corpus JSON: the files
+# given, else every one in testdata/local/incoming. See README.md.
 #
 # The pack is the longest images.tsv stem the file name starts with, followed
 # by "." or "-" (8D0907551K.kp, 8D0907551K-0001-fixed.xdf). An XDF uses
@@ -8,8 +8,10 @@
 # is rewritten only when the definitions or their origin changed; files from
 # incoming then move to incoming/imported/, so a later run can't import them
 # over newer work. A second file for one pack waits for the next run. A subset
-# (provenance.subset, as in PACK-tuner.xdf, even renamed) is refused, and so
-# is origin located (maps found by a program such as me7info).
+# (provenance.subset, as in PACK-tuner.xdf, even renamed) is refused. Origin
+# located (maps found by a program such as me7info, as model JSON) is written
+# only where the corpus JSON is missing or located too, never over a hand or
+# DAMOS definition. Model JSON keeps its own origin (ORIGIN= doesn't apply).
 #
 # Environment: INCOMING (the directory), CORPUS (an ecu-corpus checkout;
 # default ../ecu-corpus beside this repo, else the submodule),
@@ -29,15 +31,16 @@ trap 'rm -rf "$tmp"' EXIT
 
 # The definitions and origin, without the stamp and the rest of the provenance.
 model() { jq -S 'del(.stamp, .provenance.format, .provenance.file, .provenance.sha256)' "$1"; }
-convert() { "$xdfkit" --force ${meta:+--meta "$meta"} --origin "$1" "$f" "$tmp/new.json"; }
+convert() { "$xdfkit" --force ${meta:+--meta "$meta"} ${1:+--origin "$1"} "$f" "$tmp/new.json"; }
 converted() { jq -r .provenance.origin "$tmp/new.json"; }
 
-test $# -gt 0 || set -- "$in"/*.kp "$in"/*.KP "$in"/*.xdf "$in"/*.XDF
+test $# -gt 0 || set -- "$in"/*.kp "$in"/*.KP "$in"/*.xdf "$in"/*.XDF "$in"/*.json
 status=0
 seen=
 for f; do
 	test -f "$f" || continue
 	name=$(basename "$f")
+	case $name in *.meta.json) continue ;; esac
 	pack=
 	for s in $stems; do
 		case $name in "$s".* | "$s"-*)
@@ -72,25 +75,27 @@ for f; do
 		echo "$name: metadata ${meta:-missing, so what XDF cannot hold is lost}" >&2
 		;;
 	esac
-	origin=${ORIGIN:-}
-	test -n "$origin" || ! test -f "$def" || origin=$(jq -r '.provenance.origin // empty' "$def")
+	old=
+	! test -f "$def" || old=$(jq -r '.provenance.origin // empty' "$def")
+	origin=${ORIGIN:-$old}
+	case $name in *.json) origin= ;; esac
 	convert "$origin" || { status=1; continue; }
 	if jq -e '.provenance.subset' "$tmp/new.json" >/dev/null; then
 		echo "$name: skipped, a $(jq -r .provenance.subset.kind "$tmp/new.json") subset (PACK-tuner.xdf) can't replace the full definition" >&2
 		status=1
 		continue
 	fi
-	if test "$(jq -r .provenance.origin "$tmp/new.json")" = located; then
-		echo "$name: skipped, maps located by a program (origin located) aren't a corpus source" >&2
+	if test "$(converted)" = located && test -f "$def" && test "$old" != located; then
+		echo "$name: skipped, maps located by a program (origin located) can't replace $def (origin ${old:-unknown})" >&2
 		status=1
 		continue
 	fi
 	n=$(jq '.objects | length' "$tmp/new.json")
-	if test -z "${ORIGIN:-}" && test "$(jq -r .provenance.origin "$tmp/new.json")" = hand && test "$n" -ge "${DAMOS_MAPS:-3000}"; then
+	if test -z "${ORIGIN:-}" && test "${name%.json}" = "$name" && test "$(converted)" = hand && test "$n" -ge "${DAMOS_MAPS:-3000}"; then
 		echo "$name: $n maps, origin damos"
 		convert damos || { status=1; continue; }
 	fi
-	if test "$(jq -r .provenance.origin "$tmp/new.json")" = damos; then
+	if test "$(converted)" = damos; then
 		recip='[.objects[] | select(.value.conversion.reciprocal) | .key]'
 		if test -f "$def"; then
 			lost=$(jq -rn --argjson old "$(jq -c "$recip" "$def")" --argjson new "$(jq -c "$recip" "$tmp/new.json")" '$old - $new | "\(length) \(.[:5] | join(" "))"')

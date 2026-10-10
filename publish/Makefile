@@ -8,8 +8,9 @@
 #   make stage            the published tree, in build/publish/stage
 #   make upload           rsync --delete the tree to UPLOAD_DEST (set it in
 #                         local.mk, gitignored); RSYNC_FLAGS=-n for a dry run
-#   make incoming         import every KP and XDF in testdata/local/incoming
-#                         into the corpus JSON (import-incoming.sh, README.md)
+#   make incoming         import every KP, XDF and model JSON in
+#                         testdata/local/incoming into the corpus JSON
+#                         (import-incoming.sh, README.md)
 #   make clean            remove build/publish
 #
 # Each pack is the model JSON in the corpus, defs/IMAGE.json, with IMAGE from
@@ -24,9 +25,10 @@
 # Layout (README.md): a DAMOS pack (origin damos) is published in full/; an
 # ME7 one also gets a tuner subset at the top level, PACK-tuner (XDF, metadata
 # file and CSV: only the maps in CATEGORIES, the corpus categories.json, and
-# their axes). Every other pack is a hand pack, at the top level. Each
-# location holds the files and one zip dated by the last commit of the pack's
-# source (and of categories.json for a tuner zip); older zips are not kept.
+# their axes). Every other pack (origin hand or located) is a hand pack, at the
+# top level. Each location holds the files and one zip dated by the last commit
+# of the pack's source (and of categories.json for a tuner zip); older zips are
+# not kept.
 
 ROOT := $(abspath ..)
 OUT := $(ROOT)/build/publish
@@ -38,7 +40,7 @@ CATEGORIES ?= $(CORPUS)/categories.json
 XDFKIT := $(ROOT)/build/xdfkit
 
 REFS := 4Z7907551R 8D0907551F 8D0907551G
-PACKS := $(REFS) 8D0907551H 8D0907551K 8D0907551M 4Z7907551AA 4D1907558 8D0907558E 8D0907558M 06A906032HS 06A906032LP 8N0906018CB
+PACKS := $(REFS) 8D0907551H 8D0907551K 8D0907551M 4Z7907551AA 4D1907558 4D1907558-0004 8D0907558E 8D0907558M 06A906032HS 06A906032LP 8N0906018CB
 
 REFS_8D0907551H := $(addprefix -r ,$(addsuffix .json,$(REFS)))
 REFS_8D0907551M := $(REFS_8D0907551H)
