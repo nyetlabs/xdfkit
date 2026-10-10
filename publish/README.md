@@ -27,8 +27,9 @@ flowchart TD
 - The corpus is `../ecu-corpus`, the full clone beside this repo, when it exists, else the read-only `corpus/` submodule; `CORPUS=` overrides it (docs/corpus.md).
 - PACK is the pack's stem in `testdata/archive/ecuxplot/images.tsv`; the file name starts with it, followed by `.` or `-`.
 - An XDF needs its metadata file to keep what XDF can't hold: `NAME.meta.json` next to it, else `build/publish/PACK.meta.json`, which matches the published XDF.
-- `make incoming` runs `import-incoming.sh` on every KP and XDF in `incoming/`; the script also takes files as arguments. Files from `incoming/` (and their metadata files) move to `incoming/imported/`, so a later run can't import them over newer work. One file per pack per run.
+- `make incoming` runs `import-incoming.sh` on every KP and XDF in `incoming/`; the script also takes files as arguments. Files from `incoming/` (and their metadata files) move to `incoming/imported/`, so a later run can't import them over newer work. One file per pack per run. For origin `damos` it warns when the definition has no reciprocal conversions or loses ones the corpus JSON has: WinOLS's DAMOS import drops them (`docs/corpus.md`, Policy).
 - The comparison ignores the stamp and the rest of the provenance. The origin is `damos`, `a2l` or `hand` (docs/corpus.md); set `ORIGIN=damos` for a smaller DAMOS export, `DAMOS_MAPS=` changes the cutoff, `FORCE=1` imports over a hand-edited corpus JSON.
+
 ## Layout
 
 `PACKS` in the Makefile lists the packs. Each is one of:

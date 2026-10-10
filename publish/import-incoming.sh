@@ -30,6 +30,7 @@ trap 'rm -rf "$tmp"' EXIT
 # The definitions and origin, without the stamp and the rest of the provenance.
 model() { jq -S 'del(.stamp, .provenance.format, .provenance.file, .provenance.sha256)' "$1"; }
 convert() { "$xdfkit" --force ${meta:+--meta "$meta"} --origin "$1" "$f" "$tmp/new.json"; }
+converted() { jq -r .provenance.origin "$tmp/new.json"; }
 
 test $# -gt 0 || set -- "$in"/*.kp "$in"/*.KP "$in"/*.xdf "$in"/*.XDF
 status=0
@@ -88,6 +89,15 @@ for f; do
 	if test -z "${ORIGIN:-}" && test "$(jq -r .provenance.origin "$tmp/new.json")" = hand && test "$n" -ge "${DAMOS_MAPS:-3000}"; then
 		echo "$name: $n maps, origin damos"
 		convert damos || { status=1; continue; }
+	fi
+	if test "$(jq -r .provenance.origin "$tmp/new.json")" = damos; then
+		recip='[.objects[] | select(.value.conversion.reciprocal) | .key]'
+		if test -f "$def"; then
+			lost=$(jq -rn --argjson old "$(jq -c "$recip" "$def")" --argjson new "$(jq -c "$recip" "$tmp/new.json")" '$old - $new | "\(length) \(.[:5] | join(" "))"')
+			test "${lost%% *}" = 0 || echo "$name: WARNING: ${lost%% *} maps lose the reciprocal conversion $def has (${lost#* } ...); WinOLS's DAMOS import drops them (docs/corpus.md)" >&2
+		fi
+		test "$(jq "$recip | length" "$tmp/new.json")" != 0 ||
+			echo "$name: WARNING: no reciprocal conversions; WinOLS's DAMOS import sets them to factor 1, so time constants (ZK*) read raw (docs/corpus.md)" >&2
 	fi
 	model "$tmp/new.json" >"$tmp/new.model"
 	if test -f "$def" && model "$def" | cmp -s - "$tmp/new.model"; then

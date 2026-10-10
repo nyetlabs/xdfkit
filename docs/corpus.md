@@ -54,6 +54,8 @@ Readers need originals for regression tests (DAMOS and A2L have no writers; exac
 
 ### Policy
 
+- DAMOS and A2L definitions (origin `damos`, `a2l`) are maintained in the corpus JSON: fixes are made there, and a WinOLS project wanting them imports a KP generated from it (`xdfkit -f kp`) rather than being re-exported. Hand definitions are maintained in their WinOLS projects and imported with `publish/import-incoming.sh`.
+- WinOLS's DAMOS import loses reciprocal conversions: a DAMOS conversion `/REP 0, B, C, 0` (phys = (B / C) / raw; the `zk*` time constants and `rfak*` factors) comes out as factor 1, so the map reads the raw value (confirmed against 06A906032HF's `.dam`; 4B0906018CM and 06A906032S kept theirs). A definition exported from such a project needs its reciprocal conversions restored in the corpus JSON, which keeps an edited stamp. `import-incoming.sh` warns when a DAMOS definition has no reciprocal conversions, or has fewer than the corpus JSON it replaces.
 - Images are immutable: a changed image gets a new id. JSON files do change, through ordinary commits: hand fixes, and bulk regeneration when the schema or a reader improves. Bulk regeneration skips JSON with an edited stamp.
 - Schema versions: every JSON names its schema version. xdfkit reads older versions, or the corpus is regenerated in one commit per schema bump. Consumers pin a corpus commit and an xdfkit version that agree.
 - Canonical form (`jq -S .`, one value per line) keeps JSON diffs small and reviewable in git.
