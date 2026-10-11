@@ -2,9 +2,10 @@
 # Import KP, XDF and model JSON files into their packs' corpus JSON: the files
 # given, else every one in testdata/local/incoming. See README.md.
 #
-# The pack is the longest images.tsv stem the file name starts with, followed
-# by "." or "-" (8D0907551K.kp, 8D0907551K-0001-fixed.xdf). An XDF uses
-# NAME.meta.json next to it, else build/publish/PACK.meta.json. The corpus JSON
+# The pack is the longest corpus.tsv image name the file name starts with,
+# followed by "." or "-" (8D0907551K-0001.kp, 8D0907551K-0001-fixed.xdf). An
+# XDF uses NAME.meta.json next to it, else that member of
+# build/publish/stage/IMAGE-DATE.zip. The corpus JSON
 # is rewritten only when the definitions or their origin changed; files from
 # incoming then move to incoming/imported/, so a later run can't import them
 # over newer work. A second file for one definition waits for the next run. A subset
@@ -21,11 +22,10 @@
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 in=${INCOMING:-$root/testdata/local/incoming}
-tsv=$root/testdata/archive/ecuxplot/images.tsv
 corpus=${CORPUS:-$(cd "$root/../ecu-corpus" 2>/dev/null && pwd || echo "$root/corpus")}
 xdfkit=$root/build/xdfkit
 test -x "$xdfkit" || make -C "$root" build
-stems=$(awk -F'\t' 'NR > 1 { print length($1) "\t" $1 }' "$tsv" | sort -rn | cut -f2)
+stems=$(awk -F'\t' 'NR > 1 { print length($1) "\t" $1 }' "$corpus/corpus.tsv" | sort -rn | cut -f2)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
@@ -50,11 +50,11 @@ for f; do
 		esac
 	done
 	if test -z "$pack"; then
-		echo "$name: no pack in images.tsv matches the name" >&2
+		echo "$name: no image in corpus.tsv matches the name" >&2
 		status=1
 		continue
 	fi
-	def=$corpus/defs/$(awk -F'\t' -v p="$pack" '$1 == p { print $2 }' "$tsv").json
+	def=$corpus/defs/$pack.json
 	case " $seen " in *" $def "*)
 		echo "$name: skipped, another file for $(basename "$def") was imported in this run" >&2
 		status=1
@@ -69,9 +69,19 @@ for f; do
 	fi
 	meta=
 	case $name in *.xdf | *.XDF)
-		for meta in "${f%.*}.meta.json" "$root/build/publish/$pack.meta.json" ""; do
-			test -z "$meta" || test -f "$meta" && break
-		done
+		meta=${f%.*}.meta.json
+		if ! test -f "$meta"; then
+			meta=
+			member=$pack.meta.json
+			case $name in "$pack"-tuner.*) member=$pack-tuner.meta.json ;; esac
+			zip=
+			for z in "$root/build/publish/stage/$pack-"[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9].zip; do
+				test -f "$z" && zip=$z
+			done
+			if test -n "$zip" && unzip -p "$zip" "$member" >"$tmp/meta.json"; then
+				meta=$tmp/meta.json
+			fi
+		fi
 		echo "$name: metadata ${meta:-missing, so what XDF cannot hold is lost}" >&2
 		;;
 	esac

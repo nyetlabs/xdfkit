@@ -1,46 +1,32 @@
 # Publishing map definitions
 
-The published packs (KP, CSV map list, XDF with its metadata file, model JSON, tuner subsets of DAMOS packs, and dated zips) are generated from the model JSON in ecu-corpus `defs/IMAGE.json`. That JSON is the source of truth: a correction goes into it, never into the generated files. `make help` lists the targets and which packs are hand, full and tuner; outputs go to `build/publish/`, the published tree to `build/publish/stage/`.
-
-## Workflow
-
-```mermaid
-flowchart TD
-  edit["Edit the published KP in WinOLS<br/>or XDF in TunerPro"] --> save["Save it in testdata/local/incoming/<br/>as PACK.kp, PACK-note.xdf, ..."]
-  save --> incoming["make -C publish incoming"]
-  incoming --> edited{"Corpus JSON<br/>stamp edited?"}
-  edited -- "yes, without FORCE=1" --> skip["Skipped"]
-  edited -- no --> import
-  single["publish/import-incoming.sh file..."] --> edited
-  import["Convert the KP, XDF or<br/>model JSON to model JSON"]
-  import --> origin{"ORIGIN= given?"}
-  origin -- yes --> changed
-  origin -- no --> keep["Keep the corpus JSON's origin;<br/>hand with 3000+ maps becomes damos"]
-  keep --> changed{"Definitions or<br/>origin changed?"}
-  changed -- no --> unchanged["Unchanged"]
-  changed -- yes --> write["Rewrite corpus defs/IMAGE.json"]
-  write --> commit["Commit and push in ../ecu-corpus"]
-  commit --> gen["make -C publish upload<br/>(RSYNC_FLAGS=-n first)"]
-  commit --> bump["make corpus-bump here<br/>and in me7-logger"]
-```
-
-- The corpus is `../ecu-corpus`, the full clone beside this repo, when it exists, else the read-only `corpus/` submodule; `CORPUS=` overrides it (docs/corpus.md).
-- PACK is the pack's stem in `testdata/archive/ecuxplot/images.tsv`; the file name starts with it, followed by `.` or `-`. Where a part has packs for more than one image, each is named after its image (`4D1907558-0002`, the hand pack, and `4D1907558-0004`), so a file names its image and can't land on the other image's definition. The archive's stem `4D1907558` still reaches the 0002 definition.
-- An XDF needs its metadata file to keep what XDF can't hold: `NAME.meta.json` next to it, else `build/publish/PACK.meta.json`, which matches the published XDF.
-- `make incoming` runs `import-incoming.sh` on every KP, XDF and model JSON (not `.meta.json`) in `incoming/`; the script also takes files as arguments. Files from `incoming/` (and their metadata files) move to `incoming/imported/`, so a later run can't import them over newer work. One file per definition per run. For origin `damos` it warns when the definition has no reciprocal conversions or loses ones the corpus JSON has: WinOLS's DAMOS import drops them (`docs/corpus.md`, Policy).
-- Model JSON keeps its own origin. Origin `located` (me7info's located maps, as model JSON) is written only where the corpus JSON is missing or located too, never over a hand or DAMOS definition.
-- The comparison ignores the stamp and the rest of the provenance. The origin is `damos`, `a2l`, `hand` or `located` (docs/corpus.md); set `ORIGIN=damos` for a smaller DAMOS export, `DAMOS_MAPS=` changes the cutoff, `FORCE=1` imports over a hand-edited corpus JSON.
+Each corpus definition (`defs/IMAGE.json`, a `corpus.tsv` row whose `def` is set) is one zip, `IMAGE-DATE.zip`, in `build/publish/stage/`. `index.php` is the directory page: it reads the zips in the directory, counts the maps in each definition, and gives each image its own columns for the ECU, engine, code, vehicle, year, gearbox, and market. Apache serves it instead of a listing. KP, CSV and XDF are generated from that JSON. A correction goes into the JSON, never into the zip.
 
 ## Layout
 
-`PACKS` in the Makefile lists the packs. Each is one of:
+`DATE` is `YYYYMMDD`, the later of the last commit of the JSON and, for an ME7 image, `categories.json`. A commit whose message starts `chore(schema):` does not count. `make upload` is `rsync -a --delete` to `UPLOAD_DEST` (gitignored `local.mk`; `RSYNC_FLAGS=-n` is a dry run). A new date removes the previous zip. The first upload of this tree also removes the old loose files and `full/`.
 
-- Hand (origin `hand`, or `located` as 4D1907558-0004): at the top level, `PACK.kp`, `.xdf`, `.meta.json`, `.csv`, `.json` and `PACK-DATE.zip` holding them.
-- Full (origin `damos`, the known DAMOS packs): the same files in `full/`.
-- Tuner: a full pack whose image is ME7 (corpus.tsv family) also gets, at the top level, `PACK-tuner.xdf`, `.meta.json`, `.csv` and `PACK-tuner-DATE.zip`: only the maps named in the corpus `categories.json` (`CATEGORIES=` overrides it; docs/corpus.md) and the objects their axes point at, filed under its categories. No tuner KP (untested in WinOLS) and no model JSON (a subset is not a definition). None are built when the table is missing. Non-ME7 DAMOS packs (8D0907558E, 8D0907558M) are in `full/` only.
+`CORPUS` is `../ecu-corpus` when that checkout exists, else the `corpus/` submodule (`docs/corpus.md`). A shallow submodule may not reach the commit, so the date is wrong; use the full clone.
 
-`README.txt` explains the layout to downloaders and is published at the top level.
+Members keep undated names, so an XDF and its metadata file share a stem:
 
-Inside a zip the files are renamed `STEM-DATE.EXT`, so an XDF and its metadata file keep one stem and xdfkit finds the metadata file next to the XDF. A zip is dated by the last commit of its pack's source (the corpus JSON, or the archived KP), and a tuner zip also by `categories.json`'s, whichever is later. Only the current zip is published: the date tells users the pack changed, and `make upload` (`rsync --delete` to `UPLOAD_DEST`, set in the gitignored `local.mk`) removes older ones and anything else not in the tree. A tuner XDF is marked as a subset (`provenance.subset`, docs/model.md), so `import-incoming.sh` refuses it, even renamed.
+- `IMAGE.json`, copied from the corpus
+- `IMAGE.kp`, `IMAGE.csv`, `IMAGE.xdf`, `IMAGE.meta.json`
+- when the image family matches `ME7`: `IMAGE-tuner.xdf`, `IMAGE-tuner.meta.json`, `IMAGE-tuner.csv`, from `xdfkit --tuner` and `categories.json`
 
-A pack without corpus JSON is converted from its archived KP in `testdata/archive/ecuxplot/`: 8N0906018CB, whose pack fits only the archive's non-OEM image; the Makefile gives it origin `damos` and family ME7.5. The archive is never edited, so that pack can't be corrected through `incoming` until an OEM image of its software is in the corpus.
+CSV is the map list only, with no reference columns. `8N0906018CB` is not published: it has no corpus definition.
+
+## Import
+
+`make incoming` runs `import-incoming.sh` on every KP, XDF and model JSON in `testdata/local/incoming/` (or on the files given). The image is the longest `corpus.tsv` name the filename starts with, followed by `.` or `-`. `4D1907558.kp` matches neither `4D1907558-0002` nor `4D1907558-0004`.
+
+An XDF needs `NAME.meta.json` beside it, otherwise that member of `build/publish/stage/IMAGE-DATE.zip`. A subset (`IMAGE-tuner.xdf`) is refused. Origin `located` is written only where the corpus JSON is missing or already located. `ORIGIN=`, `FORCE=1` and the reciprocal-conversion warning are unchanged (`docs/corpus.md`). Files from `incoming/` then move to `incoming/imported/`.
+
+## me7-logger
+
+`me7info publish` lists every parity image. Eligible means grade D or better, confidence not mostly low, and the corpus definition is missing or already `located`. `me7info publish --write` writes `defs/NAME.json` (`provenance.origin` `located`) and sets that row's `def` to `defs/NAME.json`. The corpus is `../ecu-corpus` when that checkout exists, else `corpus/` (`CORPUS=` overrides). The command does not commit, push, bump, or upload. A star after the tier in `me7info parity` means that image has no corpus definition. xdfkit does not read tiers.
+
+`me7info onboard` is how a new image enters the parity set (me7-logger `testdata/parity/incoming/README.md`).
+
+- `hand` or `damos`. `publish` skips them. Added maps and wrong addresses are edited into that JSON by hand.
+- `import-incoming.sh` remains the importer for KP, XDF, and DAMOS.

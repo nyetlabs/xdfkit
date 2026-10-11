@@ -30,7 +30,7 @@ For the shared corpus and xdfkit outputs: image names from the image's own part 
 - The version stays in the name even where users treat versions of a part as one. Of the 10 corpus parts with two versions, 3 differ only in their data set (`DstC1o` to `DstC2o`: about 30 KB, map addresses unchanged, the same definition fits both) and 7 are rebuilt software (260 to 640 KB across every bank, maps moved: 4D1907558's pack fits -0002 but not -0004), and the identification string doesn't reliably tell them apart. Which other images a definition fits is to be listed in `corpus.tsv`, not expressed by the name.
 - No owner in the name. If owners ever need tracking, they get separate directories, not a name part, so scripts can keep globbing one directory.
 - No dates in names: history is in git. ecuxplot's dated KP copies (`8D0907551M-20261006`) become commits of one JSON.
-- Tool outputs that aren't curated definitions (me7info's generated maps) don't go in the corpus (see `corpus.md`).
+- A located model from me7info is a corpus definition only for an image with no hand or DAMOS one, and only once its parity grade is D or better (`corpus.md`). Other tool outputs stay out.
 
 ## xdfkit outputs
 
