@@ -307,7 +307,7 @@ func kpType(d Data) kp.Type {
 }
 
 func valueFromKP(v kp.Value, precision int, reciprocal bool) Value {
-	return Value{v.Description, v.Units, precision, Conversion{v.Factor, v.Offset, reciprocal}}
+	return Value{Description: v.Description, Units: v.Units, Precision: precision, Conversion: Conversion{Factor: v.Factor, Offset: v.Offset, Reciprocal: reciprocal}}
 }
 
 func kpValue(v Value) kp.Value {

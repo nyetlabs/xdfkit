@@ -33,7 +33,7 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Conversion | Units | Y | Y | Y: COMPU_METHOD unit / PHYS_UNIT | Y | Y | Y: Einheit | Y | Y |
 | Conversion | Display precision | Y | Y | Y: FORMAT | ? | Y: decimalpl | Y: Nachkommastellen | Y | Y |
 | Conversion | Display base dec / hex / binary | Y: base field | Y: base 10/16/2; binary on codewords, e.g. CWMSRCAN | N | ? | P: dec/hex only | P: Radix 10 / 16; binary not documented | Y: view base | Y |
-| Conversion | Min / max limits | Y: `range`, the map properties' value range, one low/high pair per element width (8-bit 0-255 on almost every map); raw or displayed units unconfirmed (`kp-format.md`) | Y: same | Y: limits + EXTENDED_LIMITS | ? | Y: min / max | N: no property | N | Y |
+| Conversion | Min / max limits | Y: `range`, the map properties' value range, one low/high pair per element width (8-bit 0-255 on almost every map); raw or displayed units unconfirmed (`kp-format.md`) | Y: same | Y: limits + EXTENDED_LIMITS | ? | Y: min / max | N: no property | Y: optional `min` and `max` on `value`; omitted when the source has none (`model.md`) | Y |
 | Conversion | Difference / percent view vs original | Y: flags | Y: flags D, P | N | N | N | Y: bDelta / bProzent | Y: view difference / percent | Y |
 | Conversion | Unidentified per-map doubles | P: `viewScale` and `viewOffset` are taken as the 3D view's scaling, not conversion; `view2DScale` and `view3DRotation` (300.0, 1.0) taken as view state (all unconfirmed, `kp-format.md`) | P: same | - | - | - | - | N | N: not in the model until identified; KP output takes them from a template KP or defaults |
 | Axes | Axis read from image | Y: datasource EEPROM | Y | Y: STD_AXIS / COM_AXIS | Y | Y: EMBEDDEDDATA | Y: DataSrc eRom | Y: source image | Y |
@@ -57,5 +57,5 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | DAMOS | 8 | 2 | 9 | 20 |
 | XDF | 22 | 11 | 6 | 0 |
 | WinOLS script | 17 | 6 | 15 | 1 |
-| Model (schema 1) | 17 | 6 | 17 | 0 |
+| Model (schema 1) | 18 | 6 | 16 | 0 |
 | Model (target) | 39 | 0 | 1 | 0 |

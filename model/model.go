@@ -58,22 +58,35 @@ type Category struct {
 
 // Object is one map definition: a single value, a curve or a map.
 type Object struct {
-	Key         string `json:"key" doc:"The source id, or obj-N when the id is blank. A repeated key is allowed."`
-	ID          string `json:"id" doc:"The source's own identifier (KP id, A2L name); not unique."`
-	Description string `json:"description,omitempty" doc:"Long description (KP name)."`
-	Comment     string `json:"comment,omitempty" doc:"Free-text comment."`
-	Categories  []int  `json:"categories,omitempty" doc:"Category ids."`
-	Shape       string `json:"shape" doc:"value: one cell; 1d: a row of cols cells; 2d: rows by cols cells." enum:"value|1d|2d"`
-	Inverse     bool   `json:"inverse,omitzero" doc:"KP \"2d Inverse\" organisation; its meaning is unconfirmed (docs/kp-format.md)."`
-	Marked      bool   `json:"marked,omitzero" doc:"Marked in the WinOLS map list (KP v2 Marked; unconfirmed, docs/kp-format.md)."`
-	Address     Addr   `json:"address" doc:"File offset of the first cell."`
-	Rows        int    `json:"rows" doc:"Number of rows."`
-	Cols        int    `json:"cols" doc:"Number of columns."`
-	Data        Data   `json:"data" doc:"Cell storage."`
-	Value       Value  `json:"value" doc:"Cell meaning and conversion."`
-	View        View   `json:"view,omitzero" doc:"Display settings."`
-	X           *Axis  `json:"x,omitempty" doc:"Column axis."`
-	Y           *Axis  `json:"y,omitempty" doc:"Row axis."`
+	Key         string      `json:"key,omitempty" doc:"The source id. Empty when the id is blank. A repeated key is allowed."`
+	ID          string      `json:"id" doc:"The source's own identifier (KP id, A2L name); not unique."`
+	Description string      `json:"description,omitempty" doc:"Long description (KP name)."`
+	Comment     string      `json:"comment,omitempty" doc:"Free-text comment."`
+	Categories  []int       `json:"categories,omitempty" doc:"Category ids."`
+	Shape       string      `json:"shape" doc:"value: one cell; 1d: a row of cols cells; 2d: rows by cols cells." enum:"value|1d|2d"`
+	Inverse     bool        `json:"inverse,omitzero" doc:"KP \"2d Inverse\" organisation; its meaning is unconfirmed (docs/kp-format.md)."`
+	Marked      bool        `json:"marked,omitzero" doc:"Marked in the WinOLS map list (KP v2 Marked; unconfirmed, docs/kp-format.md)."`
+	Address     Addr        `json:"address" doc:"File offset of the first cell."`
+	Rows        int         `json:"rows" doc:"Number of rows."`
+	Cols        int         `json:"cols" doc:"Number of columns."`
+	Data        Data        `json:"data" doc:"Cell storage."`
+	Value       Value       `json:"value" doc:"Cell meaning and conversion."`
+	View        View        `json:"view,omitzero" doc:"Display settings."`
+	X           *Axis       `json:"x,omitempty" doc:"Column axis."`
+	Y           *Axis       `json:"y,omitempty" doc:"Row axis."`
+	Alternates  []Alternate `json:"alternates,omitempty" doc:"Other displays of the same cells. Address and storage stay on this object."`
+}
+
+// Alternate is another display of an object's cells: a second unit or
+// equation. X and Y, when set, replace that axis's display only.
+type Alternate struct {
+	ID          string `json:"id,omitempty" doc:"Source identifier of this display."`
+	Description string `json:"description,omitempty" doc:"Long description of this display."`
+	Categories  []int  `json:"categories,omitempty" doc:"Category ids for this display."`
+	Value       Value  `json:"value" doc:"Cell meaning and conversion for this display."`
+	View        View   `json:"view,omitzero" doc:"Display settings for this display."`
+	X           *Value `json:"x,omitempty" doc:"Column axis display, when it differs."`
+	Y           *Value `json:"y,omitempty" doc:"Row axis display, when it differs."`
 }
 
 // Data is how cells are stored.
@@ -90,6 +103,8 @@ type Value struct {
 	Units       string     `json:"units,omitempty" doc:"Physical units."`
 	Precision   int        `json:"precision" doc:"Decimal places shown."`
 	Conversion  Conversion `json:"conversion" doc:"Raw to physical conversion."`
+	Min         *float64   `json:"min,omitempty" doc:"Lowest value shown. Omitted when the source has none."`
+	Max         *float64   `json:"max,omitempty" doc:"Highest value shown. Omitted when the source has none."`
 }
 
 // Conversion turns a raw cell into a physical value: factor * raw + offset.
@@ -143,15 +158,10 @@ func (Addr) jsonSchema() map[string]any {
 }
 
 // AssignKeys sets the Key of each object that has none from its ID (see
-// Object.Key). A blank id becomes obj-N, N the object's 1-based position.
-// A repeated key is kept.
+// Object.Key). A blank id leaves the key blank. A repeated key is kept.
 func (m *Model) AssignKeys() {
-	for i, o := range m.Objects {
-		if o.Key != "" {
-			continue
-		}
-		if strings.TrimSpace(o.ID) == "" {
-			o.Key = fmt.Sprintf("obj-%d", i+1)
+	for _, o := range m.Objects {
+		if o.Key != "" || strings.TrimSpace(o.ID) == "" {
 			continue
 		}
 		o.Key = o.ID
@@ -169,9 +179,6 @@ func (m *Model) Check() error {
 	for i, o := range m.Objects {
 		if o == nil {
 			return fmt.Errorf("objects[%d] is null", i)
-		}
-		if o.Key == "" {
-			return fmt.Errorf("objects[%d]: key is empty", i)
 		}
 	}
 	return nil

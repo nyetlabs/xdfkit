@@ -26,9 +26,9 @@ Converts map definitions between WinOLS KP, A2L, DAMOS, TunerPro XDF, WinOLS scr
 ## Implementation
 
 - Separate repo, OS agnostic, command line first; other front ends (a standalone GUI app, other languages) go through the bindings below. Language: Go, pure (no cgo) for the core packages and the CLI, so the C library build is the only one that needs cgo.
-- Bindings: the converter is a library first, so any language or UI framework can use it. Implemented so far: the `api` package with `convert`, `verify`, `lint`, `fix` and `version`, and the CLI on top of it. Not yet: `rpc`, the C ABI library and WebAssembly.
+- Bindings: the converter is a library first, so any language or UI framework can use it. Implemented so far: the `api` package with `convert`, `merge`, `verify`, `lint`, `fix` and `version`, and the CLI on top of it. Not yet: `rpc`, the C ABI library and WebAssembly.
   - Core packages work on bytes, never paths: no file or console I/O, no `os.Exit`, no mutable globals, safe for concurrent calls. `kp` and `canon` already follow this.
-  - One façade package (`api/`) is the only surface the bindings use: named methods such as convert, lint, fix and verify, each taking input bytes plus a JSON request and returning output bytes plus a JSON response (findings, loss report, warnings) or a JSON error. Structured data crosses every boundary as canonical JSON, so a binding needs no per-type code. It recovers every panic into an error, so a bug never takes down a host process. Built now, ahead of new features, and the CLI is a client of it.
+  - One façade package (`api/`) is the only surface the bindings use: named methods such as convert, merge, lint, fix and verify, each taking input bytes plus a JSON request and returning output bytes plus a JSON response (findings, loss report, warnings) or a JSON error. Structured data crosses every boundary as canonical JSON, so a binding needs no per-type code. It recovers every panic into an error, so a bug never takes down a host process. Built now, ahead of new features, and the CLI is a client of it. The request and response fields are the godoc (`go doc go.nyet.org/xdfkit/api`).
   - Surfaces over the façade: the CLI; a sidecar mode (`xdfkit rpc`, one JSON request and response per line on stdin/stdout) for front ends that run the binary; a C ABI shared library (`.dll`, `.so`, `.dylib` plus a header, built with `-buildmode=c-shared` from `capi/`, the only cgo code); and WebAssembly.
   - In `rpc` mode a file argument is either a path or base64 in the JSON; the C ABI and WebAssembly always pass bytes.
   - C ABI: one generic call, `xdfkit_call(method, request JSON, input bytes)`, returning output bytes and response JSON, plus a free function and an ABI version call. New methods never change the ABI. UTF-8 strings and byte buffers with explicit lengths; output allocated by the library and released with its free function; no Go pointers kept by the caller and no callbacks; the JSON documents carry their schema version.
@@ -40,6 +40,29 @@ Converts map definitions between WinOLS KP, A2L, DAMOS, TunerPro XDF, WinOLS scr
 - Project name: `xdfkit` (Go module `go.nyet.org/xdfkit`, repo `github.com/nyetlabs/xdfkit`).
 - The WinOLS binaries are packed (VMProtect and repacked sections), and unpacking means defeating the copy protection, which this project won't do. KP decoding therefore relies on feature-sweep samples (KP files saved by WinOLS with one property changed at a time) plus the UI strings in `OLS_LangE.dll`, which is readable as shipped.
 - KP v2 compression: the `intern` entry is raw deflate that zlib 1.2.x at level 9 reproduces exactly (see `kp-format.md`). Go's `compress/flate` produces a different, still valid, stream. xdfkit uses pure Go and judges the stage-1 round trip on the inflated block; WinOLS 2.24 opens re-deflated files (once `EndOffset` is updated; `kp-format.md`).
+
+## Merge
+
+`xdfkit merge` folds a second definition into a base pack. Inputs are KP, XDF (with its `.meta.json`), JSON or YAML, read through the existing readers. Provenance stays the base file's. `--force` only replaces an existing output file. Replacing a matched map is `--overwrite`. `-n` prints the report and writes nothing. One file with `--smart` only folds that file. The request fields are `go doc go.nyet.org/xdfkit/api MergeRequest`.
+
+```
+xdfkit merge [--smart] [--update] [--overwrite] [-n]
+             [--description keep|fill|replace] [--comment keep|append|replace]
+             [-f json|yaml|kp|xdf] [-i image] [--meta file] [--force]
+             base [incoming] [output]
+```
+
+A name match uses `key` when it is set, otherwise `id`, as the whole string. A blank key and a blank id match nothing. `-` is a real id. The base key and id stay. A name match consumes the incoming object: text is applied, and the object is not also appended when the address differs. A repeated name is ambiguous for layout (`--update` does not copy it). When every incoming object with that name has the same description and comment, that text is applied to every base object with the name.
+
+A span match is the same address, rows, cols and cell bits. The same raw layout also means the same cell signed, endian and float, the same object inverse, and the same image-axis address, bits and stored. An overlap that is not an equal span is kept as two objects (`overlap`).
+
+`--update` copies only what a locator detects: address, shape, rows, cols, cell bits and signed, and each image axis's source, address and bits. It leaves the base conversion, precision, units, view, min/max, endian, float, axis stored and axis signed, and reports `default` where the incoming value differs. Empty incoming units do not clear the base. Non-empty units that differ are `units`, and the base units stay. A factor of 1 is not written onto the base. A new axis copies only its source, address and bits. An existing map keeps its categories; a difference is reported. `--overwrite` replaces the whole object except the base key and id. `--description` and `--comment` override the mode default and do not copy layout. With neither `--update` nor `--overwrite`, description and comment stay (`keep`). `--update` fills an empty description and appends comment lines that are not already there. `--overwrite` replaces both when the incoming text is non-empty.
+
+`--smart` folds each file by span before the name pass. The same units, conversion, precision and axis display with different categories become one object whose categories are the union. A different display at the same raw layout becomes an alternate (`model.md`). Signed versus unsigned, a different width, or a different axis address or length stays two objects.
+
+New names are appended after the base objects, and each generator default on a new map is reported `default`. A base name missing from the incoming file is kept and reported `missing`. The report actions are `added`, `kept`, `corrected`, `description`, `comment`, `units`, `default`, `missing`, `ambiguous`, `overlap`, `categories`, `alternate`, `overwritten` and `skipped`.
+
+XDF output writes one table per category and per alternate (`stamp-and-metadata.md`). KP output writes the first category only, and says so.
 
 ## Architecture
 
@@ -71,8 +94,8 @@ flowchart LR
 
 ## Repo layout
 
-- `cmd/xdfkit/` CLI: `xdfkit [-i image.bin] [-f json|yaml|kp|csv|xdf] input.{kp,json,yaml,xdf} [out]` (planned: `--base 0x...`, `--report f`, A2L and DAMOS input), with input format detected from the file contents (a leading `{` is JSON, a leading `<` is XDF, the KP signature is KP, anything else is YAML; output format from `-f`, else the output extension, `.yml` meaning YAML); `XXX2YYY` conversion commands (see Implementation, CLI naming); subcommands `xdfkit lint` and `xdfkit fix` (see Autocorrect)
-- `api/`: the façade (typed `Convert`, `Verify`, `Lint`, `Fix`, `Version`, and the generic `Call(method, request, input)` that returns canonical JSON responses or `{"error": ...}` and recovers panics). The version string lives here (`api.Version`, set by the Makefile).
+- `cmd/xdfkit/` CLI: `xdfkit [-i image.bin] [-f json|yaml|kp|csv|xdf] input.{kp,json,yaml,xdf} [out]` (planned: `--base 0x...`, `--report f`, A2L and DAMOS input), with input format detected from the file contents (a leading `{` is JSON, a leading `<` is XDF, the KP signature is KP, anything else is YAML; output format from `-f`, else the output extension, `.yml` meaning YAML); `XXX2YYY` conversion commands (see Implementation, CLI naming); subcommands `xdfkit lint` and `xdfkit fix` (see Autocorrect) and `xdfkit merge` (below)
+- `api/`: the façade (typed `Convert`, `Merge`, `Verify`, `Lint`, `Fix`, `Version`, and the generic `Call(method, request, input)` that returns canonical JSON responses or `{"error": ...}` and recovers panics). The version string lives here (`api.Version`, set by the Makefile). `Call` method `merge` takes the base definition as its input.
 - `internal/testenv`: test inputs (ecuxplot data, jq; skip, or fail with `XDFKIT_REQUIRE_DATA`).
 - `internal/corpus`: test access to `ecu-corpus`, from `../ecu-corpus` or the submodule (manifest lookups by name or SHA-256, skip or fail when absent).
 - `model/`: the canonical model, its KP conversion, and the schema generator with the committed `schema.json`.
