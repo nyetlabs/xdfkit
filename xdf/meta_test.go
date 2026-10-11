@@ -134,7 +134,12 @@ func TestMetaEdit(t *testing.T) {
 		t.Fatal("0x3 is a constant; pick a table")
 	}
 	z := i + strings.Index(s[i:j], `<XDFAXIS id="z">`)
-	s = s[:z] + strings.Replace(s[z:j], `<MATH equation="`, `<MATH equation="2 * `, 1) + s[j:]
+	span := strings.Replace(s[z:j], `<MATH equation="`, `<MATH equation="2 * `, 1)
+	// The old min and max are the range the writer invented for the previous
+	// equation. Left in place they read as a custom limit.
+	span = stripElem(span, "min")
+	span = stripElem(span, "max")
+	s = s[:z] + span + s[j:]
 	// delete 0x4, add a copy of it as 0xFFFF
 	i, j = element("0x4")
 	moved := strings.Replace(s[i:j], `uniqueid="0x4"`, `uniqueid="0xFFFF"`, 1)
@@ -177,6 +182,24 @@ func TestMetaEdit(t *testing.T) {
 			t.Errorf("object %d %s changed: %s", i, g.Key, firstDiff(gb, wb))
 		}
 	}
+}
+
+func stripElem(s, tag string) string {
+	open, close := "<"+tag+">", "</"+tag+">"
+	i := strings.Index(s, open)
+	j := strings.Index(s, close)
+	if i < 0 || j < 0 {
+		return s
+	}
+	j += len(close)
+	k := i
+	for k > 0 && (s[k-1] == ' ' || s[k-1] == '\t') {
+		k--
+	}
+	if k > 0 && s[k-1] == '\n' {
+		k--
+	}
+	return s[:k] + s[j:]
 }
 
 func TestParseEquation(t *testing.T) {

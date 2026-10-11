@@ -49,6 +49,8 @@ type raxis struct {
 	Units      string   `xml:"units"`
 	IndexCount int      `xml:"indexcount"`
 	DecimalPl  *int     `xml:"decimalpl"`
+	Min        string   `xml:"min"`
+	Max        string   `xml:"max"`
 	OutputType string   `xml:"outputtype"`
 	Math       equation `xml:"MATH"`
 }
@@ -62,11 +64,17 @@ const stampPrefix = "xdfkit-stamp:"
 // provenance.subset, so the mark survives without the metadata file.
 const subsetPrefix = "xdfkit-subset:"
 
+// foldPrefix starts the first line of an extra table's description
+// ("xdfkit-fold: 0xPRIMARY"). The view records it and leaves it out of the
+// description. Write emits one extra table per further category and per
+// alternate; Read drops those tables when a metadata file is present.
+const foldPrefix = "xdfkit-fold:"
+
 // view is the XDF view: the model read from the XDF elements alone, objects
 // in uniqueid order (numeric; others after them, in file order), with the
-// uniqueid of each object. Label values are not read: the model has no
-// field for them.
-func view(b []byte) (m *model.Model, uids, warnings []string, err error) {
+// uniqueid of each object. folds maps an extra table's uniqueid to its
+// primary uniqueid. Label values are not read: the model has no field for them.
+func view(b []byte) (m *model.Model, uids, warnings []string, folds map[string]string, err error) {
 	if !utf8.Valid(b) {
 		b = fromCP1252(b)
 	}
@@ -74,7 +82,7 @@ func view(b []byte) (m *model.Model, uids, warnings []string, err error) {
 	dec.CharsetReader = func(_ string, r io.Reader) (io.Reader, error) { return r, nil }
 	var d rdoc
 	if err := dec.Decode(&d); err != nil {
-		return nil, nil, nil, err
+		return nil, nil, nil, nil, err
 	}
 	h := &d.Header
 	m = &model.Model{Schema: model.SchemaID, Objects: []*model.Object{}}
@@ -124,7 +132,14 @@ func view(b []byte) (m *model.Model, uids, warnings []string, err error) {
 			warnings = append(warnings, name+": "+w)
 		}
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("%s: %w", name, err)
+			return nil, nil, nil, nil, fmt.Errorf("%s: %w", name, err)
+		}
+		if primary, rest, ok := foldOf(o.Description); ok {
+			o.Description = rest
+			if folds == nil {
+				folds = map[string]string{}
+			}
+			folds[r.UniqueID] = primary
 		}
 		n, err := parseHex(r.UniqueID)
 		es = append(es, entry{r.UniqueID, n, err == nil, o})
@@ -146,7 +161,17 @@ func view(b []byte) (m *model.Model, uids, warnings []string, err error) {
 		uids = append(uids, e.uid)
 	}
 	m.AssignKeys()
-	return m, uids, warnings, nil
+	return m, uids, warnings, folds, nil
+}
+
+// foldOf reports the primary uniqueid when desc starts with a fold line.
+func foldOf(desc string) (primary, rest string, ok bool) {
+	line, rest, _ := strings.Cut(desc, "\n")
+	p, ok := strings.CutPrefix(strings.TrimSpace(line), foldPrefix+" ")
+	if !ok {
+		return "", desc, false
+	}
+	return strings.TrimSpace(p), rest, true
 }
 
 // object converts an XDFTABLE or XDFCONSTANT; cats holds the category ids.
@@ -182,6 +207,7 @@ func (r *robject) object(prec int, cats map[int]bool) (*model.Object, []string, 
 	if err != nil {
 		warnings = append(warnings, err.Error())
 	}
+	keepLimits(&o.Value, z.Min, z.Max, o.Data)
 	if o.Shape != "value" {
 		for _, a := range []struct {
 			id string
@@ -236,6 +262,33 @@ func (a *raxis) value(prec int) (model.Value, model.View, error) {
 		v.Base = 16
 	}
 	return model.Value{Units: trim(a.Units), Precision: prec, Conversion: c}, v, err
+}
+
+// keepLimits stores min and max when they differ from the range the writer
+// invents from the conversion. A match is omitted, so a round trip does not
+// grow limits onto every map.
+func keepLimits(v *model.Value, minS, maxS string, d model.Data) {
+	minS, maxS = strings.TrimSpace(minS), strings.TrimSpace(maxS)
+	if minS == "" && maxS == "" {
+		return
+	}
+	lo, hi, ok := limits(v.Conversion, d)
+	if ok && (javaFixed(lo, 6) == minS && javaFixed(hi, 6) == maxS || sameLimit(minS, lo) && sameLimit(maxS, hi)) {
+		return
+	}
+	if f, err := strconv.ParseFloat(minS, 64); err == nil && minS != "" {
+		v.Min = &f
+	}
+	if f, err := strconv.ParseFloat(maxS, 64); err == nil && maxS != "" {
+		v.Max = &f
+	}
+}
+
+// sameLimit reports whether the XDF text is the limit the writer would invent,
+// including a negative zero the six-digit spelling distinguishes from zero.
+func sameLimit(s string, f float64) bool {
+	v, err := strconv.ParseFloat(s, 64)
+	return err == nil && v == f
 }
 
 func (e embedded) data() model.Data {

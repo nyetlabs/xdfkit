@@ -179,6 +179,111 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	return out, resp, err
 }
 
+// MergeRequest is the request for Merge. The base definition is the input.
+// Incoming is the second definition; empty, with Smart, only folds the base.
+// Meta and IncomingMeta are the metadata files of XDF inputs. Smart, Update
+// and Overwrite are --smart, --update and --overwrite. Description is
+// --description (keep, fill or replace) and Comment is --comment (keep,
+// append or replace); empty selects the mode default. To is the output
+// format (json, yaml, kp or xdf; default json). Image and Title apply to XDF
+// output, as in Convert. -n is the CLI: Merge always returns the result.
+type MergeRequest struct {
+	To           string `json:"to,omitempty"`
+	Name         string `json:"name,omitempty"`
+	Incoming     []byte `json:"incoming,omitempty"`
+	IncomingName string `json:"incomingName,omitempty"`
+	Meta         []byte `json:"meta,omitempty"`
+	IncomingMeta []byte `json:"incomingMeta,omitempty"`
+	Smart        bool   `json:"smart,omitempty"`
+	Update       bool   `json:"update,omitempty"`
+	Overwrite    bool   `json:"overwrite,omitempty"`
+	Description  string `json:"description,omitempty"`
+	Comment      string `json:"comment,omitempty"`
+	Image        []byte `json:"image,omitempty"`
+	Title        string `json:"title,omitempty"`
+}
+
+// MergeResponse reports the merge. Actions are added, kept, corrected,
+// description, comment, units, default, missing, ambiguous, overlap,
+// categories, alternate, overwritten and skipped. Meta is the metadata file
+// that goes with XDF output.
+type MergeResponse struct {
+	From     string         `json:"from"`
+	To       string         `json:"to"`
+	Actions  []model.Action `json:"actions,omitempty"`
+	Warnings []string       `json:"warnings,omitempty"`
+	Meta     []byte         `json:"meta,omitempty"`
+}
+
+// Merge folds Incoming into the base definition (docs/design.md). Provenance
+// stays the base file's. JSON and YAML output is the stamped model. XDF
+// output comes with its metadata file.
+func Merge(base []byte, req MergeRequest) ([]byte, MergeResponse, error) {
+	to := req.To
+	if to == "" {
+		to = JSON
+	}
+	resp := MergeResponse{From: Detect(base), To: to}
+	if req.Meta != nil && resp.From != XDF {
+		return nil, resp, errors.New("a metadata file applies only to XDF input")
+	}
+	if len(req.IncomingMeta) > 0 && Detect(req.Incoming) != XDF {
+		return nil, resp, errors.New("a metadata file applies only to XDF input")
+	}
+	if req.Image != nil && to != XDF {
+		return nil, resp, errors.New("an image applies only to XDF output")
+	}
+	if req.Title != "" && to != XDF {
+		return nil, resp, errors.New("a title applies only to XDF output")
+	}
+	bm, warnings, err := loadModel(base, req.Name, req.Meta)
+	resp.Warnings = warnings
+	if err != nil {
+		return nil, resp, err
+	}
+	var inc *model.Model
+	if len(req.Incoming) > 0 {
+		var ws []string
+		inc, ws, err = loadModel(req.Incoming, req.IncomingName, req.IncomingMeta)
+		for _, s := range ws {
+			resp.Warnings = append(resp.Warnings, "incoming: "+s)
+		}
+		if err != nil {
+			return nil, resp, err
+		}
+	}
+	m, actions, err := model.Merge(bm, inc, model.MergeOptions{
+		Smart: req.Smart, Update: req.Update, Overwrite: req.Overwrite,
+		Description: req.Description, Comment: req.Comment,
+	})
+	resp.Actions = actions
+	if err != nil {
+		return nil, resp, err
+	}
+	if to == XDF {
+		title := req.Title
+		if title == "" {
+			title = strings.TrimSuffix(req.Name, path.Ext(req.Name))
+		}
+		out, err := xdf.Write(m, req.Image, title)
+		if err != nil {
+			return nil, resp, err
+		}
+		resp.Meta, err = xdf.Meta(m, out, "xdfkit "+Version)
+		return out, resp, err
+	}
+	if to == KP {
+		for _, o := range m.Objects {
+			if len(o.Categories) > 1 || len(o.Alternates) > 0 {
+				resp.Warnings = append(resp.Warnings, "KP writes the first category of each map")
+				break
+			}
+		}
+	}
+	out, err := encodeModel(m, to, nil)
+	return out, resp, err
+}
+
 // loadModel reads a KP file, a model JSON or YAML document, or an XDF with
 // its metadata file (nil: none). A hand-edited document adds a warning.
 func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, error) {
@@ -474,9 +579,10 @@ type errorResponse struct {
 // Call runs a method by name, with the request as JSON (empty means {}), and
 // returns the output bytes and the response as canonical JSON. A failure,
 // including a panic, returns no output and {"error": "..."}. Methods: convert
-// (ConvertRequest), lint (LintRequest), fix (FixRequest), verify and version
-// (no request fields). Images, templates and metadata files in requests and
-// responses are base64.
+// (ConvertRequest), merge (MergeRequest; the base definition is the input),
+// lint (LintRequest), fix (FixRequest), verify and version (no request
+// fields). Images, templates and metadata files in requests and responses
+// are base64.
 func Call(method string, request, input []byte) (out, response []byte) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -490,6 +596,11 @@ func Call(method string, request, input []byte) (out, response []byte) {
 		var req ConvertRequest
 		if err = decode(request, &req); err == nil {
 			out, resp, err = Convert(input, req)
+		}
+	case "merge":
+		var req MergeRequest
+		if err = decode(request, &req); err == nil {
+			out, resp, err = Merge(input, req)
 		}
 	case "verify":
 		if err = decode(request, &struct{}{}); err == nil {

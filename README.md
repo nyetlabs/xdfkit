@@ -32,12 +32,13 @@ xdfkit -f xdf -i image.bin in.kp out.xdf    # KP to XDF, plus out.meta.json
 xdfkit --template in.kp out.xdf back.kp     # XDF back to KP
 xdfkit lint -i image.bin in.kp              # report axis mistakes
 xdfkit fix -i image.bin -o fixed.kp in.kp   # fix them
+xdfkit merge --update golden.json located.json out.json
 xdfkit -f csv -i image.bin in.kp            # map list with value ranges
 xdfkit in.kp out.json                       # KP to JSON (or out.yaml)
 xdfkit verify out.json                      # has it been edited by hand?
 ```
 
-The input format is detected from the file; the output format comes from `-f`, else the output file's extension. Existing files are not overwritten without `--force`. Options of one letter take one hyphen (`-f`), longer ones two (`--force`). `xdfkit -h` lists every option.
+The input format is detected from the file; the output format comes from `-f`, else the output file's extension. Existing files are not overwritten without `--force`. Options of one letter take one hyphen (`-f`), longer ones two (`--force`). `xdfkit -h` lists every option. `xdfkit merge` folds a second definition into the first: `--update` copies a corrected address and size and leaves conversions and labels in place (`docs/design.md`).
 
 ### Quick converters
 

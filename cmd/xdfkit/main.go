@@ -26,6 +26,10 @@ const usage = `usage:
   xdfkit lint -i image [--family me7|m3] [--json findings.json] input
   xdfkit fix -i image (-o output | -n) [--rules R1,R2] [--only ID,...]
              [--min-confidence high|medium|low] [--findings findings.json] input
+  xdfkit merge [--smart] [--update] [--overwrite] [-n]
+             [--description keep|fill|replace] [--comment keep|append|replace]
+             [-f json|yaml|kp|xdf] [-i image] [--meta file] [--force]
+             base [incoming] [output]
   xdfkit version
   xdfkit xdf2kp|kp2json FILE...
   xdfkit kp2xdf [-i image] [-m] FILE...
@@ -74,6 +78,20 @@ when there are findings. fix applies the findings that have a fix: by default
 those of high confidence, or those chosen by --only, --rules and
 --min-confidence. With --findings it applies the fixes in a (possibly edited)
 lint --json file instead of linting. -o - writes to stdout; -n only reports.
+
+merge folds incoming into base. A name match (the whole key, or the id when
+the key is blank) consumes the incoming map: text is applied and a moved
+address is not appended. With no mode flag the base layout stays.
+--description and --comment set that text; the default is keep. --update
+copies detected layout (address, shape, size, cell bits and signed, image
+axis address and bits), fills an empty description, appends a comment, and
+reports generator defaults it did not copy. --overwrite replaces the matched
+map and still keeps the base key and id. --smart folds copies in each file
+first: the same display with another category becomes one map in both
+categories, and another unit becomes an alternate. One file with --smart
+only folds that file. -n prints the report and writes nothing. --force only
+replaces an existing output file. XDF input reads NAME.meta.json beside each
+file; --meta overrides the base file's.
 `
 
 func main() {
@@ -97,7 +115,7 @@ func main() {
 		fmt.Println(api.Version)
 		return
 	}
-	cmds := map[string]func([]string) error{"verify": verify, "lint": lintCmd, "fix": fix}
+	cmds := map[string]func([]string) error{"verify": verify, "lint": lintCmd, "fix": fix, "merge": mergeCmd}
 	run := convert
 	if len(args) > 0 && cmds[args[0]] != nil {
 		run, args = cmds[args[0]], args[1:]
@@ -273,6 +291,110 @@ func warn(name string, ws []string) {
 	for _, w := range ws {
 		fmt.Fprintf(os.Stderr, "xdfkit: warning: %s: %s\n", name, w)
 	}
+}
+
+func mergeCmd(args []string) error {
+	fs := newFlags("merge")
+	smart := fs.Bool("smart", false, "fold copies into categories or alternates")
+	update := fs.Bool("update", false, "copy detected layout from incoming")
+	overwrite := fs.Bool("overwrite", false, "replace a matched map")
+	dry := fs.BoolP("dry-run", "n", false, "print the report and write nothing")
+	desc := fs.String("description", "", "description policy: keep, fill or replace")
+	comment := fs.String("comment", "", "comment policy: keep, append or replace")
+	format := fs.StringP("format", "f", "", "output format: json, yaml, kp or xdf")
+	image := fs.StringP("image", "i", "", "flash image, for XDF output")
+	meta := fs.String("meta", "", "metadata file of the base XDF (default: NAME.meta.json next to it)")
+	force := fs.Bool("force", false, "overwrite an existing output file")
+	pos, err := parse(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) < 1 || len(pos) > 3 || len(pos) == 1 && !*smart {
+		fs.Usage()
+		os.Exit(2)
+	}
+	basePath, inPath, out := pos[0], "", ""
+	if len(pos) >= 2 {
+		inPath = pos[1]
+	}
+	if len(pos) == 3 {
+		out = pos[2]
+	}
+	data, err := readInput(basePath)
+	if err != nil {
+		return err
+	}
+	if *format == "" {
+		*format = strings.TrimPrefix(filepath.Ext(out), ".")
+		switch *format {
+		case "":
+			*format = api.JSON
+		case "yml":
+			*format = api.YAML
+		}
+	}
+	if *format == api.KP && out == "" && !*dry {
+		return errors.New("kp output needs an output file")
+	}
+	name := filepath.Base(basePath)
+	if basePath == "-" {
+		name = ""
+	}
+	req := api.MergeRequest{
+		To: *format, Name: name, Title: xdfTitle(*format, out),
+		Smart: *smart, Update: *update, Overwrite: *overwrite,
+		Description: *desc, Comment: *comment,
+	}
+	if *image != "" {
+		if req.Image, err = os.ReadFile(*image); err != nil {
+			return err
+		}
+	}
+	if *meta != "" {
+		req.Meta, err = os.ReadFile(*meta)
+	} else if basePath != "-" && api.Detect(data) == api.XDF {
+		req.Meta, err = readMeta(basePath)
+	}
+	if err != nil {
+		return err
+	}
+	if inPath != "" {
+		req.Incoming, err = readInput(inPath)
+		if err != nil {
+			return err
+		}
+		if inPath != "-" {
+			req.IncomingName = filepath.Base(inPath)
+			if api.Detect(req.Incoming) == api.XDF {
+				req.IncomingMeta, err = readMeta(inPath)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	b, resp, err := api.Merge(data, req)
+	warn(basePath, resp.Warnings)
+	if err != nil {
+		return fmt.Errorf("%s: %w", basePath, err)
+	}
+	for _, a := range resp.Actions {
+		line := a.Action
+		if a.Key != "" {
+			line += "\t" + a.Key
+		}
+		if a.Field != "" {
+			line += "\t" + a.Field
+		}
+		fmt.Fprintln(os.Stderr, line)
+	}
+	if *dry {
+		return nil
+	}
+	if out == "" {
+		out = "-"
+	}
+	return writeConverted(out, b, resp.Meta, *force)
 }
 
 func convert(args []string) error {

@@ -30,12 +30,9 @@ type metaFile struct {
 // Meta returns the metadata file for m written as the XDF x (by Write), with
 // a stamp naming tool.
 func Meta(m *model.Model, x []byte, tool string) ([]byte, error) {
-	v, uids, _, err := view(x)
+	v, uids, _, folds, err := view(x)
 	if err != nil {
 		return nil, err
-	}
-	if len(v.Objects) != len(m.Objects) {
-		return nil, fmt.Errorf("the XDF has %d objects, the model %d", len(v.Objects), len(m.Objects))
 	}
 	vh, vobjs, err := split(v, false)
 	if err != nil {
@@ -45,6 +42,9 @@ func Meta(m *model.Model, x []byte, tool string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(v.Objects)-len(folds) != len(m.Objects) {
+		return nil, fmt.Errorf("the XDF has %d objects, the model %d", len(v.Objects)-len(folds), len(m.Objects))
+	}
 	mf := metaFile{
 		Schema:  MetaSchemaID,
 		Model:   canon.MergeDiff(vh, mh).(map[string]any),
@@ -53,11 +53,16 @@ func Meta(m *model.Model, x []byte, tool string) ([]byte, error) {
 	if mf.XDF.Digests, err = canon.Digests(whole(vh, vobjs)); err != nil {
 		return nil, err
 	}
+	pi := 0
 	for i, uid := range uids {
-		if uid != hex(i+1) {
-			return nil, fmt.Errorf("object %d has uniqueid %s: the XDF wasn't written from this model", i, uid)
+		if _, ok := folds[uid]; ok {
+			continue
 		}
-		mf.Objects[uid] = canon.MergeDiff(vobjs[i], mobjs[i]).(map[string]any)
+		if uid != hex(pi+1) {
+			return nil, fmt.Errorf("object %d has uniqueid %s: the XDF wasn't written from this model", pi, uid)
+		}
+		mf.Objects[uid] = canon.MergeDiff(vobjs[i], mobjs[pi]).(map[string]any)
+		pi++
 	}
 	return canon.MarshalStamped(mf, tool)
 }
@@ -69,7 +74,7 @@ func Meta(m *model.Model, x []byte, tool string) ([]byte, error) {
 // missing from it are dropped. Warnings report XDF content the reader ignores
 // and the edits.
 func Read(x, meta []byte) (*model.Model, []string, error) {
-	v, uids, warnings, err := view(x)
+	v, uids, warnings, folds, err := view(x)
 	if err != nil || meta == nil {
 		return v, warnings, err
 	}
@@ -87,11 +92,11 @@ func Read(x, meta []byte) (*model.Model, []string, error) {
 	if mf.Schema != MetaSchemaID {
 		return nil, warnings, fmt.Errorf("metadata: schema %q, want %q", mf.Schema, MetaSchemaID)
 	}
-	m, ws, err := merge(v, uids, &mf)
+	m, ws, err := merge(v, uids, folds, &mf)
 	return m, append(warnings, ws...), err
 }
 
-func merge(v *model.Model, uids []string, mf *metaFile) (*model.Model, []string, error) {
+func merge(v *model.Model, uids []string, folds map[string]string, mf *metaFile) (*model.Model, []string, error) {
 	vh, vobjs, err := split(v, false)
 	if err != nil {
 		return nil, nil, err
@@ -130,6 +135,9 @@ func merge(v *model.Model, uids []string, mf *metaFile) (*model.Model, []string,
 	seen := map[string]bool{}
 	for i, vo := range v.Objects {
 		uid := uids[i]
+		if _, ok := folds[uid]; ok {
+			continue
+		}
 		name := fmt.Sprintf("%s %q", uid, vo.ID)
 		p, ok := mf.Objects[uid]
 		if !ok || seen[uid] {
@@ -175,6 +183,7 @@ func merge(v *model.Model, uids []string, mf *metaFile) (*model.Model, []string,
 func reconcile(v, c *model.Object) *model.Object {
 	o := *v
 	o.Key, o.Inverse, o.Marked, o.View = c.Key, c.Inverse, c.Marked, c.View
+	o.Alternates = c.Alternates
 	if t, d := text(c); t == v.ID && d == v.Description {
 		o.ID, o.Description, o.Comment = c.ID, c.Description, c.Comment
 	}
@@ -238,6 +247,22 @@ func value(o *model.Value, c model.Value, d model.Data) {
 	if limitPrecision(p, d.Bits, d.Signed) == o.Precision {
 		o.Precision = c.Precision
 	}
+	if o.Min == nil && o.Max == nil || limitsMatch(o, o.Conversion, d) || limitsMatch(o, c.Conversion, d) {
+		o.Min, o.Max = c.Min, c.Max
+	}
+}
+
+// limitsMatch reports whether v's min and max are the range limits invents
+// for c, so a round trip does not store that range as a real limit.
+func limitsMatch(v *model.Value, c model.Conversion, d model.Data) bool {
+	if v.Min == nil || v.Max == nil {
+		return false
+	}
+	lo, hi, ok := limits(c, d)
+	if !ok {
+		return false
+	}
+	return *v.Min == lo && *v.Max == hi || javaFixed(*v.Min, 6) == javaFixed(lo, 6) && javaFixed(*v.Max, 6) == javaFixed(hi, 6)
 }
 
 // remap translates category ids from one category list to another by name,

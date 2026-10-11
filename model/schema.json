@@ -1,5 +1,45 @@
 {
   "$defs": {
+    "Alternate": {
+      "additionalProperties": false,
+      "properties": {
+        "categories": {
+          "description": "Category ids for this display.",
+          "items": {
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "description": {
+          "description": "Long description of this display.",
+          "type": "string"
+        },
+        "id": {
+          "description": "Source identifier of this display.",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Value",
+          "description": "Cell meaning and conversion for this display."
+        },
+        "view": {
+          "$ref": "#/$defs/View",
+          "description": "Display settings for this display."
+        },
+        "x": {
+          "$ref": "#/$defs/Value",
+          "description": "Column axis display, when it differs."
+        },
+        "y": {
+          "$ref": "#/$defs/Value",
+          "description": "Row axis display, when it differs."
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object"
+    },
     "Axis": {
       "additionalProperties": false,
       "properties": {
@@ -141,6 +181,13 @@
           "pattern": "^0x[0-9A-Fa-f]{1,8}$",
           "type": "string"
         },
+        "alternates": {
+          "description": "Other displays of the same cells. Address and storage stay on this object.",
+          "items": {
+            "$ref": "#/$defs/Alternate"
+          },
+          "type": "array"
+        },
         "categories": {
           "description": "Category ids.",
           "items": {
@@ -173,7 +220,7 @@
           "type": "boolean"
         },
         "key": {
-          "description": "The source id, or obj-N when the id is blank. A repeated key is allowed.",
+          "description": "The source id. Empty when the id is blank. A repeated key is allowed.",
           "type": "string"
         },
         "marked": {
@@ -211,7 +258,6 @@
         }
       },
       "required": [
-        "key",
         "id",
         "shape",
         "address",
@@ -311,6 +357,14 @@
         "description": {
           "description": "Description of the quantity.",
           "type": "string"
+        },
+        "max": {
+          "description": "Highest value shown. Omitted when the source has none.",
+          "type": "number"
+        },
+        "min": {
+          "description": "Lowest value shown. Omitted when the source has none.",
+          "type": "number"
         },
         "precision": {
           "description": "Decimal places shown.",

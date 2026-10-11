@@ -207,12 +207,22 @@ func Write(m *model.Model, image []byte, title string) ([]byte, error) {
 		}
 		return ""
 	}
+	next := len(m.Objects)
 	for _, o := range byAddress(m) {
 		obj, err := object(o, index[o], catIndex, link, image)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", o.Key, err)
 		}
 		d.Objects = append(d.Objects, obj)
+		for _, c := range expansions(o) {
+			obj, err = object(c, next, catIndex, link, image)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", o.Key, err)
+			}
+			tagFold(obj, hex(index[o]+1))
+			d.Objects = append(d.Objects, obj)
+			next++
+		}
 	}
 	var b bytes.Buffer
 	e := xml.NewEncoder(&b)
@@ -253,6 +263,77 @@ func categories(m *model.Model) ([]string, map[int]int) {
 		}
 	}
 	return names, idx
+}
+
+// expansions are the extra tables of o: one per category after the first, and
+// one per alternate per alternate category. A map with one category and no
+// alternate has none, so archive packs are unchanged.
+func expansions(o *model.Object) []*model.Object {
+	if len(o.Categories) < 2 && len(o.Alternates) == 0 {
+		return nil
+	}
+	var out []*model.Object
+	for _, id := range o.Categories[1:] {
+		out = append(out, foldCopy(o, []int{id}, nil))
+	}
+	for i := range o.Alternates {
+		alt := &o.Alternates[i]
+		if len(alt.Categories) == 0 {
+			out = append(out, foldCopy(o, nil, alt))
+			continue
+		}
+		for _, id := range alt.Categories {
+			out = append(out, foldCopy(o, []int{id}, alt))
+		}
+	}
+	return out
+}
+
+// foldCopy is o shown as one extra table: cat is its only category, and alt,
+// when set, replaces the display. Address and storage stay on o.
+func foldCopy(o *model.Object, cat []int, alt *model.Alternate) *model.Object {
+	c := *o
+	c.Categories = append([]int{}, cat...)
+	c.Alternates = nil
+	if o.X != nil {
+		x := *o.X
+		c.X = &x
+	}
+	if o.Y != nil {
+		y := *o.Y
+		c.Y = &y
+	}
+	if alt == nil {
+		return &c
+	}
+	c.ID, c.Description, c.Comment = alt.ID, alt.Description, ""
+	c.Value, c.View = alt.Value, alt.View
+	if alt.X != nil && c.X != nil {
+		c.X.Value = *alt.X
+	}
+	if alt.Y != nil && c.Y != nil {
+		c.Y.Value = *alt.Y
+	}
+	return &c
+}
+
+// tagFold makes the first line of an extra table's description name the
+// primary table, so the reader can fold it back.
+func tagFold(obj any, primary string) {
+	line := foldPrefix + " " + primary
+	switch o := obj.(type) {
+	case *table:
+		o.Description = prefixLine(line, o.Description)
+	case *constant:
+		o.Description = prefixLine(line, o.Description)
+	}
+}
+
+func prefixLine(line, rest string) string {
+	if rest == "" {
+		return line
+	}
+	return line + "\n" + rest
 }
 
 // byAddress returns the objects sorted by address, in source order at the
@@ -313,7 +394,9 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 	if o.Cols > 1 {
 		z.Data.ColCount = o.Cols
 	}
-	if lo, hi, ok := limits(o.Value.Conversion, o.Data); ok {
+	if o.Value.Min != nil && o.Value.Max != nil {
+		z.Min, z.Max = javaFixed(*o.Value.Min, 6), javaFixed(*o.Value.Max, 6)
+	} else if lo, hi, ok := limits(o.Value.Conversion, o.Data); ok {
 		z.Min, z.Max = javaFixed(lo, 6), javaFixed(hi, 6)
 	}
 	z.OutputType = outputType(prec, o.View.Base)
