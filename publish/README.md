@@ -24,9 +24,9 @@ An XDF needs `NAME.meta.json` beside it, otherwise that member of `build/publish
 
 ## me7-logger
 
-`me7info publish` lists every parity image. Eligible means grade D or better, confidence not mostly low, and the corpus definition is missing or already `located`. `me7info publish --write` writes `defs/NAME.json` (`provenance.origin` `located`) and sets that row's `def` to `defs/NAME.json`. The corpus is `../ecu-corpus` when that checkout exists, else `corpus/` (`CORPUS=` overrides). The command does not commit, push, bump, or upload. A star after the tier in `me7info parity` means that image has no corpus definition. xdfkit does not read tiers.
+`me7info publish` lists every parity image. Confidence has to pass. With no definition, or when the JSON is already `located`, the grade must be D or better. Origin `hand` does not wait for that grade: it is eligible when the located model is a strict superset, and `--write` keeps the hand conversion, units, and description on the shared names. `me7info publish --write` writes `defs/NAME.json` (`provenance.origin` `located`) and sets that row's `def` to `defs/NAME.json`. The corpus is `../ecu-corpus` when that checkout exists, else `corpus/` (`CORPUS=` overrides). The command does not commit, push, bump, or upload. A star after the tier in `me7info parity` means that image has no corpus definition. xdfkit does not read tiers.
 
 `me7info onboard` is how a new image enters the parity set (me7-logger `testdata/parity/incoming/README.md`).
 
-- `hand` or `damos`. `publish` skips them. Added maps and wrong addresses are edited into that JSON by hand.
-- `import-incoming.sh` remains the importer for KP, XDF, and DAMOS.
+- `damos` or `a2l`. `publish` skips them. Added maps and wrong addresses are edited into that JSON by hand.
+- A `hand` file that the located model does not cover (`hand short`, `hand disagrees`, `hand equal`) stays. `import-incoming.sh` remains the importer for KP, XDF, and DAMOS, and still will not write `located` over `hand`.
