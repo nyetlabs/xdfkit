@@ -58,7 +58,7 @@ type Category struct {
 
 // Object is one map definition: a single value, a curve or a map.
 type Object struct {
-	Key         string `json:"key" doc:"Unique within the file: the source id, with #2, #3 appended to repeats in source order, or obj-N when the id is blank."`
+	Key         string `json:"key" doc:"The source id, or obj-N when the id is blank. A repeated key is allowed."`
 	ID          string `json:"id" doc:"The source's own identifier (KP id, A2L name); not unique."`
 	Description string `json:"description,omitempty" doc:"Long description (KP name)."`
 	Comment     string `json:"comment,omitempty" doc:"Free-text comment."`
@@ -143,26 +143,18 @@ func (Addr) jsonSchema() map[string]any {
 }
 
 // AssignKeys sets the Key of each object that has none from its ID (see
-// Object.Key), avoiding the keys already set.
+// Object.Key). A blank id becomes obj-N, N the object's 1-based position.
+// A repeated key is kept.
 func (m *Model) AssignKeys() {
-	used := map[string]bool{}
-	for _, o := range m.Objects {
-		used[o.Key] = o.Key != ""
-	}
 	for i, o := range m.Objects {
 		if o.Key != "" {
 			continue
 		}
-		base := o.ID
-		if strings.TrimSpace(base) == "" {
-			base = fmt.Sprintf("obj-%d", i+1)
+		if strings.TrimSpace(o.ID) == "" {
+			o.Key = fmt.Sprintf("obj-%d", i+1)
+			continue
 		}
-		k := base
-		for n := 2; used[k]; n++ {
-			k = fmt.Sprintf("%s#%d", base, n)
-		}
-		used[k] = true
-		o.Key = k
+		o.Key = o.ID
 	}
 }
 
@@ -174,15 +166,13 @@ func (m *Model) Check() error {
 	if p := m.Provenance; p != nil && p.Origin != "" && !slices.Contains(Origins, p.Origin) {
 		return fmt.Errorf("provenance origin %q, want one of %s", p.Origin, strings.Join(Origins, ", "))
 	}
-	keys := map[string]bool{}
 	for i, o := range m.Objects {
 		if o == nil {
 			return fmt.Errorf("objects[%d] is null", i)
 		}
-		if o.Key == "" || keys[o.Key] {
-			return fmt.Errorf("objects[%d]: key %q is empty or repeated", i, o.Key)
+		if o.Key == "" {
+			return fmt.Errorf("objects[%d]: key is empty", i)
 		}
-		keys[o.Key] = true
 	}
 	return nil
 }

@@ -146,13 +146,13 @@ func (m *Model) KP(template *kp.File) (*kp.File, error) {
 		}
 		folders[c.ID] = r
 	}
-	maps := map[string]map[string]any{}
+	maps := map[string][]map[string]any{}
 	for i, o := range tm.Objects {
 		r, err := residue(t.Project.Maps[i], o.kpMap(i))
 		if err != nil {
 			return nil, err
 		}
-		maps[o.Key] = r
+		maps[o.Key] = append(maps[o.Key], r)
 	}
 
 	for _, c := range m.Categories {
@@ -167,8 +167,11 @@ func (m *Model) KP(template *kp.File) (*kp.File, error) {
 		f.Project.Folders = append(f.Project.Folders, fd)
 	}
 	for i, o := range m.Objects {
-		r, ok := maps[o.Key]
-		if !ok {
+		var r map[string]any
+		if q := maps[o.Key]; len(q) > 0 {
+			r = q[0]
+			maps[o.Key] = q[1:]
+		} else {
 			r = map[string]any{}
 			for k, v := range d["map"] {
 				r[k] = v

@@ -230,7 +230,7 @@ func TestKeys(t *testing.T) {
 	for _, o := range m.Objects {
 		keys = append(keys, o.Key)
 	}
-	if got, want := strings.Join(keys, ","), "A,-,A#2,-#2,obj-5,A#2#2"; got != want {
+	if got, want := strings.Join(keys, ","), "A,-,A,-,obj-5,A#2"; got != want {
 		t.Errorf("keys %s, want %s", got, want)
 	}
 	m.Schema = SchemaID
@@ -238,8 +238,12 @@ func TestKeys(t *testing.T) {
 		t.Error(err)
 	}
 	m.Objects[1].Key = "A"
+	if err := m.Check(); err != nil {
+		t.Error(err)
+	}
+	m.Objects[0].Key = ""
 	if err := m.Check(); err == nil {
-		t.Error("repeated key accepted")
+		t.Error("empty key accepted")
 	}
 }
 

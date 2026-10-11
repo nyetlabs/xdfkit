@@ -173,7 +173,7 @@
           "type": "boolean"
         },
         "key": {
-          "description": "Unique within the file: the source id, with #2, #3 appended to repeats in source order, or obj-N when the id is blank.",
+          "description": "The source id, or obj-N when the id is blank. A repeated key is allowed.",
           "type": "string"
         },
         "marked": {
