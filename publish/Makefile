@@ -38,13 +38,22 @@ stage:
 		if test -f $$zip && test $$zip -nt $$src && test $$zip -nt $$img && test $$zip -nt $(XDFKIT) \
 			&& { test -z "$$tuner" || test $$zip -nt $(CORPUS)/categories.json; }; then continue; fi; \
 		w=$(OUT)/work/$$name; rm -rf $$w; mkdir -p $$w; cp -p $$src $$w/$$name.json; \
-		$(XDFKIT) --force $$w/$$name.json $$w/$$name.kp; \
-		$(XDFKIT) -f csv --force -i $$img $$w/$$name.json $$w/$$name.csv; \
-		$(XDFKIT) -f xdf --force -i $$img $$w/$$name.json $$w/$$name.xdf; \
+		if ! st=$$($(XDFKIT) verify $$w/$$name.json 2>$$w/verify.err); then \
+			if test -s $$w/verify.err; then cat $$w/verify.err >&2; exit 1; fi; \
+		fi; \
+		rm -f $$w/verify.err; \
+		q=; \
+		case $$st in *': edited ('*) \
+			echo "$$name: definition changed since it was stamped; publishing that version"; \
+			q=--quiet ;; \
+		esac; \
+		$(XDFKIT) $$q --force $$w/$$name.json $$w/$$name.kp; \
+		$(XDFKIT) $$q -f csv --force -i $$img $$w/$$name.json $$w/$$name.csv; \
+		$(XDFKIT) $$q -f xdf --force -i $$img $$w/$$name.json $$w/$$name.xdf; \
 		set -- $$name.json $$name.kp $$name.csv $$name.xdf $$name.meta.json; \
 		if test -n "$$tuner"; then \
-			$(XDFKIT) -f csv --force --tuner $(CORPUS)/categories.json -i $$img $$w/$$name.json $$w/$$name-tuner.csv; \
-			$(XDFKIT) -f xdf --force --tuner $(CORPUS)/categories.json -i $$img $$w/$$name.json $$w/$$name-tuner.xdf; \
+			$(XDFKIT) $$q -f csv --force --tuner $(CORPUS)/categories.json -i $$img $$w/$$name.json $$w/$$name-tuner.csv; \
+			$(XDFKIT) $$q -f xdf --force --tuner $(CORPUS)/categories.json -i $$img $$w/$$name.json $$w/$$name-tuner.xdf; \
 			set -- "$$@" $$name-tuner.csv $$name-tuner.xdf $$name-tuner.meta.json; \
 		fi; \
 		(cd $$w && zip -qX $$zip "$$@"); \

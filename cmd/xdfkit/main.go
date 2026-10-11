@@ -21,7 +21,7 @@ import (
 const usage = `usage:
   xdfkit [-f json|yaml|kp|csv|xdf] [--template orig.kp] [-i image] [-r ref]...
          [--meta file.meta.json] [--origin damos|a2l|hand|located]
-         [--tuner categories.json] [--force] input [output]
+         [--tuner categories.json] [--quiet] [--force] input [output]
   xdfkit verify file.json|file.yaml...
   xdfkit lint -i image [--family me7|m3] [--json findings.json] input
   xdfkit fix -i image (-o output | -n) [--rules R1,R2] [--only ID,...]
@@ -406,6 +406,7 @@ func convert(args []string) error {
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
 	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, hand or located")
 	tuner := fs.String("tuner", "", "category table: keep only its maps and their axes")
+	quiet := fs.Bool("quiet", false, "suppress warnings")
 	refs := fs.StringArrayP("ref", "r", nil, "reference definition, for a CSV column of matching map names (repeatable)")
 	pos, err := parse(fs, args)
 	if err != nil {
@@ -472,7 +473,9 @@ func convert(args []string) error {
 		return err
 	}
 	b, resp, err := api.Convert(data, req)
-	warn(in, resp.Warnings)
+	if !*quiet {
+		warn(in, resp.Warnings)
+	}
 	if err != nil {
 		return fmt.Errorf("%s: %w", in, err)
 	}

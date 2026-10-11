@@ -318,7 +318,11 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 		return nil, nil, err
 	}
 	var warnings []string
-	if v.Status != "clean" && v.Status != "unstamped" {
+	switch v.Status {
+	case "clean", "unstamped":
+	case "edited":
+		warnings = append(warnings, "changed since it was stamped; using the file as written")
+	default:
 		warnings = append(warnings, "stamp "+v.String())
 	}
 	m := new(model.Model)

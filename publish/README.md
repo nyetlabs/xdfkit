@@ -16,6 +16,8 @@ Members keep undated names, so an XDF and its metadata file share a stem:
 
 CSV is the map list only, with no reference columns. `8N0906018CB` is not published: it has no corpus definition.
 
+A rebuilt zip whose definition changed since it was stamped prints one line, `NAME: definition changed since it was stamped; publishing that version`. The JSON in the zip is still the corpus file.
+
 ## Import
 
 `make incoming` runs `import-incoming.sh` on every KP, XDF and model JSON in `testdata/local/incoming/` (or on the files given). The image is the longest `corpus.tsv` name the filename starts with, followed by `.` or `-`. `4D1907558.kp` matches neither `4D1907558-0002` nor `4D1907558-0004`.
