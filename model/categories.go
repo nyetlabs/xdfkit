@@ -14,8 +14,7 @@ import (
 // CategoryTableSchema is the schema version of a category table.
 const CategoryTableSchema = 1
 
-// CategoryTable is the corpus categories.json (docs/corpus.md): the tuner
-// set of map names, each with its category.
+// CategoryTable is a tuner set of map names, each with its category.
 type CategoryTable struct {
 	Schema     int               `json:"schema" doc:"Schema version." enum:"1"`
 	Categories map[string]string `json:"categories" doc:"Category of each map name in the tuner set."`

@@ -16,8 +16,8 @@ func Schema() ([]byte, error) {
 	return schemaOf(reflect.TypeFor[Model](), "schema.json", "xdfkit map definition model", true)
 }
 
-// CategoryTableJSONSchema returns the JSON Schema of the corpus category
-// table; the committed categories.schema.json must equal it.
+// CategoryTableJSONSchema returns the JSON Schema of a category table; the
+// committed categories.schema.json must equal it.
 func CategoryTableJSONSchema() ([]byte, error) {
 	return schemaOf(reflect.TypeFor[CategoryTable](), "categories.schema.json", "xdfkit category table", false)
 }

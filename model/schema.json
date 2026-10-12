@@ -300,7 +300,7 @@
           "type": "string"
         },
         "origin": {
-          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are), located (found in the image by a program; never a corpus source).",
+          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are), located (found in the image by a program).",
           "enum": [
             "damos",
             "a2l",
@@ -316,7 +316,7 @@
         },
         "subset": {
           "$ref": "#/$defs/Subset",
-          "description": "Set when the definition is a subset of the original file's, which must not replace it in the corpus."
+          "description": "Set when the definition is a subset of the original file's."
         }
       },
       "required": [

@@ -270,7 +270,7 @@ func TestLimitPrecision(t *testing.T) {
 }
 
 // TestMapdump compares the XDF of each archived pack with mapdump's XDF of
-// the KP that xdfkit writes from the model (make -C publish), in the directory
+// the KP that xdfkit writes from the model, in the directory
 // XDFKIT_MAPDUMP_DIR.
 func TestMapdump(t *testing.T) {
 	ref := os.Getenv("XDFKIT_MAPDUMP_DIR")
