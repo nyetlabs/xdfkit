@@ -2,50 +2,93 @@
 
 KP v1/v2 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, v1, 4170 maps, and `8D0907551M.kp`, v2, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro XML (mapdump writes 1.50, TunerPro 5.00 saves 1.80), checked against TunerPro's version history up to 5.00.10305 (2026-01); WinOLS script per the "Importing with scripts" help topic (map creation only, write only); the model is xdfkit's canonical model in JSON or YAML (`model.md`): "schema 1" is what `model/schema.json` holds today, "target" is the design, not implemented beyond schema 1.
 
-Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed (samples needed), `-` not applicable.
+Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed (samples needed), `-` not applicable. Script is the WinOLS script. Model is schema 1. Target is the design.
 
-| Group | Field | KP v1 | KP v2 | A2L | DAMOS | XDF | WinOLS script | Model (schema 1) | Model (target) |
-|---|---|---|---|---|---|---|---|---|---|
-| Identity | Short identifier | Y: id, e.g. KFMIOP | Y: id | Y: object name | Y | Y: title | Y: IdName | Y: id | Y |
-| Identity | Long description | Y: name | Y: name | Y: LongIdentifier | Y | Y: description | Y: Name | Y: description | Y |
-| Identity | Free-text comment | N | Y: comment; in 8D0907551M it holds hex signature bytes | P: ANNOTATION | ? | P: only by appending to description | Y: Kommentar | Y: comment | Y |
-| Identity | Categories | Y: one folder per map (321 folders in 8D0907551G) | Y: one folder per map | Y: FUNCTION/GROUP, nested, many-to-many | P: function assignment | P: a path of up to 3 levels per object (CATEGORYMEM index 0 to 2 is category A, B, C), not many-to-many; up to 2048 categories, but builds before 5.00.9813 (2023) misload numbers above 255 (323 load correctly in 5.00.10305) | P: FolderName, one folder per map (WinOLS 2.08+) | P: flat categories, several per object, no nesting | Y |
-| Identity | Project / ECU metadata | P: name and version parsed; most header fields unknown | P: same | Y: PROJECT, HEADER, MODULE, MOD_PAR (EPK, CPU) | P | P: title, description, author | N | P: name and version | Y |
-| Addressing | Address is a file offset | Y | Y | N: ECU CPU address; needs a segment-to-file mapping | N: ECU address | Y: plus header baseoffset | Y: StartAddr / DataAddr (hexdump address, decimal) | P: file offset only; no CPU address or segment | Y: file offset plus original CPU address and segment |
-| Addressing | Memory segments | N | N | Y: MEMORY_SEGMENT | ? | P: REGION (size only) | N | N | Y |
-| Addressing | Checksum definition | N: separate WinOLS checksum modules | N | P: vendor-specific IF_DATA | N | Y: CHECKSUM (plugin) | N | N | Y |
-| Addressing | Search signature (find map in other SW) | Y: per map and per axis | Y | N | N | N | P: search commands place maps at import; not stored with the map | N: not kept (the axis `signature` is the marker byte) | Y |
-| Data layout | Single value / 1D / 2D | Y | Y | Y: VALUE / CURVE / MAP | Y: Festwert / Kennlinie / Kennfeld | Y: CONSTANT / TABLE | Y: Typ eEinzel / eEindim / eZweidim | Y: shape value / 1d / 2d | Y |
-| Data layout | 3D and higher | N | N | Y: CUBOID, CUBE_4, CUBE_5 | N | N | N | N | Y |
-| Data layout | Value block (array, no axes) | P: 2D with ordinal 1,2,3 axes | P: same | Y: VAL_BLK | ? | Y: table with label axes | P: 2D with no-axis data source | P: 2d with ordinal axes | Y |
-| Data layout | Strings | N | N | Y: ASCII | ? | P: outputtype 4 | N | N | Y |
-| Data layout | Integer 8/16/32, signed | Y | Y | Y: also 64-bit | Y | Y | Y: DataOrg + bVorzeichen | Y: bits 8/16/32, signed | Y |
-| Data layout | Float | Y: 32-bit only | Y: 32-bit only | Y: 16/32/64-bit | ? | Y: float flag, 32-bit; 64-bit unconfirmed. Added in 5.00.8008 (2012) with no equations on float data (only `X`); whether that limit still holds is unconfirmed | Y: eFloatLoHi / eFloatHiLo, 32-bit | Y: 32-bit | Y |
-| Data layout | Endianness per object | Y: HiLo/LoHi in type enum | Y | Y: BYTE_ORDER, module default | ?: global (unconfirmed) | Y: mmedtypeflags | Y: DataOrg | Y: endian | Y |
-| Data layout | Row vs column major | Y: '2d Inverse' (252 of 4170 maps in 8D0907551G) | Y: '2d Inverse' (99 of 471 in 8D0907551M) | Y: RECORD_LAYOUT | ? | Y: major stride / flags | Y: Typ eZweiInv | P: `inverse` flag (KP) | Y |
-| Data layout | Gaps, alignment, interleaved records | N | N | Y: RECORD_LAYOUT positions, ALIGNMENT_* | ? | P: stride only | P: SkipBytes on axes only | N | Y |
-| Data layout | Bit mask / sub-byte fields | ?: not decoded; may be in an unknown block | ? | Y: BIT_MASK | ? | P: XDFFLAG, single bit | N | N | Y |
-| Conversion | Linear factor + offset | Y | Y | Y: LINEAR / RAT_FUNC | Y | Y: equation | Y: Faktor / Offset (help example uses a decimal comma; locale to test) | Y: factor, offset | Y |
-| Conversion | Reciprocal (f / x) | Y: flag | Y: flag | Y: RAT_FUNC | ? | Y: equation | Y: bKehrwert | Y: reciprocal flag | Y |
-| Conversion | General rational (6 coefficients) | N | N | Y: RAT_FUNC | ? | Y: equation | N | N | Y |
-| Conversion | Arbitrary formula | N | N | Y: FORMULA (+ inverse) | N | Y: equation; can reference other objects | N | N | Y |
-| Conversion | Enum / lookup tables | N | N | Y: COMPU_TAB, COMPU_VTAB, VTAB_RANGE | ? | N | N | N | Y |
-| Conversion | Units | Y | Y | Y: COMPU_METHOD unit / PHYS_UNIT | Y | Y | Y: Einheit | Y | Y |
-| Conversion | Display precision | Y | Y | Y: FORMAT | ? | Y: decimalpl | Y: Nachkommastellen | Y | Y |
-| Conversion | Display base dec / hex / binary | Y: base field | Y: base 10/16/2; binary on codewords, e.g. CWMSRCAN | N | ? | P: dec/hex only | P: Radix 10 / 16; binary not documented | Y: view base | Y |
-| Conversion | Min / max limits | Y: `range`, the map properties' value range, one low/high pair per element width (8-bit 0-255 on almost every map); raw or displayed units unconfirmed (`kp-format.md`) | Y: same | Y: limits + EXTENDED_LIMITS | ? | Y: min / max | N: no property | Y: optional `min` and `max` on `value`; omitted when the source has none (`model.md`) | Y |
-| Conversion | Difference / percent view vs original | Y: flags | Y: flags D, P | N | N | N | Y: bDelta / bProzent | Y: view difference / percent | Y |
-| Conversion | Unidentified per-map doubles | P: `viewScale` and `viewOffset` are taken as the 3D view's scaling, not conversion; `view2DScale` and `view3DRotation` (300.0, 1.0) taken as view state (all unconfirmed, `kp-format.md`) | P: same | - | - | - | - | N | N: not in the model until identified; KP output takes them from a template KP or defaults |
-| Axes | Axis read from image | Y: datasource EEPROM | Y | Y: STD_AXIS / COM_AXIS | Y | Y: EMBEDDEDDATA | Y: DataSrc eRom | Y: source image | Y |
-| Axes | Per-axis type, sign, units, conversion | Y | Y | Y | Y | Y | Y: StuetzX/Y.* | Y | Y |
-| Axes | Fixed axis values (not in image) | Y: '1,2,3' ordinal or 'Free editable'; axis block sized 4 bytes per point | Y: '1,2,3' ordinal; 'Free editable' (datasource 4) with its values in the axis `values` list, in the axis type | Y: FIX_AXIS_PAR / _DIST / _LIST | ? | Y: static LABELs | P: DataSrc eUserdef, but no property for the values | P: source editable; the values aren't stored | Y |
-| Axes | Shared axis object | N: address repeated per map | N | Y: COM_AXIS -> AXIS_PTS | ? | Y: axis linked to another table (`embedinfo type="3" linkobjid`, the table's uniqueid; TunerPro 5) | N | N: address repeated per axis (the XDF writer links an axis to a matching curve at its address) | Y |
-| Axes | Axis point count read from image | ? | ? | Y: NO_AXIS_PTS in record layout | ? | N | ?: DataHeader marks header bytes; whether the count is read is undocumented | N: `header` counts header bytes; the count isn't read | Y |
-| Axes | Axis stored as differences | Y: 'EEPROM, subtract' = gaps between breakpoints, counted down from 256 (`kp-format.md`); 'add' and 'backwards' still unknown | Y: same datasource field; ME7 packs have mislabelled absolute axes | Y: DEPOSIT DIFFERENCE | ? | P: static LABELs computed from the bin; or live, through a linked helper table with `CELL()` equations (`kp-format.md`; XML unconfirmed) | Y: DataSrc eRomAdd / eRomSub; also eRomBackwards | Y: stored absolute / add / subtract / backwards (add and backwards semantics unknown) | Y |
-| Axes | Rescale / curve axes | N | N | Y: RES_AXIS, CURVE_AXIS | N | P: axis "Normalized" through a function (XDFFUNCTION, Ford-style normalizer); how closely it matches CURVE_AXIS is unconfirmed | N | N | Y |
-| Tool-specific | Map list mark / visibility level | N | Y: `Marked`, taken as the map list marker (unconfirmed, `kp-format.md`) | N | ? | P: `vislevel`, a numbered level per item for the parameter tree filter ("Show Up To" / "Show Only" a level; from TunerPro's strings), not a mark; attribute or element, range and default unconfirmed; not written | N | Y: `marked`; XDF keeps it in the metadata file | Y |
-| Tool-specific | Patches | N | N | N | N | Y: XDFPATCH | N | N | Y |
-| Tool-specific | Measurements (logging channels) | N | N | Y: MEASUREMENT; useful for ecuxplot | N | N | N | N | Y |
+| Group | Field | KP v1 | KP v2 | A2L | DAMOS | XDF | Script | Model | Target |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Identity | Short identifier | Y | Y | Y | Y | Y | Y | Y | Y |
+| Identity | Long description | Y | Y | Y | Y | Y | Y | Y | Y |
+| Identity | Comment | N | Y | P | ? | P | Y | Y | Y |
+| Identity | Categories | Y | Y | Y | P | P | P | P | Y |
+| Identity | Project / ECU metadata | P | P | Y | P | P | N | P | Y |
+| Addressing | File offset | Y | Y | N | N | Y | Y | P | Y |
+| Addressing | Memory segments | N | N | Y | ? | P | N | N | Y |
+| Addressing | Checksum definition | N | N | P | N | Y | N | N | Y |
+| Addressing | Search signature | Y | Y | N | N | N | P | N | Y |
+| Data layout | Single value / 1D / 2D | Y | Y | Y | Y | Y | Y | Y | Y |
+| Data layout | 3D and higher | N | N | Y | N | N | N | N | Y |
+| Data layout | Value block, no axes | P | P | Y | ? | Y | P | P | Y |
+| Data layout | Strings | N | N | Y | ? | P | N | N | Y |
+| Data layout | Integer 8/16/32, signed | Y | Y | Y | Y | Y | Y | Y | Y |
+| Data layout | Float | Y | Y | Y | ? | Y | Y | Y | Y |
+| Data layout | Endianness | Y | Y | Y | ? | Y | Y | Y | Y |
+| Data layout | Row vs column major | Y | Y | Y | ? | Y | Y | P | Y |
+| Data layout | Gaps / alignment | N | N | Y | ? | P | P | N | Y |
+| Data layout | Bit mask | ? | ? | Y | ? | P | N | N | Y |
+| Conversion | Factor + offset | Y | Y | Y | Y | Y | Y | Y | Y |
+| Conversion | Reciprocal (f / x) | Y | Y | Y | ? | Y | Y | Y | Y |
+| Conversion | Rational, 6 coefficients | N | N | Y | ? | Y | N | N | Y |
+| Conversion | Arbitrary formula | N | N | Y | N | Y | N | N | Y |
+| Conversion | Enum / lookup table | N | N | Y | ? | N | N | N | Y |
+| Conversion | Units | Y | Y | Y | Y | Y | Y | Y | Y |
+| Conversion | Display precision | Y | Y | Y | ? | Y | Y | Y | Y |
+| Conversion | Display base | Y | Y | N | ? | P | P | Y | Y |
+| Conversion | Min / max | Y | Y | Y | ? | Y | N | Y | Y |
+| Conversion | Difference / percent | Y | Y | N | N | N | Y | Y | Y |
+| Conversion | Per-map doubles | P | P | - | - | - | - | N | N |
+| Axes | Read from image | Y | Y | Y | Y | Y | Y | Y | Y |
+| Axes | Type, sign, units, conversion | Y | Y | Y | Y | Y | Y | Y | Y |
+| Axes | Fixed values | Y | Y | Y | ? | Y | P | P | Y |
+| Axes | Shared axis object | N | N | Y | ? | Y | N | N | Y |
+| Axes | Point count from image | ? | ? | Y | ? | N | ? | N | Y |
+| Axes | Stored as differences | Y | Y | Y | ? | P | Y | Y | Y |
+| Axes | Rescale / curve | N | N | Y | N | P | N | N | Y |
+| Tool-specific | Map mark / visibility | N | Y | N | ? | P | N | Y | Y |
+| Tool-specific | Patches | N | N | N | N | Y | N | N | Y |
+| Tool-specific | Measurements | N | N | Y | N | N | N | N | Y |
+
+Names and limits for the rows above:
+
+- Short identifier. KP `id`. A2L object name. XDF `title`. Script `IdName`. Model `id`.
+- Long description. KP `name`. A2L `LongIdentifier`. XDF `description`. Script `Name`. Model `description`.
+- Comment. KP v2 `comment`. In 8D0907551M that string holds hex signature bytes. A2L `ANNOTATION`. XDF only by appending to `description`. Script `Kommentar`.
+- Categories. KP: one folder per map (321 in 8D0907551G). A2L: `FUNCTION` / `GROUP`, nested, many-to-many. DAMOS: a function assignment. XDF: one path of up to 3 levels (`CATEGORYMEM` 0 to 2), not many-to-many; up to 2048 categories; builds before 5.00.9813 (2023) misload numbers above 255 (323 load in 5.00.10305). Script: `FolderName`, one folder, WinOLS 2.08+. Model: flat, several per object, no nesting.
+- Project / ECU metadata. KP: name and version; most header fields are unknown. A2L: `PROJECT`, `HEADER`, `MODULE`, `MOD_PAR` (EPK, CPU). XDF: title, description, author. Model: name and version.
+- File offset. A2L and DAMOS store an ECU address and need a segment map. XDF adds the header `baseoffset`. Script `StartAddr` / `DataAddr` is a hexdump address, decimal. Model is a file offset only. Target adds the original CPU address and segment.
+- Memory segments. A2L `MEMORY_SEGMENT`. XDF `REGION` is a size only.
+- Checksum definition. KP uses separate WinOLS checksum modules. A2L is vendor `IF_DATA`. XDF `CHECKSUM` is a plugin.
+- Search signature. KP: per map and per axis. Script search commands place maps at import and are not stored on the map. Model does not keep it. The axis `signature` is a marker byte, not this. Target keeps it.
+- Single value / 1D / 2D. A2L `VALUE` / `CURVE` / `MAP`. DAMOS Festwert / Kennlinie / Kennfeld. XDF `CONSTANT` / `TABLE`. Script `eEinzel` / `eEindim` / `eZweidim`. Model `value` / `1d` / `2d`.
+- 3D and higher. A2L `CUBOID`, `CUBE_4`, `CUBE_5`.
+- Value block. KP and the model: a 2D map with ordinal axes. A2L `VAL_BLK`. XDF: a table with label axes. Script: a 2D map with a no-axis data source.
+- Strings. A2L `ASCII`. XDF `outputtype` 4.
+- Integer. A2L also has 64-bit. Script `DataOrg` plus `bVorzeichen`. Model `bits` 8/16/32 and `signed`.
+- Float. KP, script, and the model are 32-bit (`eFloatLoHi` / `eFloatHiLo`). A2L is 16/32/64-bit. XDF has a 32-bit float flag, added in 5.00.8008 (2012). 64-bit is unconfirmed. That build allowed no equation on float data except `X`; whether the limit remains is unconfirmed.
+- Endianness. KP HiLo/LoHi is the type enum. A2L `BYTE_ORDER`, with a module default. DAMOS may be global. XDF `mmedtypeflags`. Script `DataOrg`. Model `endian`.
+- Row vs column major. KP `2d Inverse`: 252 of 4170 maps in 8D0907551G, 99 of 471 in 8D0907551M. A2L `RECORD_LAYOUT`. XDF major stride and flags. Script `eZweiInv`. Model `inverse` from KP.
+- Gaps / alignment. A2L `RECORD_LAYOUT` positions and `ALIGNMENT_*`. XDF stride only. Script `SkipBytes` on axes only.
+- Bit mask. KP is not decoded; it may sit in an unknown block. A2L `BIT_MASK`. XDF `XDFFLAG`, one bit.
+- Factor + offset. A2L `LINEAR` / `RAT_FUNC`. XDF equation. Script `Faktor` / `Offset`. The help example uses a decimal comma; locale is not tested.
+- Reciprocal. KP flag. A2L `RAT_FUNC`. XDF equation. Script `bKehrwert`. Model flag.
+- Rational. A2L `RAT_FUNC`. XDF equation.
+- Arbitrary formula. A2L `FORMULA`, with an inverse. XDF equation, which can reference other objects.
+- Enum / lookup table. A2L `COMPU_TAB`, `COMPU_VTAB`, `VTAB_RANGE`.
+- Units. A2L `COMPU_METHOD` unit / `PHYS_UNIT`. Script `Einheit`.
+- Display precision. A2L `FORMAT`. XDF `decimalpl`. Script `Nachkommastellen`.
+- Display base. KP base field; v2 uses binary on codewords such as CWMSRCAN. XDF decimal and hex only. Script radix 10 or 16; binary is not documented. Model view base.
+- Min / max. KP `range`: one low/high pair per element width, stored as typed (`kp-format.md`). Raw versus displayed units is unconfirmed. A2L limits plus `EXTENDED_LIMITS`. Script has no property. Model `min` and `max` on `value`, omitted when the source has none (`model.md`).
+- Difference / percent. KP flags. Script `bDelta` / `bProzent`. Model view flags.
+- Per-map doubles. KP `viewScale`, `viewOffset`, `view2DScale`, and `view3DRotation` (often 300.0, 1.0) are view state, not a conversion. Not in the model. KP output takes them from a template or from defaults.
+- Read from image. KP datasource EEPROM. A2L `STD_AXIS` / `COM_AXIS`. XDF `EMBEDDEDDATA`. Script `eRom`. Model source `image`.
+- Per-axis type, sign, units, conversion. Script `StuetzX` / `StuetzY`.
+- Fixed values. KP ordinal `1, 2, 3`, or free editable with 4 bytes per point. v2 stores those values in the axis list, in the axis type. A2L `FIX_AXIS_PAR`, `FIX_AXIS_DIST`, `FIX_AXIS_LIST`. XDF static `LABEL`s. Script `eUserdef` has no property for the values. Model source `editable`; the values are not stored.
+- Shared axis object. KP repeats the address on each map. A2L `COM_AXIS` points at `AXIS_PTS`. XDF links an axis to another table (`embedinfo type="3"`, `linkobjid` the uniqueid; TunerPro 5). The model repeats the address. The XDF writer links an axis to a matching curve at that address.
+- Point count from image. A2L `NO_AXIS_PTS` in the record layout. Script `DataHeader` marks header bytes; whether the count is read is not documented. Model `header` is a byte count; the point count is not read.
+- Stored as differences. KP `EEPROM, subtract` counts gaps down from 256 (`kp-format.md`). `add` and `backwards` are still unknown. ME7 packs include absolute axes labelled subtract. A2L `DEPOSIT DIFFERENCE`. XDF writes static labels from the image, or a live helper table of `CELL()` equations whose XML is unconfirmed. Script `eRomAdd`, `eRomSub`, `eRomBackwards`. The model stores `absolute`, `add`, `subtract`, and `backwards`.
+- Rescale / curve. A2L `RES_AXIS`, `CURVE_AXIS`. XDF axis "Normalized" through `XDFFUNCTION`. How close that is to `CURVE_AXIS` is unconfirmed.
+- Map mark / visibility. KP v2 `Marked` is 0 or 1. Whether it is the map-list marker is unconfirmed. XDF `vislevel` is a tree-filter level ("Show Up To" / "Show Only"), not a mark. Attribute or element, range, and default are unconfirmed, and it is not written. Model `marked`. XDF keeps that in the metadata file.
+- Patches. XDF `XDFPATCH`.
+- Measurements. A2L `MEASUREMENT`, which ecuxplot can log.
 
 ## Totals
 

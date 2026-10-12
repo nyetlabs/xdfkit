@@ -29,5 +29,5 @@ Fixing KP files mechanically, instead of hand-editing each axis in WinOLS. Evide
 - Only axes whose datasource reads the image and that have at least two integer points are checked; float axes are skipped. R8 checks every map and doesn't read the image.
 - Family: from the Bosch identification string in the image (`40/1/ME7.1/5/...` is ME7, `5655/1/M3.82/...` and `9655/1/M5.92/...` are delta). Images without one need `--family`.
 - R7 is the merge report (`xdfkit merge --update` of the definition with the located model). It is not a `lint` rule. A caller that must reject a moved name does that before merge; merge does not decide that gate.
-- R1 changes what WinOLS displays: WinOLS shows a "subtract" axis as 256 minus the sum of the remaining raw values (confirmed in WinOLS 2.24; see the axis datasource section of `kp-format.md`), so a mislabelled absolute axis shows wrong values until fixed.
+- R1 changes what WinOLS displays: WinOLS shows a "subtract" axis as 256 minus the sum of the remaining raw values (see `kp-format.md`, EEPROM, subtract), so a mislabelled absolute axis shows wrong values until fixed.
 - R2 fixes display as intended in WinOLS 2.24 (confirmed on KFFA X in 8D0907558E: 1.0, 1.6, 2.2, ..., 10.5, 11.0 ms/rev).
