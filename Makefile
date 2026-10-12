@@ -22,7 +22,7 @@ VERSION ?= $(patsubst v%,%,$(shell git describe --tags --match 'v[0-9]*' --dirty
 LDFLAGS := -ldflags "-X go.nyet.org/xdfkit/api.Version=$(VERSION)"
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.1
 
-.PHONY: all lint test build check-links install uninstall schema version package corpus corpus-bump clean help
+.PHONY: all lint test build check-links install uninstall schema version package corpus bump corpus-bump clean help
 
 # Archive name uses macos; the Go port is darwin.
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
@@ -120,7 +120,7 @@ package:
 corpus:
 	git submodule update --init --checkout --depth 1 corpus
 
-corpus-bump:
+bump corpus-bump:
 	git submodule update --init --checkout --remote --depth 1 corpus
 	@git -C corpus log -1 --format='corpus now at %h %s'
 	@git status --short corpus
