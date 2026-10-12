@@ -48,8 +48,8 @@ const (
 // (docs/stamp-and-metadata.md). Origin, for KP or XDF input, is where its
 // definitions came from (model.Origins), recorded in the provenance; it
 // defaults to hand, or for an XDF to its metadata file's. Tuner is a category
-// table (the corpus categories.json): only its maps and the objects their
-// axes point at are kept, filed under its categories.
+// table: only its maps and the objects their axes point at are kept, filed
+// under its categories.
 type ConvertRequest struct {
 	To       string `json:"to"`
 	Name     string `json:"name,omitempty"`
@@ -332,11 +332,10 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 	return m, subsetWarning(m, warnings), m.Check()
 }
 
-// subsetWarning adds a warning when m is a subset (provenance.subset), which
-// must not replace the full definition in the corpus.
+// subsetWarning adds a warning when m is a subset (provenance.subset).
 func subsetWarning(m *model.Model, warnings []string) []string {
 	if m.Provenance != nil && m.Provenance.Subset != nil {
-		warnings = append(warnings, m.Provenance.Subset.Kind+" subset of the original definition, not a corpus source")
+		warnings = append(warnings, m.Provenance.Subset.Kind+" subset of the original definition")
 	}
 	return warnings
 }

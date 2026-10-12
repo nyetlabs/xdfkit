@@ -19,8 +19,8 @@ import (
 )
 
 // TestSurvey writes a survey of every unconfirmed field over the archived
-// packs and the local WinOLS saves, with their images, to the file named by
-// XDFKIT_SURVEY. Skipped otherwise.
+// packs, with their images, to the file named by XDFKIT_SURVEY. Skipped
+// otherwise. WinOLS saves in testdata/local are not read.
 func TestSurvey(t *testing.T) {
 	out := os.Getenv("XDFKIT_SURVEY")
 	if out == "" {
@@ -87,10 +87,9 @@ type sample struct {
 	img   []byte
 }
 
-// surveyInputs returns the archived packs (without their dated copies) and the
-// WinOLS saves in testdata/local, each with its image where one is found.
+// surveyInputs returns the archived packs (without their dated copies), each
+// with its image where one is found.
 func surveyInputs(t *testing.T) []sample {
-	root := testenv.ModuleRoot()
 	arch := testenv.Archive(t)
 	cdir := corpus.Dir()
 	names := map[string]string{}
@@ -106,15 +105,6 @@ func surveyInputs(t *testing.T) []sample {
 		}
 		b, _ := os.ReadFile(filepath.Join(cdir, "images", names[stem]+".bin"))
 		return b
-	}
-	stemOf := func(file string) string {
-		best := ""
-		for s := range names {
-			if strings.HasPrefix(file, s) && len(s) > len(best) {
-				best = s
-			}
-		}
-		return best
 	}
 	var out []sample
 	add := func(label, path, stem string) {
@@ -132,21 +122,6 @@ func surveyInputs(t *testing.T) []sample {
 	for _, p := range testenv.Packs(t) {
 		if !dated.MatchString(p) {
 			add(filepath.Base(p), p, strings.TrimSuffix(filepath.Base(p), ".kp"))
-		}
-	}
-	local := filepath.Join(root, "testdata", "local")
-	for _, g := range []struct{ glob, image string }{
-		{"outgoing/w*.kp", "8D0907551M"},
-		{"incoming/sweep/*.kp", "8D0907551M"},
-		{"incoming/imported/*.kp", ""},
-	} {
-		ps, _ := filepath.Glob(filepath.Join(local, g.glob))
-		for _, p := range ps {
-			img := g.image
-			if img == "" {
-				img = stemOf(filepath.Base(p))
-			}
-			add("local/"+filepath.Base(p)+" (WinOLS 2.24 save of "+img+")", p, img)
 		}
 	}
 	return out

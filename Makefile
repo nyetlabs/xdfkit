@@ -50,8 +50,8 @@ test:
 schema:
 	go test ./model -run "TestSchemaFile|TestKPDefaultsFile" -update
 
-# build replaces build/xdfkit only when it changed, so publish/ rebuilds
-# outputs only after a real change.
+# build replaces build/xdfkit only when it changed, so a caller that
+# checks the binary's mtime rebuilds only after a real change.
 build:
 	mkdir -p build
 	go build $(LDFLAGS) -o build/xdfkit.new ./cmd/xdfkit
