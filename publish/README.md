@@ -1,6 +1,6 @@
 # Publishing map definitions
 
-Each corpus definition (`defs/IMAGE.json`, a `corpus.tsv` row whose `def` is set) is one zip, `IMAGE-DATE.zip`, in `build/publish/stage/`. `index.php` is the directory page: it reads the zips in the directory, counts the maps in each definition, and gives each image its own columns for the ECU, engine, code, vehicle, year, gearbox, and market. Apache serves it instead of a listing. KP, CSV and XDF are generated from that JSON. A correction goes into the JSON, never into the zip.
+Each corpus definition (`defs/IMAGE.json`, a `corpus.tsv` row whose `def` is set) is one zip, `IMAGE-DATE.zip`, in `build/publish/stage/`. `index.php` is the directory page: it reads the zips in the directory, counts the maps in each definition, and gives each image its own columns for the ECU, engine, code, vehicle, year, gearbox, and market. Apache serves it instead of a listing. `make stage` fails when a corpus image has no row there. KP, CSV and XDF are generated from that JSON. A correction goes into the JSON, never into the zip.
 
 ## Layout
 
@@ -16,7 +16,7 @@ Members keep undated names, so an XDF and its metadata file share a stem:
 
 CSV is the map list only, with no reference columns. `8N0906018CB` is not published: it has no corpus definition.
 
-A rebuilt zip whose definition changed since it was stamped prints one line, `NAME: definition changed since it was stamped; publishing that version`. The JSON in the zip is still the corpus file.
+A definition that changed since it was stamped is published as written, and its conversions are quiet. The JSON in the zip is still the corpus file.
 
 ## Import
 

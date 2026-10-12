@@ -62,10 +62,14 @@ for f; do
 		;;
 	esac
 	seen="$seen $def"
-	if test -f "$def" && test "${FORCE:-}" != 1 && "$xdfkit" verify "$def" | grep -Eq ': (edited|mixed)'; then
-		echo "$name: skipped, $def is hand edited (FORCE=1 imports anyway)" >&2
-		status=1
-		continue
+	if test -f "$def" && test "${FORCE:-}" != 1; then
+		st=$("$xdfkit" verify --status "$def") || exit 1
+		case $st in edited | mixed)
+			echo "$name: skipped, $def is hand edited (FORCE=1 imports anyway)" >&2
+			status=1
+			continue
+			;;
+		esac
 	fi
 	meta=
 	case $name in *.xdf | *.XDF)

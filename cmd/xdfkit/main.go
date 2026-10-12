@@ -22,7 +22,7 @@ const usage = `usage:
   xdfkit [-f json|yaml|kp|csv|xdf] [--template orig.kp] [-i image] [-r ref]...
          [--meta file.meta.json] [--origin damos|a2l|hand|located]
          [--tuner categories.json] [--quiet] [--force] input [output]
-  xdfkit verify file.json|file.yaml...
+  xdfkit verify [--status] file.json|file.yaml...
   xdfkit lint -i image [--family me7|m3] [--json findings.json] input
   xdfkit fix -i image (-o output | -n) [--rules R1,R2] [--only ID,...]
              [--min-confidence high|medium|low] [--findings findings.json] input
@@ -71,6 +71,8 @@ xdfkit kp2xdf.
 
 verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
 and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
+It exits 1 when a file is not clean. --status prints only that status word
+and exits 0 when the file could be read.
 
 lint checks the KP file's image axes against the flash image and prints one
 line per finding; --json also writes them as JSON ("-" for stdout). It exits 1
@@ -522,7 +524,13 @@ func writeConverted(out string, b, meta []byte, force bool) error {
 	return writeOutput(metaName(out), meta, force)
 }
 
-func verify(files []string) error {
+func verify(args []string) error {
+	fs := newFlags("verify")
+	statusOnly := fs.Bool("status", false, "print only the status word")
+	files, err := parse(fs, args)
+	if err != nil {
+		return err
+	}
 	if len(files) == 0 {
 		return errors.New("verify: no files")
 	}
@@ -536,10 +544,14 @@ func verify(files []string) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", name, err)
 		}
-		fmt.Printf("%s: %s\n", name, v)
+		if *statusOnly {
+			fmt.Println(v.Status)
+		} else {
+			fmt.Printf("%s: %s\n", name, v)
+		}
 		bad = bad || v.Status != "clean"
 	}
-	if bad {
+	if bad && !*statusOnly {
 		os.Exit(1)
 	}
 	return nil

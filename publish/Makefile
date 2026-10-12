@@ -26,6 +26,7 @@ stage:
 	@$(MAKE) --no-print-directory -C $(ROOT) build
 	@mkdir -p $(STAGE) $(OUT)/work
 	@set -eu -o pipefail; keep=$(OUT)/keep; : > $$keep; \
+	php index.php $$(awk -F '\t' 'NR > 1 && $$10 != "-" { print $$1 }' $(CORPUS)/corpus.tsv); \
 	awk -F '\t' 'NR > 1 && $$10 != "-" { print $$1, $$4, $$10 }' $(CORPUS)/corpus.tsv | \
 	while read -r name family def; do \
 		src=$(CORPUS)/$$def; img=$(CORPUS)/images/$$name.bin; \
@@ -38,15 +39,9 @@ stage:
 		if test -f $$zip && test $$zip -nt $$src && test $$zip -nt $$img && test $$zip -nt $(XDFKIT) \
 			&& { test -z "$$tuner" || test $$zip -nt $(CORPUS)/categories.json; }; then continue; fi; \
 		w=$(OUT)/work/$$name; rm -rf $$w; mkdir -p $$w; cp -p $$src $$w/$$name.json; \
-		if ! st=$$($(XDFKIT) verify $$w/$$name.json 2>$$w/verify.err); then \
-			if test -s $$w/verify.err; then cat $$w/verify.err >&2; exit 1; fi; \
-		fi; \
-		rm -f $$w/verify.err; \
+		st=$$($(XDFKIT) verify --status $$w/$$name.json) || exit 1; \
 		q=; \
-		case $$st in *': edited ('*) \
-			echo "$$name: definition changed since it was stamped; publishing that version"; \
-			q=--quiet ;; \
-		esac; \
+		if test "$$st" = edited; then q=--quiet; fi; \
 		$(XDFKIT) $$q --force $$w/$$name.json $$w/$$name.kp; \
 		$(XDFKIT) $$q -f csv --force -i $$img $$w/$$name.json $$w/$$name.csv; \
 		$(XDFKIT) $$q -f xdf --force -i $$img $$w/$$name.json $$w/$$name.xdf; \

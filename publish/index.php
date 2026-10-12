@@ -25,6 +25,7 @@ $notes = [
 	'8D0907551H-0003' => ['ME7.1', '2.7T', 'APB', 'S4', '2001', 'manual', 'NA'],
 	'8D0907551AA-4000' => ['ME7.1', '2.7T', 'APB', 'S4', '2002', 'automatic', 'NA'],
 	'8D0907551K-0001' => ['ME7.1', '2.7T', 'AZR', 'RS4', '2001', 'manual', 'EU'],
+	'8D0907551Q-0001' => ['ME7.1', '2.7T', 'AZR', 'RS4', '2002', 'manual', 'EU'],
 	'8D0907551L-0001' => ['ME7.1', '2.7T', 'APB', 'S4', '2001.5', 'automatic', 'NA'],
 	'8D0907551M-0002' => ['ME7.1', '2.7T', 'APB', 'S4', '2001.5', 'manual', 'NA'],
 	'8D0907551T-0003' => ['ME7.1', '2.7T', 'APB', 'S4', '2002', 'manual', 'NA'],
@@ -33,6 +34,19 @@ $notes = [
 	'8N0906018CB-0003' => ['ME7.5', '1.8T', 'BAM', 'TT', '2003-2006', 'manual', 'EU'],
 	'8N0906018CJ-0001' => ['ME7.5', '1.8T', 'BEA', 'TT', '2004+', 'manual', 'NA'],
 ];
+
+// make stage passes corpus image names. A missing row fails the publish.
+if (PHP_SAPI === 'cli') {
+	array_shift($argv);
+	$missing = 0;
+	foreach ($argv as $name) {
+		if (!isset($notes[$name])) {
+			fwrite(STDERR, "$name: no vehicle information\n");
+			$missing = 1;
+		}
+	}
+	exit($missing);
+}
 
 function note(string $name, array $notes): array {
 	if (isset($notes[$name])) {
