@@ -1,0 +1,16 @@
+#!/bin/bash
+# Remove what scripts/install put in DESTDIR$LIBDIR and the BINDIR links that
+# point there. Alias names are the remaining arguments.
+set -euo pipefail
+. "$(dirname "$0")/common.sh"
+cd "$root"
+
+: "${LIBDIR:?}" "${BINDIR:?}"
+for n in xdfkit "$@"; do
+	f="$DESTDIR$BINDIR/$n"
+	if [[ -L $f && $(readlink "$f") == "$LIBDIR/$n" ]]; then
+		rm "$f"
+	fi
+	rm -f "$DESTDIR$LIBDIR/$n"
+done
+rmdir "$DESTDIR$LIBDIR" 2>/dev/null || true

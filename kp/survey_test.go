@@ -103,7 +103,7 @@ func surveyInputs(t *testing.T) []sample {
 		if b, err := os.ReadFile(filepath.Join(arch, stem+".bin")); err == nil {
 			return b
 		}
-		b, _ := os.ReadFile(filepath.Join(cdir, "images", names[stem]+".bin"))
+		b, _ := os.ReadFile(filepath.Join(cdir, corpus.Rel(names[stem])))
 		return b
 	}
 	var out []sample

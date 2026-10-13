@@ -66,9 +66,24 @@ func Open(t testing.TB) *Corpus {
 	return c
 }
 
-// Path returns the image file for a manifest name (images/NAME.bin).
+// Group is the images/ subdirectory for a manifest name: the first 9 characters
+// of the part number (the stem up to '-'). A shorter part is its own directory.
+func Group(name string) string {
+	part, _, _ := strings.Cut(name, "-")
+	if len(part) > 9 {
+		return part[:9]
+	}
+	return part
+}
+
+// Rel is images/<group>/NAME.bin relative to the corpus root.
+func Rel(name string) string {
+	return filepath.Join("images", Group(name), name+".bin")
+}
+
+// Path returns the image file for a manifest name.
 func (c *Corpus) Path(name string) string {
-	return filepath.Join(c.Dir, "images", name+".bin")
+	return filepath.Join(c.Dir, Rel(name))
 }
 
 // ByName returns the image with that manifest name.

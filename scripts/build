@@ -1,0 +1,20 @@
+#!/bin/bash
+# Build build/xdfkit, replacing it only when the bytes changed, then link the
+# alias names at the rest of the arguments (xdf2kp kp2xdf kp2json).
+set -euo pipefail
+. "$(dirname "$0")/common.sh"
+cd "$root"
+
+version=${1:?version}
+shift
+
+mkdir -p build
+go build -ldflags "$(ldflags "$version")" -o build/xdfkit.new ./cmd/xdfkit
+if cmp -s build/xdfkit.new build/xdfkit; then
+	rm build/xdfkit.new
+else
+	mv build/xdfkit.new build/xdfkit
+fi
+for a in "$@"; do
+	ln -sfn xdfkit "build/$a"
+done

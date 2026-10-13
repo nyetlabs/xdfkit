@@ -1,0 +1,46 @@
+#!/bin/bash
+# Write dist archives. Arguments: VERSION "alias alias ..." "goos/arch ...".
+# macOS and Linux are tar.gz with the aliases as symlinks. Windows is zip,
+# with the aliases as .cmd shims. darwin is archived as macos.
+set -euo pipefail
+. "$(dirname "$0")/common.sh"
+cd "$root"
+
+version=${1:?version}
+aliases=$2
+platforms=$3
+command -v zip >/dev/null
+
+rm -rf dist
+mkdir -p dist
+for spec in $platforms; do
+	goos=${spec%/*}
+	arch=${spec#*/}
+	os=$goos
+	ext=
+	if [[ $goos == darwin ]]; then
+		os=macos
+	fi
+	if [[ $goos == windows ]]; then
+		ext=.exe
+	fi
+	name=xdfkit-$version-$os-$arch
+	stage=dist/$name
+	rm -rf "$stage"
+	mkdir -p "$stage"
+	CGO_ENABLED=0 GOOS=$goos GOARCH=$arch go build -ldflags "$(ldflags "$version")" -o "$stage/xdfkit$ext" ./cmd/xdfkit
+	for a in $aliases; do
+		if [[ $goos == windows ]]; then
+			printf '@"%%~dp0xdfkit.exe" %s %%*\r\n' "$a" >"$stage/$a.cmd"
+		else
+			ln -s xdfkit "$stage/$a"
+		fi
+	done
+	cp README.md COPYING COPYING.LESSER "$stage/"
+	if [[ $goos == windows ]]; then
+		(cd dist && COPYFILE_DISABLE=1 zip -r -q -X "$name.zip" "$name")
+	else
+		COPYFILE_DISABLE=1 tar -C dist -czf "dist/$name.tar.gz" "$name"
+	fi
+	rm -rf "$stage"
+done

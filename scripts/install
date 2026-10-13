@@ -1,0 +1,27 @@
+#!/bin/bash
+# Install build/xdfkit into DESTDIR$LIBDIR and link it, plus the alias names
+# on the command line, from DESTDIR$BINDIR. Does not build.
+set -euo pipefail
+. "$(dirname "$0")/common.sh"
+cd "$root"
+
+case $(uname -s) in
+Darwin | Linux) ;;
+*)
+	echo "make install supports macOS and Linux only" >&2
+	exit 1
+	;;
+esac
+if [[ ! -x build/xdfkit ]]; then
+	echo "build/xdfkit missing: run make build first" >&2
+	exit 1
+fi
+: "${LIBDIR:?}" "${BINDIR:?}"
+install -d "$DESTDIR$LIBDIR" "$DESTDIR$BINDIR"
+install -m 0755 build/xdfkit "$DESTDIR$LIBDIR/xdfkit"
+for a in "$@"; do
+	ln -sfn xdfkit "$DESTDIR$LIBDIR/$a"
+done
+for n in xdfkit "$@"; do
+	ln -sfn "$LIBDIR/$n" "$DESTDIR$BINDIR/$n"
+done

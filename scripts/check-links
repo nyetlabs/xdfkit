@@ -1,0 +1,13 @@
+#!/bin/bash
+# Run the build/ alias symlinks on a test pack.
+set -euo pipefail
+. "$(dirname "$0")/common.sh"
+cd "$root"
+
+d=$(mktemp -d)
+trap 'rm -rf "$d"' EXIT
+cp testdata/archive/ecuxplot/test8maps.kp "$d/p.kp"
+build/kp2xdf -m "$d/p.kp"
+build/kp2json "$d/p.kp"
+rm "$d/p.kp"
+build/xdf2kp "$d/p.xdf"

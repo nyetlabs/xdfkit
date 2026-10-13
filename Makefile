@@ -19,7 +19,6 @@
 SHELL := /bin/bash
 
 VERSION ?= $(patsubst v%,%,$(shell git describe --tags --match 'v[0-9]*' --dirty --always 2>/dev/null))
-LDFLAGS := -ldflags "-X go.nyet.org/xdfkit/api.Version=$(VERSION)"
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.1
 
 .PHONY: all lint test build check-links install uninstall schema version package corpus bump corpus-bump clean help
@@ -53,68 +52,25 @@ schema:
 # build replaces build/xdfkit only when it changed, so a caller that
 # checks the binary's mtime rebuilds only after a real change.
 build:
-	mkdir -p build
-	go build $(LDFLAGS) -o build/xdfkit.new ./cmd/xdfkit
-	if cmp -s build/xdfkit.new build/xdfkit; then rm build/xdfkit.new; else mv build/xdfkit.new build/xdfkit; fi
-	for a in $(ALIASES); do ln -sfn xdfkit build/$$a; done
+	scripts/build $(VERSION) $(ALIASES)
 
 check-links: build
-	@set -e; d=$$(mktemp -d); trap 'rm -rf "$$d"' EXIT; \
-	cp testdata/archive/ecuxplot/test8maps.kp "$$d/p.kp"; \
-	build/kp2xdf -m "$$d/p.kp"; build/kp2json "$$d/p.kp"; rm "$$d/p.kp"; \
-	build/xdf2kp "$$d/p.xdf"
+	scripts/check-links
 
 # install doesn't build, so sudo make install doesn't run go as root.
 install:
-	@case $$(uname -s) in Darwin|Linux) ;; *) echo "make install supports macOS and Linux only"; exit 1;; esac
-	@test -x build/xdfkit || { echo "build/xdfkit missing: run make build first"; exit 1; }
-	install -d "$(DESTDIR)$(LIBDIR)" "$(DESTDIR)$(BINDIR)"
-	install -m 0755 build/xdfkit "$(DESTDIR)$(LIBDIR)/xdfkit"
-	for a in $(ALIASES); do ln -sfn xdfkit "$(DESTDIR)$(LIBDIR)/$$a"; done
-	for n in xdfkit $(ALIASES); do ln -sfn "$(LIBDIR)/$$n" "$(DESTDIR)$(BINDIR)/$$n"; done
+	DESTDIR='$(DESTDIR)' LIBDIR='$(LIBDIR)' BINDIR='$(BINDIR)' scripts/install $(ALIASES)
 
 # uninstall removes only BINDIR links that point into LIBDIR.
 uninstall:
-	for n in xdfkit $(ALIASES); do \
-		f="$(DESTDIR)$(BINDIR)/$$n"; \
-		if [[ -L $$f && $$(readlink "$$f") == "$(LIBDIR)/$$n" ]]; then rm "$$f"; fi; \
-		rm -f "$(DESTDIR)$(LIBDIR)/$$n"; \
-	done
-	rmdir "$(DESTDIR)$(LIBDIR)" 2>/dev/null || true
+	DESTDIR='$(DESTDIR)' LIBDIR='$(LIBDIR)' BINDIR='$(BINDIR)' scripts/uninstall $(ALIASES)
 
 version:
 	@echo $(VERSION)
 
-# Each archive is xdfkit, its aliases, README.md, COPYING and COPYING.LESSER. macOS and Linux are tar.gz,
-# with the aliases as symlinks. Windows is zip, with the aliases as .cmd shims.
+# Each archive is xdfkit, its aliases, README.md, COPYING and COPYING.LESSER.
 package:
-	rm -rf dist
-	mkdir -p dist
-	@set -euo pipefail; \
-	command -v zip >/dev/null; \
-	for spec in $(PLATFORMS); do \
-		goos=$${spec%/*}; \
-		arch=$${spec#*/}; \
-		os=$$goos; \
-		ext=; \
-		if [[ $$goos == darwin ]]; then os=macos; fi; \
-		if [[ $$goos == windows ]]; then ext=.exe; fi; \
-		name=xdfkit-$(VERSION)-$$os-$$arch; \
-		stage=dist/$$name; \
-		rm -rf "$$stage"; \
-		mkdir -p "$$stage"; \
-		CGO_ENABLED=0 GOOS=$$goos GOARCH=$$arch go build $(LDFLAGS) -o "$$stage/xdfkit$$ext" ./cmd/xdfkit; \
-		for a in $(ALIASES); do \
-			if [[ $$goos == windows ]]; then printf '@"%%~dp0xdfkit.exe" %s %%*\r\n' "$$a" > "$$stage/$$a.cmd"; else ln -s xdfkit "$$stage/$$a"; fi; \
-		done; \
-		cp README.md COPYING COPYING.LESSER "$$stage/"; \
-		if [[ $$goos == windows ]]; then \
-			( cd dist && COPYFILE_DISABLE=1 zip -r -q -X "$$name.zip" "$$name" ); \
-		else \
-			COPYFILE_DISABLE=1 tar -C dist -czf "dist/$$name.tar.gz" "$$name"; \
-		fi; \
-		rm -rf "$$stage"; \
-	done
+	scripts/package '$(VERSION)' '$(ALIASES)' '$(PLATFORMS)'
 
 # --checkout overrides update = none in .gitmodules.
 corpus:

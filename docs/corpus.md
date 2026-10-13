@@ -4,9 +4,9 @@
 
 ## What tests read
 
-- `images/NAME.bin`, named from `testdata/archive/ecuxplot/images.tsv` (`internal/corpus.ArchiveImage`). `8N0906018CB` uses the bin in that archive: the corpus image of that part is different software.
+- `images/<part>/NAME.bin`, `<part>` the first 9 characters of the part number. Named from `testdata/archive/ecuxplot/images.tsv` (`internal/corpus.ArchiveImage`). `8N0906018CB` uses the bin in that archive: the corpus image of that part is different software.
 - `categories.json`, checked by `model.TestCorpusCategoryTable` against `model/categories.schema.json`.
-- `corpus.tsv`. `internal/corpus.TestImages` checks every row's size and SHA-256 against `images/`. Lookups are by name or SHA-256.
+- `corpus.tsv`. `internal/corpus.TestImages` checks every row's size and SHA-256 against `images/<part>/`. Lookups are by name or SHA-256.
 
 Without a manifest those tests skip. `XDFKIT_REQUIRE_CORPUS=1` makes that a failure. CI sets it when it has the credential. Lint also has synthetic fixtures that need no corpus (`testdata/lint/cases.json`).
 
