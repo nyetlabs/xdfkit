@@ -1,6 +1,6 @@
 #!/bin/bash
 # Build build/xdfkit, replacing it only when the bytes changed, then link the
-# alias names at the rest of the arguments (xdf2kp kp2xdf kp2json).
+# alias names at the rest of the arguments (ALIASES in the Makefile).
 set -euo pipefail
 . "$(dirname "$0")/common.sh"
 cd "$root"

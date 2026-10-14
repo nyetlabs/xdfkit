@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -31,7 +33,7 @@ const usage = `usage:
              [-f json|yaml|kp|xdf] [-i image] [--meta file] [--force]
              base [incoming] [output]
   xdfkit version
-  xdfkit xdf2kp|kp2json FILE...
+  xdfkit xdf2kp|kp2json|xdf2json|json2kp FILE...
   xdfkit kp2xdf [-i image] [-m] FILE...
 
 A single hyphen is for single-letter options, which also have long names:
@@ -62,12 +64,14 @@ another) or located (found in the image by a program such as me7info).
 category name maps to its map names) and the objects their axes point at,
 filed under the table's categories.
 
-xdf2kp, kp2xdf and kp2json convert each FILE to the same name with the .kp,
-.xdf or .json extension, next to it, and reject input of another format. They
-never replace an existing file. kp2xdf's -i is the flash image, as above; -m
-also writes the metadata file, without which the XDF doesn't convert back
-exactly. A link named kp2xdf (the release archives have them) is the same as
-xdfkit kp2xdf.
+xdf2kp, kp2xdf, kp2json, xdf2json and json2kp convert each FILE to the same
+name with the .kp, .xdf or .json extension, next to it, and reject input of
+another format. They never replace an existing file. kp2xdf's -i is the flash
+image, as above; -m also writes the metadata file, without which the XDF
+doesn't convert back exactly. json2kp fills the KP fields the model doesn't
+carry from defaults (no --template). A link named kp2xdf (the release
+archives have them) is the same as xdfkit kp2xdf, and takes only that
+command's options.
 
 verify checks each digest in a JSON or YAML file's stamp (RFC 8785 and jq -S .)
 and prints clean, edited, mixed (the digests disagree), unknown or unstamped.
@@ -106,6 +110,9 @@ func main() {
 	}
 	if name, ok := alias(os.Args[0]); ok {
 		os.Exit(runAlias(name, os.Args[1:]))
+	} else if conversionName.MatchString(name) {
+		fmt.Fprintf(os.Stderr, "%s: not an xdfkit conversion; the links are %s\n", name, strings.Join(slices.Sorted(maps.Keys(aliases)), ", "))
+		os.Exit(2)
 	}
 	args := os.Args[1:]
 	if len(args) > 0 {

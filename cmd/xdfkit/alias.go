@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -14,12 +15,18 @@ import (
 // aliases are the names xdfkit answers to through a symlink: the input
 // format each accepts and the format it writes. make build links them.
 var aliases = map[string][2]string{
-	"xdf2kp":  {api.XDF, api.KP},
-	"kp2xdf":  {api.KP, api.XDF},
-	"kp2json": {api.KP, api.JSON},
+	"xdf2kp":   {api.XDF, api.KP},
+	"kp2xdf":   {api.KP, api.XDF},
+	"kp2json":  {api.KP, api.JSON},
+	"xdf2json": {api.XDF, api.JSON},
+	"json2kp":  {api.JSON, api.KP},
 }
 
-// alias is the alias argv0 names, if any.
+// conversionName is the XXX2YYY shape of an alias name. A link by such a
+// name that isn't an alias is refused rather than run as plain xdfkit.
+var conversionName = regexp.MustCompile(`^[a-z]+2[a-z]+$`)
+
+// alias is the base name argv0 names, and whether it is an alias.
 func alias(argv0 string) (string, bool) {
 	name := strings.TrimSuffix(argv0[strings.LastIndexAny(argv0, `/\`)+1:], ".exe")
 	_, ok := aliases[name]

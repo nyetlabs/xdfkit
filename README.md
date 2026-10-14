@@ -42,13 +42,15 @@ The input format is detected from the file; the output format comes from `-f`, e
 
 ### Quick converters
 
-`xdfkit kp2xdf FILE...` (and `xdf2kp`, `kp2json`) converts each file named to the same name with the new extension, next to it. It never replaces an existing file and rejects input of another format. `kp2xdf` takes `-i image` (the flash image, as above) and `-m`, which also writes `.meta.json`; without it the XDF doesn't convert back exactly. Archives include them as commands of their own: links to `xdfkit`, or `.cmd` files on Windows.
+`xdfkit kp2xdf FILE...` (and `xdf2kp`, `kp2json`, `xdf2json`, `json2kp`) converts each file named to the same name with the new extension, next to it. It never replaces an existing file and rejects input of another format. `kp2xdf` takes `-i image` (the flash image, as above) and `-m`, which also writes `.meta.json`; without it the XDF doesn't convert back exactly. Archives include them as commands of their own: links to `xdfkit`, or `.cmd` files on Windows.
 
 ```sh
 kp2xdf *.kp       # a.kp -> a.xdf, b.kp -> b.xdf
 kp2xdf -m a.kp    # a.kp -> a.xdf, a.meta.json
 xdf2kp a.xdf      # a.xdf -> a.kp (reads a.meta.json if present)
 kp2json a.kp      # a.kp -> a.json
+xdf2json a.xdf    # a.xdf -> a.json (reads a.meta.json if present)
+json2kp a.json    # a.json -> a.kp (KP-only fields from defaults)
 ```
 
 With `go install`, make the links yourself, for example `ln -s xdfkit kp2xdf` in the same directory.

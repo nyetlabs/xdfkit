@@ -3,7 +3,7 @@
 #   make                  lint, test, then build
 #   make lint             gofmt (must print nothing), go vet, staticcheck
 #   make test             go test ./...
-#   make build            build/xdfkit and its alias symlinks (xdf2kp, kp2xdf, kp2json)
+#   make build            build/xdfkit and its alias symlinks (ALIASES)
 #   make check-links      run the alias symlinks in build/ on a test pack
 #   make install          install build/xdfkit (macOS, Linux; run make build first) to LIBDIR
 #                         (/usr/local/lib/xdfkit) with its aliases, linked from BINDIR (/usr/local/bin)
@@ -27,7 +27,7 @@ STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.1
 PLATFORMS := darwin/amd64 darwin/arm64 linux/amd64 linux/arm64 windows/amd64
 
 # xdfkit converts when invoked by one of these names (cmd/xdfkit/alias.go).
-ALIASES := xdf2kp kp2xdf kp2json
+ALIASES := xdf2kp kp2xdf kp2json xdf2json json2kp
 
 # make install: LIBDIR holds the binary and its alias links, like a release
 # archive; BINDIR gets links to them. LIBDIR=/usr/local/xdfkit also works.

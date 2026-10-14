@@ -45,6 +45,46 @@ func TestAliasesMatchMakefile(t *testing.T) {
 	if _, ok := alias("xdfkit"); ok {
 		t.Error("xdfkit is an alias")
 	}
+	for n := range aliases {
+		if !conversionName.MatchString(n) {
+			t.Errorf("alias %s is not XXX2YYY", n)
+		}
+	}
+	for _, n := range []string{"ols2kp", "xdf2yaml"} {
+		if _, ok := alias(n); ok || !conversionName.MatchString(n) {
+			t.Errorf("%s is not refused", n)
+		}
+	}
+	for _, n := range []string{"xdfkit", "xdfkit.test", "main"} {
+		if conversionName.MatchString(n) {
+			t.Errorf("%s is refused", n)
+		}
+	}
+}
+
+// TestAliasRejectsMainOptions: no option of plain xdfkit or its commands is
+// taken by an alias, except -i and -m on those writing XDF.
+func TestAliasRejectsMainOptions(t *testing.T) {
+	kp := filepath.Join(t.TempDir(), "p.kp")
+	opts := [][]string{
+		{"-f", "json"}, {"--format", "json"}, {"--template", "t"}, {"-r", "r"}, {"--ref", "r"},
+		{"--meta", "m"}, {"--origin", "hand"}, {"--tuner", "t"}, {"--quiet"}, {"--force"},
+		{"-o", "o"}, {"--output", "o"}, {"-n"}, {"--dry-run"}, {"--rules", "R1"}, {"--only", "x"},
+		{"--min-confidence", "low"}, {"--findings", "f"}, {"--family", "me7"}, {"--json", "j"},
+		{"--status"}, {"--smart"}, {"--update"}, {"--overwrite"}, {"--description", "keep"},
+		{"--comment", "keep"}, {"-version"},
+	}
+	for n := range aliases {
+		o := opts
+		if aliases[n][1] != api.XDF {
+			o = append(o, []string{"-i", "i"}, []string{"--image", "i"}, []string{"-m"}, []string{"--write-meta"})
+		}
+		for _, a := range o {
+			if rc := runAlias(n, append(a, kp)); rc != 2 {
+				t.Errorf("%s %q: rc %d, want 2", n, a, rc)
+			}
+		}
+	}
 }
 
 // aliasInput copies the test KP pack to dir/p.kp and returns its contents.
@@ -84,6 +124,36 @@ func TestAliasConvert(t *testing.T) {
 	}
 	if b, _ := os.ReadFile(kp); !bytes.Equal(b, src) {
 		t.Error("xdf2kp replaced p.kp")
+	}
+	if rc := runAlias("xdf2json", []string{kp}); rc != 1 {
+		t.Errorf("xdf2json on a KP: rc %d, want 1", rc)
+	}
+	if err := os.Remove(filepath.Join(dir, "p.json")); err != nil {
+		t.Fatal(err)
+	}
+	if rc := runAlias("xdf2json", []string{xdf}); rc != 0 {
+		t.Errorf("xdf2json: rc %d", rc)
+	}
+	if rc := runAlias("json2kp", []string{xdf}); rc != 1 {
+		t.Errorf("json2kp on an XDF: rc %d, want 1", rc)
+	}
+	r := filepath.Join(dir, "r.kp")
+	if err := os.WriteFile(r, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if rc := runAlias("kp2json", []string{r}); rc != 0 {
+		t.Fatalf("kp2json r.kp: rc %d", rc)
+	}
+	if err := os.Remove(r); err != nil {
+		t.Fatal(err)
+	}
+	if rc := runAlias("json2kp", []string{filepath.Join(dir, "r.json")}); rc != 0 {
+		t.Errorf("json2kp: rc %d", rc)
+	}
+	if b, err := os.ReadFile(r); err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(modelOf(t, b), modelOf(t, src)) {
+		t.Error("json2kp: model differs from the source KP's")
 	}
 	for _, s := range []struct {
 		name string
