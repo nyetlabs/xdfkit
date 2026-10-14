@@ -12,12 +12,13 @@ import (
 )
 
 // CategoryTableSchema is the schema version of a category table.
-const CategoryTableSchema = 1
+const CategoryTableSchema = 2
 
-// CategoryTable is a tuner set of map names, each with its category.
+// CategoryTable is a tuner set: each category names the maps filed under it.
 type CategoryTable struct {
-	Schema     int               `json:"schema" doc:"Schema version." enum:"1"`
-	Categories map[string]string `json:"categories" doc:"Category of each map name in the tuner set."`
+	Schema     int                 `json:"schema" doc:"Schema version." enum:"2"`
+	Categories map[string][]string `json:"categories" doc:"Map names in each category of the tuner set."`
+	byName     map[string]string
 	sum        string
 }
 
@@ -36,14 +37,36 @@ func ParseCategoryTable(b []byte) (*CategoryTable, error) {
 	if len(t.Categories) == 0 {
 		return nil, fmt.Errorf("category table: no categories")
 	}
-	for n, c := range t.Categories {
-		if n == "" || c == "" {
-			return nil, fmt.Errorf("category table: empty name or category %q: %q", n, c)
+	t.byName = map[string]string{}
+	for c, names := range t.Categories {
+		if c == "" {
+			return nil, fmt.Errorf("category table: empty category")
+		}
+		if len(names) == 0 {
+			return nil, fmt.Errorf("category table: %q has no maps", c)
+		}
+		for _, n := range names {
+			if n == "" {
+				return nil, fmt.Errorf("category table: empty map name in %q", c)
+			}
+			if prev, ok := t.byName[n]; ok {
+				if prev == c {
+					return nil, fmt.Errorf("category table: %q repeated in %q", n, c)
+				}
+				return nil, fmt.Errorf("category table: %q is in %q and %q", n, prev, c)
+			}
+			t.byName[n] = c
 		}
 	}
 	s := sha256.Sum256(b)
 	t.sum = hex.EncodeToString(s[:])
 	return t, nil
+}
+
+// Category is the category of a map name. The table must come from
+// ParseCategoryTable. An unlisted name returns "".
+func (t *CategoryTable) Category(name string) string {
+	return t.byName[name]
 }
 
 // Name is the map name an object is listed under: the first word of its ID.
@@ -75,12 +98,13 @@ func (m *Model) Tuner(t *CategoryTable) error {
 // is in the table gets its category, and an object its image axes point at
 // (at the axis address, or before its header) gets the category of the first
 // such map. Every other object gets rest, or no category when rest is "".
+// The table must come from ParseCategoryTable.
 func (m *Model) Categorize(t *CategoryTable, rest string) {
 	cat := map[*Object]string{}
 	at := map[Addr][]*Object{}
 	for _, o := range m.Objects {
 		at[o.Address] = append(at[o.Address], o)
-		if c, ok := t.Categories[o.Name()]; ok {
+		if c := t.Category(o.Name()); c != "" {
 			cat[o] = c
 		}
 	}

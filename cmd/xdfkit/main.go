@@ -58,8 +58,9 @@ to it are reported. --origin records where a KP or XDF input's definitions
 came from in the model's provenance: damos or a2l (exported from Bosch
 data), hand (made by hand; the default, unless an XDF's metadata file has
 another) or located (found in the image by a program such as me7info).
---tuner keeps only the maps named in a category table and the objects their
-axes point at, filed under the table's categories.
+--tuner keeps only the maps named in a category table (schema 2: each
+category name maps to its map names) and the objects their axes point at,
+filed under the table's categories.
 
 xdf2kp, kp2xdf and kp2json convert each FILE to the same name with the .kp,
 .xdf or .json extension, next to it, and reject input of another format. They

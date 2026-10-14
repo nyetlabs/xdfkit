@@ -14,18 +14,27 @@ import (
 
 func TestParseCategoryTable(t *testing.T) {
 	for _, s := range []string{
+		`{"schema": 1, "categories": {"Timing": ["KFZW"]}}`,
+		`{"schema": 2, "categories": {}}`,
+		`{"schema": 2, "categories": {"Timing": []}}`,
+		`{"schema": 2, "categories": {"Timing": [""]}}`,
+		`{"schema": 2, "categories": {"": ["KFZW"]}}`,
+		`{"schema": 2, "categories": {"Timing": ["KFZW"], "Fueling": ["KFZW"]}}`,
+		`{"schema": 2, "categories": {"Timing": ["KFZW", "KFZW"]}}`,
+		`{"schema": 2, "categories": {"Timing": ["KFZW"]}, "extra": 1}`,
 		`{"schema": 2, "categories": {"KFZW": "Timing"}}`,
-		`{"schema": 1, "categories": {}}`,
-		`{"schema": 1, "categories": {"KFZW": ""}}`,
-		`{"schema": 1, "categories": {"KFZW": "Timing"}, "extra": 1}`,
 		`not json`,
 	} {
 		if _, err := ParseCategoryTable([]byte(s)); err == nil {
 			t.Errorf("%s: no error", s)
 		}
 	}
-	if _, err := ParseCategoryTable([]byte(`{"schema": 1, "categories": {"KFZW": "Timing"}}`)); err != nil {
-		t.Error(err)
+	tab, err := ParseCategoryTable([]byte(`{"schema": 2, "categories": {"Timing": ["KFZW", "KFZW2"], "Fueling": ["LAMFA"]}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tab.Category("KFZW") != "Timing" || tab.Category("LAMFA") != "Fueling" || tab.Category("NOPE") != "" {
+		t.Errorf("Timing %q Fueling %q missing %q", tab.Category("KFZW"), tab.Category("LAMFA"), tab.Category("NOPE"))
 	}
 }
 
@@ -47,7 +56,7 @@ func TestTuner(t *testing.T) {
 			{Key: "UNLISTED", ID: "UNLISTED", Address: 0x500},
 		},
 	}
-	tab, err := ParseCategoryTable([]byte(`{"schema": 1, "categories": {"KFZW": "Timing", "KFMIOP": "Torque", "ABSENT": "Boost"}}`))
+	tab, err := ParseCategoryTable([]byte(`{"schema": 2, "categories": {"Timing": ["KFZW"], "Torque": ["KFMIOP"], "Boost": ["ABSENT"]}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +90,7 @@ func TestCategorize(t *testing.T) {
 		{Key: "SNM12ZWUW", ID: "SNM12ZWUW", Address: 0x100},
 		{Key: "UNLISTED", ID: "UNLISTED", Address: 0x500},
 	}}
-	tab, err := ParseCategoryTable([]byte(`{"schema": 1, "categories": {"KFZW": "Timing"}}`))
+	tab, err := ParseCategoryTable([]byte(`{"schema": 2, "categories": {"Timing": ["KFZW"]}}`))
 	if err != nil {
 		t.Fatal(err)
 	}

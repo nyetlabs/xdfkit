@@ -5,15 +5,18 @@
   "properties": {
     "categories": {
       "additionalProperties": {
-        "type": "string"
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
       },
-      "description": "Category of each map name in the tuner set.",
+      "description": "Map names in each category of the tuner set.",
       "type": "object"
     },
     "schema": {
       "description": "Schema version.",
       "enum": [
-        1
+        2
       ],
       "type": "integer"
     }

@@ -72,7 +72,7 @@ func TestConvertTuner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	table := []byte(`{"schema": 1, "categories": {"KFZW": "Timing", "LDRXN": "Boost"}}`)
+	table := []byte(`{"schema": 2, "categories": {"Timing": ["KFZW"], "Boost": ["LDRXN"]}}`)
 	x, resp, err := Convert(in, ConvertRequest{To: XDF, Tuner: table})
 	if err != nil {
 		t.Fatal(err)
@@ -110,7 +110,7 @@ func TestConvertTuner(t *testing.T) {
 			t.Errorf("meta %v: subset not marked: %v", meta != nil, resp.Warnings)
 		}
 	}
-	if _, _, err := Convert(in, ConvertRequest{To: XDF, Tuner: []byte(`{"schema": 1}`)}); err == nil {
+	if _, _, err := Convert(in, ConvertRequest{To: XDF, Tuner: []byte(`{"schema": 2}`)}); err == nil {
 		t.Error("empty table: no error")
 	}
 	if _, _, err := Convert(in, ConvertRequest{To: KP, Tuner: table}); err == nil {

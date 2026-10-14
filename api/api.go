@@ -48,8 +48,8 @@ const (
 // (docs/stamp-and-metadata.md). Origin, for KP or XDF input, is where its
 // definitions came from (model.Origins), recorded in the provenance; it
 // defaults to hand, or for an XDF to its metadata file's. Tuner is a category
-// table: only its maps and the objects their axes point at are kept, filed
-// under its categories.
+// table (schema 2: each category name maps to its map names): only its maps
+// and the objects their axes point at are kept, filed under its categories.
 type ConvertRequest struct {
 	To       string `json:"to"`
 	Name     string `json:"name,omitempty"`
