@@ -243,6 +243,34 @@ func TestKeys(t *testing.T) {
 	}
 }
 
+func TestReference(t *testing.T) {
+	sha := strings.Repeat("0", 64)
+	for _, c := range []struct {
+		origin string
+		ref    Reference
+		ok     bool
+		agreed bool
+	}{
+		{"auto", Reference{Origin: "damos", SHA256: sha, Agree: [2]int{10, 10}}, true, true},
+		{"auto", Reference{Origin: "manual", SHA256: sha, Agree: [2]int{9, 10}, Except: []string{"ESKONF"}}, true, true},
+		{"auto", Reference{Origin: "a2l", SHA256: sha, Agree: [2]int{8, 10}, Except: []string{"ESKONF"}}, true, false},
+		{"auto", Reference{Origin: "auto", SHA256: sha}, false, false},
+		{"auto", Reference{Origin: "damos", SHA256: sha, Agree: [2]int{11, 10}}, false, true},
+		{"damos", Reference{Origin: "damos", SHA256: sha, Agree: [2]int{1, 1}}, false, true},
+	} {
+		m := &Model{Schema: SchemaID, Provenance: &Provenance{Format: "xdf", Origin: c.origin, Reference: &c.ref}}
+		if err := m.Check(); (err == nil) != c.ok {
+			t.Errorf("%s %+v: Check %v", c.origin, c.ref, err)
+		}
+		if c.ref.Agreed() != c.agreed {
+			t.Errorf("%+v: Agreed %v", c.ref, !c.agreed)
+		}
+	}
+	if (*Reference)(nil).Agreed() {
+		t.Error("nil Agreed")
+	}
+}
+
 func TestAddr(t *testing.T) {
 	var a Addr
 	for _, bad := range []string{`"13D52"`, `"0x"`, `"0x+1"`, `"0x100000000"`, `81234`} {

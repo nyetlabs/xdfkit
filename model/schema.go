@@ -60,6 +60,8 @@ func (g *schemaGen) schema(t reflect.Type) map[string]any {
 		return map[string]any{"$ref": "#/$defs/" + t.Name()}
 	case reflect.Slice:
 		return map[string]any{"type": "array", "items": g.schema(t.Elem())}
+	case reflect.Array:
+		return map[string]any{"type": "array", "items": g.schema(t.Elem()), "minItems": t.Len(), "maxItems": t.Len()}
 	case reflect.Map:
 		return map[string]any{"type": "object", "additionalProperties": g.schema(t.Elem())}
 	case reflect.String:

@@ -36,7 +36,7 @@ func TestMergeAddAndMissing(t *testing.T) {
 }
 
 func TestMergeDescriptionKeepsAddress(t *testing.T) {
-	base := &Model{Schema: SchemaID, Provenance: &Provenance{Format: "kp", Origin: "hand", SHA256: "aa"},
+	base := &Model{Schema: SchemaID, Provenance: &Provenance{Format: "kp", Origin: "manual", SHA256: "aa"},
 		Objects: []*Object{obj("KFZW", 0x100, 0.75)}}
 	base.Objects[0].Description = "old"
 	in := obj("KFZW", 0x999, 1)
@@ -53,7 +53,7 @@ func TestMergeDescriptionKeepsAddress(t *testing.T) {
 	if o.Address != 0x100 || o.Value.Conversion.Factor != 0.75 || o.Description != "new sentence" {
 		t.Fatalf("%#v", o)
 	}
-	if out.Provenance.Origin != "hand" {
+	if out.Provenance.Origin != "manual" {
 		t.Fatal(out.Provenance)
 	}
 	acts(t, as, "description")

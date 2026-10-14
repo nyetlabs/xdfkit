@@ -22,7 +22,7 @@ import (
 
 const usage = `usage:
   xdfkit [-f json|yaml|kp|csv|xdf] [--template orig.kp] [-i image] [-r ref]...
-         [--meta file.meta.json] [--origin damos|a2l|hand|located]
+         [--meta file.meta.json] [--origin damos|a2l|manual|auto]
          [--tuner categories.json] [--quiet] [--force] input [output]
   xdfkit verify [--status] file.json|file.yaml...
   xdfkit lint -i image [--family me7|m3] [--json findings.json] input
@@ -58,8 +58,8 @@ holding what XDF can't express. XDF input reads the metadata file given by
 since it was written converts back to the definition exactly, and edits made
 to it are reported. --origin records where a KP or XDF input's definitions
 came from in the model's provenance: damos or a2l (exported from Bosch
-data), hand (made by hand; the default, unless an XDF's metadata file has
-another) or located (found in the image by a program such as me7info).
+data), manual (made by hand; the default, unless an XDF's metadata file has
+another) or auto (found in the image by a program such as me7info).
 --tuner keeps only the maps named in a category table (schema 2: each
 category name maps to its map names) and the objects their axes point at,
 filed under the table's categories.
@@ -413,7 +413,7 @@ func convert(args []string) error {
 	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
 	image := fs.StringP("image", "i", "", "flash image, for CSV value ranges and XDF")
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
-	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, hand or located")
+	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, manual or auto")
 	tuner := fs.String("tuner", "", "category table: keep only its maps and their axes")
 	quiet := fs.Bool("quiet", false, "suppress warnings")
 	refs := fs.StringArrayP("ref", "r", nil, "reference definition, for a CSV column of matching map names (repeatable)")

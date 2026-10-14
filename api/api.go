@@ -47,7 +47,7 @@ const (
 // its extension). Meta is the metadata file of an XDF input
 // (docs/stamp-and-metadata.md). Origin, for KP or XDF input, is where its
 // definitions came from (model.Origins), recorded in the provenance; it
-// defaults to hand, or for an XDF to its metadata file's. Tuner is a category
+// defaults to manual, or for an XDF to its metadata file's. Tuner is a category
 // table (schema 2: each category name maps to its map names): only its maps
 // and the objects their axes point at are kept, filed under its categories.
 type ConvertRequest struct {
@@ -305,7 +305,7 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 			m.Provenance = p
 		}
 		if m.Provenance.Origin == "" {
-			m.Provenance.Origin = "hand"
+			m.Provenance.Origin = "manual"
 		}
 		return m, subsetWarning(m, warnings), nil
 	}

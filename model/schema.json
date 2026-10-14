@@ -300,14 +300,18 @@
           "type": "string"
         },
         "origin": {
-          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), hand (made by hand, as KP map packs usually are), located (found in the image by a program).",
+          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), manual (made by hand, as KP map packs usually are), auto (found in the image by a program).",
           "enum": [
             "damos",
             "a2l",
-            "hand",
-            "located"
+            "manual",
+            "auto"
           ],
           "type": "string"
+        },
+        "reference": {
+          "$ref": "#/$defs/Reference",
+          "description": "The definition an auto one was checked against."
         },
         "sha256": {
           "description": "SHA-256 of the original file (the image, for format image), lowercase hex.",
@@ -317,11 +321,67 @@
         "subset": {
           "$ref": "#/$defs/Subset",
           "description": "Set when the definition is a subset of the original file's."
+        },
+        "verified": {
+          "description": "A person checked every definition against the image.",
+          "type": "boolean"
         }
       },
       "required": [
         "format",
         "sha256"
+      ],
+      "type": "object"
+    },
+    "Reference": {
+      "additionalProperties": false,
+      "properties": {
+        "agree": {
+          "description": "Names at the same address, and names in the reference.",
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "minItems": 2,
+          "type": "array"
+        },
+        "except": {
+          "description": "Names the reference lists at another address, such as ESKONF.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "file": {
+          "description": "The reference's file name.",
+          "type": "string"
+        },
+        "origin": {
+          "description": "The reference's origin.",
+          "enum": [
+            "damos",
+            "a2l",
+            "manual"
+          ],
+          "type": "string"
+        },
+        "sha256": {
+          "description": "SHA-256 of the reference file, lowercase hex.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "unreferenced": {
+          "description": "Located names the reference does not list.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "origin",
+        "sha256",
+        "agree"
       ],
       "type": "object"
     },

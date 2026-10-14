@@ -190,7 +190,7 @@ func TestCall(t *testing.T) {
 	}
 	v, m := call("convert", `{"to": "json", "name": "a.xdf"}`, x)
 	var vm prov
-	if err := json.Unmarshal(v, &vm); err != nil || vm.Provenance.Format != "xdf" || vm.Provenance.Origin != "hand" || vm.Provenance.File != "a.xdf" {
+	if err := json.Unmarshal(v, &vm); err != nil || vm.Provenance.Format != "xdf" || vm.Provenance.Origin != "manual" || vm.Provenance.File != "a.xdf" {
 		t.Errorf("xdf alone to json: %v %v %+v", err, m, vm)
 	}
 	for _, c := range []struct {
@@ -198,7 +198,7 @@ func TestCall(t *testing.T) {
 		in   []byte
 		want string // "": an error
 	}{
-		{`{"to": "json"}`, in, "hand"},
+		{`{"to": "json"}`, in, "manual"},
 		{`{"to": "json", "origin": "kp"}`, in, ""},
 		{`{"to": "json", "origin": "damos"}`, in, "damos"},
 		{`{"to": "json", "origin": "damos"}`, x, "damos"},
