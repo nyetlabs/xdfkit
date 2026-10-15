@@ -4,6 +4,7 @@ package kp
 // Undecoded fields are named as described in the package doc.
 type Map struct {
 	Index          int         `json:"index" kp:"-"`
+	Key            string      `json:"-" kp:"-"`                // model object key when the map came from model JSON; lint only
 	Selected       byte        `json:"selected"`                // selected in the map list (unconfirmed): changes between exports of the same project
 	LinkID         int32       `json:"linkId,omitzero" kp:"v2"` // -1: id of a linked map, -1 for none (unconfirmed)
 	Comment        string      `json:"comment,omitzero" kp:"v2"`

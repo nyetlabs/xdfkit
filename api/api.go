@@ -455,9 +455,11 @@ func Verify(in []byte) (VerifyResponse, error) {
 
 // LintRequest carries the flash image the KP file describes, and optionally
 // the ECU family (me7 or m3) when the image has no Bosch identification.
+// Rules, when set, keeps only findings whose rule is in the list.
 type LintRequest struct {
-	Image  []byte `json:"image"`
-	Family string `json:"family,omitempty"`
+	Image  []byte   `json:"image"`
+	Family string   `json:"family,omitempty"`
+	Rules  []string `json:"rules,omitempty"`
 }
 
 // LintResponse lists the findings (docs/autocorrect.md).
@@ -485,7 +487,20 @@ func (r *LintResponse) lint(f *kp.File, req LintRequest) error {
 	}
 	rep, err := lint.Lint(f, req.Image, lint.Options{Family: req.Family})
 	r.Family, r.FamilySource, r.Findings = rep.Family, rep.FamilySource, rep.Findings
-	return err
+	if err != nil || len(req.Rules) == 0 {
+		return err
+	}
+	var out []lint.Finding
+	for _, fd := range r.Findings {
+		for _, rule := range req.Rules {
+			if fd.Rule == rule {
+				out = append(out, fd)
+				break
+			}
+		}
+	}
+	r.Findings = out
+	return nil
 }
 
 // FixRequest selects the fixes to make. Findings, if given (for example an

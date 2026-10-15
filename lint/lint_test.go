@@ -134,6 +134,29 @@ func TestApply(t *testing.T) {
 	}
 }
 
+func TestAxisRefKey(t *testing.T) {
+	for _, c := range fixtureCases(t) {
+		if c.Name != "me7" {
+			continue
+		}
+		f, img := c.build(t)
+		r, err := Lint(f, img, Options{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, fd := range r.Findings {
+			for _, ref := range fd.Maps {
+				if ref.Key == "" {
+					t.Errorf("%s: empty key for %s", fd.ID, ref.ID)
+				}
+				if ref.Key != ref.ID {
+					t.Errorf("%s: key %q, want id %q", fd.ID, ref.Key, ref.ID)
+				}
+			}
+		}
+	}
+}
+
 func TestCountDisagrees(t *testing.T) {
 	n := 8
 	bare := &kp.Axis{}

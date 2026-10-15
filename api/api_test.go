@@ -268,6 +268,37 @@ func TestLintFix(t *testing.T) {
 	}
 }
 
+func TestLintRules(t *testing.T) {
+	d := testenv.Archive(t)
+	in, err := os.ReadFile(filepath.Join(d, "8D0907551G.kp"))
+	if err != nil {
+		testenv.Missing(t, "%v", err)
+	}
+	img := corpus.ArchiveImage(t, "8D0907551G")
+	all, err := Lint(in, LintRequest{Image: img})
+	if err != nil || len(all.Findings) == 0 {
+		t.Fatalf("lint: %v findings=%d", err, len(all.Findings))
+	}
+	got, err := Lint(in, LintRequest{Image: img, Rules: []string{"R9"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fd := range got.Findings {
+		if fd.Rule != "R9" {
+			t.Errorf("wanted only R9, got %s", fd.ID)
+		}
+	}
+	var want int
+	for _, fd := range all.Findings {
+		if fd.Rule == "R9" {
+			want++
+		}
+	}
+	if len(got.Findings) != want {
+		t.Errorf("R9 findings %d, want %d", len(got.Findings), want)
+	}
+}
+
 // stripStamp drops the stamp and provenance, which differ between files with
 // the same definitions.
 func stripStamp(t *testing.T, js []byte) []byte {

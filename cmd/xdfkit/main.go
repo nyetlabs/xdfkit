@@ -25,7 +25,7 @@ const usage = `usage:
          [--meta file.meta.json] [--origin damos|a2l|manual|auto]
          [--tuner categories.json] [--quiet] [--force] input [output]
   xdfkit verify [--status] file.json|file.yaml...
-  xdfkit lint -i image [--family me7|m3] [--json findings.json] input
+  xdfkit lint -i image [--family me7|m3] [--rules R9,R10] [--json findings.json] input
   xdfkit fix -i image (-o output | -n) [--rules R1,R2] [--only ID,...]
              [--min-confidence high|medium|low] [--findings findings.json] input
   xdfkit merge [--smart] [--update] [--overwrite] [-n]
@@ -79,11 +79,12 @@ It exits 1 when a file is not clean. --status prints only that status word
 and exits 0 when the file could be read.
 
 lint checks the KP file's image axes against the flash image and prints one
-line per finding; --json also writes them as JSON ("-" for stdout). It exits 1
-when there are findings. fix applies the findings that have a fix: by default
-those of high confidence, or those chosen by --only, --rules and
---min-confidence. With --findings it applies the fixes in a (possibly edited)
-lint --json file instead of linting. -o - writes to stdout; -n only reports.
+line per finding; --json also writes them as JSON ("-" for stdout). --rules
+limits the report to those rules. It exits 1 when there are findings. fix
+applies the findings that have a fix: by default those of high confidence, or
+those chosen by --only, --rules and --min-confidence. With --findings it
+applies the fixes in a (possibly edited) lint --json file instead of linting.
+-o - writes to stdout; -n only reports.
 
 merge folds incoming into base. A name match (the whole key, or the id when
 the key is blank) consumes the incoming map: text is applied and a moved
@@ -171,6 +172,7 @@ func lintCmd(args []string) error {
 	fs := newFlags("lint")
 	image := fs.StringP("image", "i", "", "flash image")
 	family := fs.String("family", "", "ECU family: me7 or m3 (default: from the image)")
+	rules := fs.String("rules", "", "comma-separated rules to report (default: all)")
 	jsonOut := fs.String("json", "", "also write the findings as JSON to this file")
 	force := fs.Bool("force", false, "overwrite an existing JSON file")
 	pos, err := parse(fs, args)
@@ -189,7 +191,7 @@ func lintCmd(args []string) error {
 	if err != nil {
 		return err
 	}
-	resp, err := api.Lint(data, api.LintRequest{Image: img, Family: *family})
+	resp, err := api.Lint(data, api.LintRequest{Image: img, Family: *family, Rules: list(*rules)})
 	warn(pos[0], resp.Warnings)
 	if err != nil {
 		return fmt.Errorf("%s: %w", pos[0], err)

@@ -37,6 +37,7 @@ func AtLeast(c, min string) bool { return confRank[c] >= confRank[min] }
 // AxisRef names one map axis that uses a finding's axis.
 type AxisRef struct {
 	Index int    `json:"index"`
+	Key   string `json:"key,omitempty"` // model object key when the map came from model JSON
 	ID    string `json:"id"`
 	Name  string `json:"name"`
 	Axis  string `json:"axis,omitempty"` // x or y; empty for map findings
@@ -125,7 +126,7 @@ func Lint(f *kp.File, img []byte, opt Options) (Report, error) {
 		if fd == nil {
 			return
 		}
-		ref := AxisRef{Index: m.Index, ID: m.ID, Name: m.Name, Axis: axis}
+		ref := AxisRef{Index: m.Index, Key: m.Key, ID: m.ID, Name: m.Name, Axis: axis}
 		if i, ok := byID[fd.ID]; ok {
 			r.Findings[i].Maps = append(r.Findings[i].Maps, ref)
 			return

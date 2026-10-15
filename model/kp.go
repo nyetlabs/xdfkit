@@ -186,7 +186,7 @@ func (m *Model) KP(template *kp.File) (*kp.File, error) {
 		if err := restore(km, o.kpMap(i), r); err != nil {
 			return nil, fmt.Errorf("object %s: %w", o.Key, err)
 		}
-		km.Index = i
+		km.Index, km.Key = i, o.Key
 		f.Project.Maps = append(f.Project.Maps, km)
 	}
 	return &f, nil
@@ -243,6 +243,7 @@ func (o *Object) kpMap(i int) *kp.Map {
 	t := kpType(o.Data)
 	km := &kp.Map{
 		Index:        i,
+		Key:          o.Key,
 		Comment:      o.Comment,
 		Name:         o.Description,
 		Organization: org,
