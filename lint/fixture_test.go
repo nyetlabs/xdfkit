@@ -90,19 +90,23 @@ func (c *fixtureCase) build(t *testing.T) (*kp.File, []byte) {
 		if a.Values == nil {
 			return &model.Axis{Source: "image", Stored: "absolute", Address: &a.Addr, Data: &d, Value: model.Value{Conversion: model.Conversion{Factor: 1}}}, a.Points
 		}
+		n := len(a.Values)
+		if a.Points > 0 {
+			n = a.Points // declared size may disagree with written values (R4)
+		}
 		if w == 1 {
-			n := len(a.Values)
+			c := n
 			if a.Count != nil {
-				n = *a.Count
+				c = *a.Count
 			}
-			img[at-1] = byte(n)
+			img[at-1] = byte(c)
 		}
 		stored := a.Stored
 		if stored == "" {
 			stored = "absolute"
 		}
 		addr := a.Addr
-		return &model.Axis{Source: "image", Stored: stored, Address: &addr, Data: &d, Value: model.Value{Conversion: model.Conversion{Factor: 1}}}, len(a.Values)
+		return &model.Axis{Source: "image", Stored: stored, Address: &addr, Data: &d, Value: model.Value{Conversion: model.Conversion{Factor: 1}}}, n
 	}
 	for _, fm := range c.Maps {
 		x, cols := axis(fm.X)

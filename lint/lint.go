@@ -48,6 +48,10 @@ type Fix struct {
 	DataSource *kp.DataSource `json:"dataSource,omitempty"`
 	Signed     *bool          `json:"signed,omitempty"`
 	End        *uint32        `json:"end,omitempty"`
+	Points     *int           `json:"points,omitempty"` // new axis point count (R4); map cols/rows and end follow
+	Addr       *uint32        `json:"addr,omitempty"`   // new axis address (R5, R9)
+	Start      *uint32        `json:"start,omitempty"`  // new map start (R9, R10); end follows
+	Type       *kp.Type       `json:"type,omitempty"`   // new axis element type (R9 axis-width)
 }
 
 // Finding is one problem with one axis (address and point count) or one map
@@ -199,7 +203,11 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 		if w == 2 {
 			fd.Cause, fd.Record = axisRecord(a, n, other, on, img)
 		}
-		return set("R9", None, fmt.Sprintf("%d-bit axis at an odd address (ME7 stores 16-bit data at even addresses); monotonic: %s; %s", 8*w, strings.Join(mono, ", "), describe(fd.Cause, fd.Record)), nil)
+		fix, conf := recordFix(fd.Cause, fd.Record), None
+		if fix != nil {
+			conf = Low
+		}
+		return set("R9", conf, fmt.Sprintf("%d-bit axis at an odd address (ME7 stores 16-bit data at even addresses); monotonic: %s; %s", 8*w, strings.Join(mono, ", "), describe(fd.Cause, fd.Record)), fix)
 	}
 	if allEqual(v) {
 		return set("R6", None, "all values identical: wrong address or size", nil)
@@ -217,6 +225,9 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 			fd.Opposite = opp
 			return set("R3", Medium, "monotonic only with the opposite signedness", &Fix{Signed: ptr(!a.Signed)})
 		case !monotonic(v):
+			if fd := r5(a, n, img, set); fd != nil {
+				return fd
+			}
 			return set("R6", None, "not monotonic: check address, size or type", nil)
 		}
 		return nil
@@ -226,9 +237,44 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 	case !delta && !monotonic(v) && sub:
 		return set("R2", High, "plain axis in an M3.x image that is increasing only read as \"EEPROM, subtract\"", &Fix{DataSource: ptr(kp.DSEepromSubtract)})
 	case countDisagrees(a, fd.CountByte, n):
-		return set("R4", None, fmt.Sprintf("count byte before the axis is %d, axis size is %d: check address or size", *fd.CountByte, n), nil)
+		c := *fd.CountByte
+		msg := fmt.Sprintf("count byte before the axis is %d, axis size is %d: check address or size", c, n)
+		if v2 := read(img, a.Addr, c, a.Type, a.Signed); monotonic(v2) {
+			return set("R4", Medium, msg+"; size "+fmt.Sprint(c)+" is monotonic", &Fix{Points: &c})
+		}
+		return set("R4", None, msg, nil)
 	case delta && !sub:
+		if fd := r5(a, n, img, set); fd != nil {
+			return fd
+		}
 		return set("R6", None, fmt.Sprintf("%s axis that is not increasing from 0 or more when read as \"EEPROM, subtract\": check address, size or type", a.DataSource), nil)
+	case !delta && !monotonic(v):
+		if fd := r5(a, n, img, set); fd != nil {
+			return fd
+		}
+	}
+	return nil
+}
+
+// r5 looks for a count byte and monotonic axis a few bytes from the stored
+// address. Low confidence; fix applies only with --only (or --min-confidence low).
+func r5(a *kp.Axis, n int, img []byte, set func(rule, conf, msg string, fix *Fix) *Finding) *Finding {
+	if a.Type.Width() != 1 || n < 2 {
+		return nil
+	}
+	for _, d := range []int{1, -1, 2, -2, 3, -3, 4, -4} {
+		cand := int64(a.Addr) + int64(d)
+		if cand < 1 || cand+int64(n) > int64(len(img)) {
+			continue
+		}
+		caddr := uint32(cand)
+		if int(img[caddr-1]) != n {
+			continue
+		}
+		if !monotonic(read(img, caddr, n, a.Type, a.Signed)) {
+			continue
+		}
+		return set("R5", Low, fmt.Sprintf("count %d and monotonic axis at 0x%x (%+d from stored)", n, caddr, d), &Fix{Addr: &caddr})
 	}
 	return nil
 }
@@ -290,14 +336,18 @@ func checkAlign(m *kp.Map, img []byte, family string) *Finding {
 	}
 	k := min(n, alignCells)
 	cause, rec := mapRecord(m, img)
+	fix, conf := recordFix(cause, rec), None
+	if fix != nil {
+		conf = Low
+	}
 	return &Finding{
-		ID: fmt.Sprintf("R9@0x%x:%d", m.Start, n*w), Rule: "R9", Confidence: None,
+		ID: fmt.Sprintf("R9@0x%x:%d", m.Start, n*w), Rule: "R9", Confidence: conf,
 		Message: fmt.Sprintf("%d-bit map at an odd address (ME7 stores 16-bit data at even addresses); %s", 8*w, describe(cause, rec)),
 		Addr:    m.Start, Points: n * w, Type: m.Type, Signed: m.Signed,
 		Values:  read(img, m.Start, k, m.Type, m.Signed),
 		Later:   read(img, m.Start+1, k, m.Type, m.Signed),
 		Earlier: read(img, m.Start-1, k, m.Type, m.Signed),
-		Record:  rec, Cause: cause,
+		Record:  rec, Cause: cause, Fix: fix,
 	}
 }
 
@@ -324,12 +374,13 @@ func checkHeader(m *kp.Map, img []byte, family string) *Finding {
 		if len(l) != len(counts) || !ok || !sameCounts(r.Counts, counts) {
 			continue
 		}
+		fix := recordFix(RecordStart, &r)
 		return &Finding{
-			ID: fmt.Sprintf("R10@0x%x:%d", m.Start, mapBytes(m)), Rule: "R10", Confidence: None,
+			ID: fmt.Sprintf("R10@0x%x:%d", m.Start, mapBytes(m)), Rule: "R10", Confidence: Low,
 			Message: fmt.Sprintf("map without image axes starts on its own point counts and monotonic axes; %s", describe(RecordStart, &r)),
 			Addr:    m.Start, Points: mapBytes(m), Type: m.Type, Signed: m.Signed,
 			Values: read(img, r.Axes[0].Addr, r.Counts[0], intType(r.Axes[0].Bits/8), false),
-			Record: &r, Cause: RecordStart,
+			Record: &r, Cause: RecordStart, Fix: fix,
 		}
 	}
 	return nil
@@ -441,6 +492,12 @@ func Apply(f *kp.File, fs []Finding) error {
 				if m.Start != fd.Addr || mapBytes(m) != fd.Points {
 					return fmt.Errorf("%s: map %d (%s) no longer matches", fd.ID, ref.Index, ref.ID)
 				}
+				if fd.Fix.Start != nil {
+					m.Start = *fd.Fix.Start
+					if nb := mapBytes(m); nb > 0 {
+						m.End = m.Start + uint32(nb)
+					}
+				}
 				if fd.Fix.End != nil {
 					m.End = *fd.Fix.End
 				}
@@ -459,7 +516,64 @@ func Apply(f *kp.File, fs []Finding) error {
 			if fd.Fix.Signed != nil {
 				a.Signed = *fd.Fix.Signed
 			}
+			if fd.Fix.Addr != nil {
+				a.Addr = *fd.Fix.Addr
+			}
+			if fd.Fix.Type != nil {
+				a.Type = *fd.Fix.Type
+				a.Width = int32(fd.Fix.Type.Width())
+			}
+			if fd.Fix.Points != nil {
+				setAxisPoints(m, ref.Axis, *fd.Fix.Points)
+			}
 		}
 	}
 	return nil
+}
+
+// recordFix proposes an R9/R10 change from the cause and record. Low
+// confidence; apply with --only until a WinOLS check on a moved map.
+func recordFix(cause string, r *Record) *Fix {
+	if r == nil {
+		return nil
+	}
+	switch cause {
+	case ValuesPad, TableLate, RecordStart:
+		if r.Values == 0 {
+			return nil
+		}
+		v := r.Values
+		return &Fix{Start: &v}
+	case AxisPad:
+		if len(r.Axes) == 0 {
+			return nil
+		}
+		a := r.Axes[0].Addr
+		return &Fix{Addr: &a}
+	case AxisWidth:
+		if len(r.Axes) == 0 {
+			return nil
+		}
+		a := r.Axes[0].Addr
+		t := kp.Type(1)
+		return &Fix{Addr: &a, Type: &t}
+	}
+	return nil
+}
+
+// setAxisPoints sets a map's cols or rows to n, keeps storage order in step,
+// and sets the end address to start plus the new byte length.
+func setAxisPoints(m *kp.Map, axis string, n int) {
+	if axis == "y" {
+		m.Rows = int32(n)
+	} else {
+		m.Cols = int32(n)
+	}
+	m.StoredCols, m.StoredRows = m.Cols, m.Rows
+	if m.Organization == kp.OrgTwoDInv {
+		m.StoredCols, m.StoredRows = m.Rows, m.Cols
+	}
+	if nb := mapBytes(m); nb > 0 {
+		m.End = m.Start + uint32(nb)
+	}
 }
