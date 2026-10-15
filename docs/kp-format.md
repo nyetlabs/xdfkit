@@ -136,7 +136,7 @@ The 80 bytes after the Y axis:
 | 0x45 | `ViewOffset` | float64 | |
 | 0x4D | `Term2` | byte[3] | 1, 1, 1. The first two must be 1 |
 
-Opening a map in WinOLS can change `Cursor`, `Selected`, and `ViewScale`. `ViewMode` is the script's `ViewMode`.
+Opening a map in WinOLS can change `Cursor`, `Selected`, and `ViewScale`.
 
 ## Axis
 
@@ -176,7 +176,7 @@ In v2 the list is empty except on free-editable axes. In v1 both axis records ho
 | Data source | 0 ordinal, 1 EEPROM, 2 EEPROM add, 3 EEPROM subtract, 4 free editable, 5 EEPROM backwards |
 | Display base | 10, 16, 2 |
 
-Datasource 4 and 5 follow the script enum (`eUserdef`, `eRomBackwards`). The WinOLS UI lists those two in the other order.
+Datasource 4 and 5 are free editable then EEPROM backwards. The WinOLS UI lists those two in the other order.
 
 ## EEPROM, subtract
 

@@ -17,7 +17,7 @@ make help       # all targets
 
 ## Formats
 
-Every conversion goes through one model, so any input converts to any output. Dashed lines are planned: A2L and DAMOS input, WinOLS script output (the import route into WinOLS, `docs/winols-script.md`).
+Every conversion goes through one model, so any input converts to any output. Dashed lines are planned: A2L and DAMOS input. KP is the route into WinOLS.
 
 ```mermaid
 flowchart LR
@@ -31,9 +31,8 @@ flowchart LR
   model --> xdfout["TunerPro XDF"]
   model --> jsonout["JSON / YAML"]
   model --> csv["CSV map list"]
-  model -.-> script["WinOLS script"]
   classDef planned stroke-dasharray: 5 5
-  class a2l,damos,script planned
+  class a2l,damos planned
 ```
 
 ## Architecture
@@ -75,7 +74,6 @@ me7-logger imports `model`, `xdf` and `canon` (`docs/integrations.md`): after ch
 | `docs/kp-format.md` | KP v1/v2 layout |
 | `docs/autocorrect.md` | `lint` and `fix` |
 | `docs/stamp-and-metadata.md` | Edit stamp and XDF metadata file |
-| `docs/winols-script.md` | WinOLS script import format |
 | `docs/corpus.md` | Test images from ecu-corpus |
 | `docs/naming.md` | Output file names |
 | `docs/integrations.md` | ecuxplot, ME7Sum, me7-logger |

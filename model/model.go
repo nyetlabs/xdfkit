@@ -146,8 +146,8 @@ type Axis struct {
 	Value     Value  `json:"value" doc:"Breakpoint meaning and conversion."`
 	View      View   `json:"view,omitzero" doc:"Display settings."`
 	Mirror    bool   `json:"mirror,omitzero" doc:"KP \"mirror map\" axis setting: WinOLS shows the axis in descending order; storage is unchanged."`
-	Header    int    `json:"header,omitzero" doc:"Header bytes before the axis data (WinOLS script DataHeader; KP field DataHeader, unconfirmed); usually a point count."`
-	Signature *int   `json:"signature,omitempty" doc:"Marker value WinOLS associates with the axis (WinOLS script SignaturByte, the byte before the axis data; unconfirmed); omitted when none."`
+	Header    int    `json:"header,omitzero" doc:"Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count."`
+	Signature *int   `json:"signature,omitempty" doc:"Marker value WinOLS associates with the axis (KP SignatureByte, the byte before the axis data; unconfirmed); omitted when none."`
 }
 
 // Addr is a file offset, written as a hex string ("0x13D52").

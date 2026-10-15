@@ -53,7 +53,7 @@
           "description": "Breakpoint storage, for image axes."
         },
         "header": {
-          "description": "Header bytes before the axis data (WinOLS script DataHeader; KP field DataHeader, unconfirmed); usually a point count.",
+          "description": "Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count.",
           "type": "integer"
         },
         "mirror": {
@@ -61,7 +61,7 @@
           "type": "boolean"
         },
         "signature": {
-          "description": "Marker value WinOLS associates with the axis (WinOLS script SignaturByte, the byte before the axis data; unconfirmed); omitted when none.",
+          "description": "Marker value WinOLS associates with the axis (KP SignatureByte, the byte before the axis data; unconfirmed); omitted when none.",
           "type": "integer"
         },
         "source": {
