@@ -224,12 +224,25 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 	switch {
 	case !delta && !monotonic(v) && sub:
 		return set("R2", High, "plain axis in an M3.x image that is increasing only read as \"EEPROM, subtract\"", &Fix{DataSource: ptr(kp.DSEepromSubtract)})
-	case fd.CountByte != nil && *fd.CountByte != n:
+	case countDisagrees(a, fd.CountByte, n):
 		return set("R4", None, fmt.Sprintf("count byte before the axis is %d, axis size is %d: check address or size", *fd.CountByte, n), nil)
 	case delta && !sub:
 		return set("R6", None, fmt.Sprintf("%s axis that is not increasing from 0 or more when read as \"EEPROM, subtract\": check address, size or type", a.DataSource), nil)
 	}
 	return nil
+}
+
+// countDisagrees reports an 8-bit axis whose previous byte is not its point
+// count. That byte is a count when it is a plausible size, 1 through 24, or
+// when the axis declares a data header. A bare 0 or 255 is not a header.
+func countDisagrees(a *kp.Axis, prev *int, n int) bool {
+	if prev == nil || *prev == n {
+		return false
+	}
+	if a.DataHeader != 0 {
+		return true
+	}
+	return *prev >= 1 && *prev <= 24
 }
 
 // subtracted returns the points WinOLS 2.24 displays for an "EEPROM,

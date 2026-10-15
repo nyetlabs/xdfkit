@@ -22,7 +22,8 @@ import (
 // (06A906032HS, 8N0906018CB) and on KFMLDMN Y (4D1907558). R10 finds
 // nothing in these packs. 8D0907558M's R2 and R4 differ: the prototype read
 // "subtract" axes as forward sums, and six axes that are increasing that way
-// but negative as WinOLS reads them are R4 here.
+// but negative as WinOLS reads them are R4 here. R4 counts a previous
+// byte only when it is a plausible count or the axis declares a header.
 var want = map[string]map[string]int{
 	"06A906032HS": {"R3": 7, "R9": 26},
 	"06A906032LP": {"R1": 16, "R3": 6, "R6": 1, "R9": 30},
@@ -35,7 +36,7 @@ var want = map[string]map[string]int{
 	"8D0907551K":  {"R6": 2, "R8": 64},
 	"8D0907551M":  {"R1": 1, "R6": 3, "R8": 13},
 	"8D0907558E":  {"R2": 216},
-	"8D0907558M":  {"R2": 68, "R4": 45, "R6": 3, "R8": 333},
+	"8D0907558M":  {"R2": 68, "R4": 16, "R6": 9, "R8": 333},
 	"8N0906018CB": {"R1": 13, "R9": 25},
 }
 
@@ -130,6 +131,28 @@ func TestApply(t *testing.T) {
 				t.Errorf("reapplying: %v", err)
 			}
 		})
+	}
+}
+
+func TestCountDisagrees(t *testing.T) {
+	n := 8
+	bare := &kp.Axis{}
+	for _, b := range []int{0, 32, 185, 255} {
+		if countDisagrees(bare, &b, n) {
+			t.Errorf("byte %d flagged as a count", b)
+		}
+	}
+	bad := 9
+	if !countDisagrees(bare, &bad, n) {
+		t.Error("a plausible count that disagrees was kept")
+	}
+	if countDisagrees(bare, &n, n) {
+		t.Error("a matching count was flagged")
+	}
+	declared := &kp.Axis{DataHeader: 1}
+	odd := 255
+	if !countDisagrees(declared, &odd, n) {
+		t.Error("a declared header that disagrees was kept")
 	}
 }
 
