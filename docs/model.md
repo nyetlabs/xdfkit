@@ -24,6 +24,7 @@ The format-neutral model every reader converts into and every writer converts ou
 - Names are format-neutral English; each writer maps them to its format's names (WinOLS script properties in `winols-script.md`).
 - `image`, the identity of the flash image (part number, version, Bosch ident, SHA-256), is planned and not in schema 1 yet.
 - Planned for the DAMOS reader: a conversion `/REP 0, B, C, 0` (phys = (B / C) / raw; the `zk*` time constants and `rfak*` factors) sets `reciprocal` with factor B/C and offset 0. A rational with A or D nonzero is refused rather than written as factor 1. WinOLS's DAMOS import writes factor 1 for that form (confirmed against 06A906032HF's `.dam`; 4B0906018CM and 06A906032S kept theirs). Checked against 06A906032HF's `.dam`.
+- Planned for the DAMOS reader: ME7 record layout. The `/SPZ` address (ECU address minus 0x800000) is the record start. Values (type 1), curves and maps on shared axes (7, 8), fixed-axis curves and maps (4, 5) and value blocks (13) start there. A record with inline axes (2 curve, 3 map, 6 axis-point table) holds one count byte per axis (`/SPX`'s first), then the axes in that order, then the values, and every 16-bit field starts at an even address, with a pad byte before it when needed: a curve with an 8-bit axis of four points and 16-bit values is count, four axis bytes, pad, values. Confirmed against the images of 06A906032HF, 06A906032S and 8D0907551M-0002 (`/SPX` and `/SPW` give the widths).
 
 ## KP output
 

@@ -14,16 +14,24 @@ import (
 )
 
 type fixtureAxis struct {
-	Addr   model.Addr `json:"addr"`
-	Bits   int        `json:"bits"`
-	Stored string     `json:"stored"`
-	Count  *int       `json:"count"`
-	Values []uint32   `json:"values"`
+	Addr   model.Addr  `json:"addr"`
+	Bits   int         `json:"bits"`
+	At     *model.Addr `json:"at"`     // where the values are written; default addr
+	AtBits int         `json:"atBits"` // their width there; default bits
+	Stored string      `json:"stored"`
+	Count  *int        `json:"count"`
+	Values []uint32    `json:"values"`
+	Points int         `json:"points"` // without values: nothing is written
 }
 
 type fixtureMap struct {
 	ID   string       `json:"id"`
 	Addr model.Addr   `json:"addr"`
+	Bits int          `json:"bits"`
+	Cols int          `json:"cols"` // points without an x axis
+	Rows int          `json:"rows"` // points without a y axis
+	At   *model.Addr  `json:"at"`   // where data is written; default addr
+	Data []int        `json:"data"` // bytes
 	End  *model.Addr  `json:"end"`
 	X    *fixtureAxis `json:"x"`
 	Y    *fixtureAxis `json:"y"`
@@ -34,9 +42,12 @@ type fixtureCase struct {
 	Ident string       `json:"ident"`
 	Maps  []fixtureMap `json:"maps"`
 	Want  []struct {
-		ID         string   `json:"id"`
-		Confidence string   `json:"confidence"`
-		Maps       []string `json:"maps"`
+		ID         string      `json:"id"`
+		Confidence string      `json:"confidence"`
+		Maps       []string    `json:"maps"`
+		Cause      string      `json:"cause"`
+		Values     *model.Addr `json:"values"` // the record's values address
+		Axis       *model.Addr `json:"axis"`   // the record's first axis address
 	} `json:"want"`
 }
 
@@ -56,23 +67,35 @@ func (c *fixtureCase) build(t *testing.T) (*kp.File, []byte) {
 			a.Bits = 8
 		}
 		d := model.Data{Bits: a.Bits}
-		w := a.Bits / 8
+		if a.Bits > 8 {
+			d.Endian = "big"
+		}
+		at, atBits := a.Addr, a.Bits
+		if a.At != nil {
+			at = *a.At
+		}
+		if a.AtBits != 0 {
+			atBits = a.AtBits
+		}
+		w := atBits / 8
 		for i, v := range a.Values {
-			p := img[int(a.Addr)+i*w:]
+			p := img[int(at)+i*w:]
 			switch w {
 			case 1:
 				p[0] = byte(v)
 			case 2:
-				d.Endian = "big"
 				binary.BigEndian.PutUint16(p, uint16(v))
 			}
+		}
+		if a.Values == nil {
+			return &model.Axis{Source: "image", Stored: "absolute", Address: &a.Addr, Data: &d, Value: model.Value{Conversion: model.Conversion{Factor: 1}}}, a.Points
 		}
 		if w == 1 {
 			n := len(a.Values)
 			if a.Count != nil {
 				n = *a.Count
 			}
-			img[a.Addr-1] = byte(n)
+			img[at-1] = byte(n)
 		}
 		stored := a.Stored
 		if stored == "" {
@@ -84,13 +107,30 @@ func (c *fixtureCase) build(t *testing.T) (*kp.File, []byte) {
 	for _, fm := range c.Maps {
 		x, cols := axis(fm.X)
 		y, rows := axis(fm.Y)
+		if fm.X == nil && fm.Cols > 0 {
+			cols = fm.Cols
+		}
+		if fm.Y == nil && fm.Rows > 0 {
+			rows = fm.Rows
+		}
+		at := fm.Addr
+		if fm.At != nil {
+			at = *fm.At
+		}
+		for i, b := range fm.Data {
+			img[int(at)+i] = byte(b)
+		}
 		shape := "1d"
-		if y != nil {
+		if rows > 1 {
 			shape = "2d"
+		}
+		d := model.Data{Bits: 8}
+		if fm.Bits > 8 {
+			d = model.Data{Bits: fm.Bits, Endian: "big"}
 		}
 		m.Objects = append(m.Objects, &model.Object{
 			ID: fm.ID, Shape: shape, Address: fm.Addr, Rows: rows, Cols: cols,
-			Data: model.Data{Bits: 8}, Value: model.Value{Conversion: model.Conversion{Factor: 1}}, X: x, Y: y,
+			Data: d, Value: model.Value{Conversion: model.Conversion{Factor: 1}}, X: x, Y: y,
 		})
 	}
 	m.AssignKeys()
@@ -146,6 +186,24 @@ func TestFixtures(t *testing.T) {
 			}
 			if !reflect.DeepEqual(gotMaps, wantMaps) {
 				t.Errorf("maps %v, want %v", gotMaps, wantMaps)
+			}
+			byID := map[string]Finding{}
+			for _, fd := range r.Findings {
+				byID[fd.ID] = fd
+			}
+			for _, w := range c.Want {
+				fd := byID[w.ID]
+				if fd.Cause != w.Cause {
+					t.Errorf("%s: cause %q, want %q", w.ID, fd.Cause, w.Cause)
+				}
+				for _, a := range []struct {
+					want *model.Addr
+					got  func(*Record) uint32
+				}{{w.Values, func(r *Record) uint32 { return r.Values }}, {w.Axis, func(r *Record) uint32 { return r.Axes[0].Addr }}} {
+					if a.want != nil && (fd.Record == nil || a.got(fd.Record) != uint32(*a.want)) {
+						t.Errorf("%s: record %+v, want 0x%x", w.ID, fd.Record, uint32(*a.want))
+					}
+				}
 			}
 
 			if err := Apply(f, Select(r.Findings, nil, nil, Low)); err != nil {

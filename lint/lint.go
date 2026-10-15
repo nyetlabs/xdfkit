@@ -1,6 +1,7 @@
-// Package lint checks a KP file's image axes against the flash image, and its
-// map end addresses, and proposes fixes (docs/autocorrect.md). Findings are
-// grouped by address, so an axis shared by several maps is reported once.
+// Package lint checks a KP file's image axes and maps against the flash
+// image, and its map end addresses, and proposes fixes (docs/autocorrect.md).
+// Findings are grouped by address, so an axis shared by several maps is
+// reported once.
 // Apply makes the proposed changes to a kp.File; only fixed-width fields that
 // are already decoded change.
 package lint
@@ -49,7 +50,7 @@ type Fix struct {
 }
 
 // Finding is one problem with one axis (address and point count) or one map
-// (start address and byte length, rule R8), with the evidence and the
+// (start address and byte length, rules R8 to R10), with the evidence and the
 // proposed fix.
 type Finding struct {
 	ID         string         `json:"id"` // RULE@0xADDR:POINTS
@@ -64,8 +65,13 @@ type Finding struct {
 	Values     []int64        `json:"values,omitempty"`     // raw, as stored
 	Subtracted []int64        `json:"subtracted,omitempty"` // Values as WinOLS shows a "subtract" axis
 	Opposite   []int64        `json:"opposite,omitempty"`   // raw, with the other signedness
-	CountByte  *int           `json:"countByte,omitempty"`
-	End        *uint32        `json:"end,omitempty"` // stored map end address
+	Later      []int64        `json:"later,omitempty"`      // R9: raw, read one byte later
+	Earlier    []int64        `json:"earlier,omitempty"`    // R9: raw, read one byte earlier
+	Narrow     []int64        `json:"narrow,omitempty"`     // R9: axis read as 8-bit one byte earlier
+	CountByte  *int           `json:"countByte,omitempty"`  // before an 8-bit axis, or before Narrow
+	Record     *Record        `json:"record,omitempty"`     // R9, R10: the record the image holds there
+	Cause      string         `json:"cause,omitempty"`      // R9, R10: how the def differs from Record
+	End        *uint32        `json:"end,omitempty"`        // stored map end address
 	Fix        *Fix           `json:"fix,omitempty"`
 	Maps       []AxisRef      `json:"maps"`
 }
@@ -130,8 +136,10 @@ func Lint(f *kp.File, img []byte, opt Options) (Report, error) {
 	}
 	for _, m := range f.Project.Maps {
 		add(checkEnd(m), m, "")
-		add(check(m.X, int(m.Cols), img, r.Family), m, "x")
-		add(check(m.Y, int(m.Rows), img, r.Family), m, "y")
+		add(checkAlign(m, img, r.Family), m, "")
+		add(checkHeader(m, img, r.Family), m, "")
+		add(check(m.X, int(m.Cols), m.Y, int(m.Rows), img, r.Family), m, "x")
+		add(check(m.Y, int(m.Rows), m.X, int(m.Cols), img, r.Family), m, "y")
 	}
 	sort.Slice(r.Findings, func(i, j int) bool {
 		a, b := r.Findings[i], r.Findings[j]
@@ -140,9 +148,10 @@ func Lint(f *kp.File, img []byte, opt Options) (Report, error) {
 	return r, nil
 }
 
-// check applies the rules to one axis and returns its finding, if any.
-func check(a *kp.Axis, n int, img []byte, family string) *Finding {
-	if a == nil || !a.Defined || !a.DataSource.FromImage() || n < 2 || a.Type.Width() == 0 || a.Type.Float() {
+// check applies the rules to one axis of n points and returns its finding, if
+// any; other is the map's other axis, of on points.
+func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string) *Finding {
+	if !imageAxis(a, n) {
 		return nil
 	}
 	w := a.Type.Width()
@@ -164,6 +173,32 @@ func check(a *kp.Axis, n int, img []byte, family string) *Finding {
 		fd.ID = fmt.Sprintf("%s@0x%x:%d", rule, a.Addr, n)
 		fd.Rule, fd.Confidence, fd.Message, fd.Fix = rule, conf, msg, fix
 		return fd
+	}
+	if family == ME7 && w > 1 && a.Addr%2 == 1 {
+		fd.Later = read(img, a.Addr+1, n, a.Type, a.Signed)
+		fd.Earlier = read(img, a.Addr-1, n, a.Type, a.Signed)
+		fd.Narrow = read(img, a.Addr-1, n, kp.Type(1), a.Signed)
+		fd.CountByte = nil
+		if a.Addr >= 2 {
+			c := int(img[a.Addr-2])
+			fd.CountByte = &c
+		}
+		var mono []string
+		for _, r := range []struct {
+			v    []int64
+			what string
+		}{{v, "as stored"}, {fd.Later, "one byte later"}, {fd.Earlier, "one byte earlier"}, {fd.Narrow, "as 8-bit one byte earlier"}} {
+			if monotonic(r.v) {
+				mono = append(mono, r.what)
+			}
+		}
+		if len(mono) == 0 {
+			mono = []string{"no reading"}
+		}
+		if w == 2 {
+			fd.Cause, fd.Record = axisRecord(a, n, other, on, img)
+		}
+		return set("R9", None, fmt.Sprintf("%d-bit axis at an odd address (ME7 stores 16-bit data at even addresses); monotonic: %s; %s", 8*w, strings.Join(mono, ", "), describe(fd.Cause, fd.Record)), nil)
 	}
 	if allEqual(v) {
 		return set("R6", None, "all values identical: wrong address or size", nil)
@@ -226,6 +261,64 @@ func checkEnd(m *kp.Map) *Finding {
 		Addr:    m.Start, Points: n, Type: m.Type, Signed: m.Signed, End: ptr(m.End),
 		Fix: &Fix{End: &end},
 	}
+}
+
+// alignCells caps the cells an R9 map finding shows from each reading.
+const alignCells = 16
+
+// checkAlign applies rule R9 to a map: ME7 stores 16-bit data at even addresses
+// only, so integer cells of 16 bits or more at an odd address are
+// mislocated. Report only; the readings one byte either side are evidence.
+func checkAlign(m *kp.Map, img []byte, family string) *Finding {
+	n, w := int(m.Cols)*int(m.Rows), m.Type.Width()
+	if family != ME7 || w < 2 || m.Type.Float() || m.Start%2 == 0 || n <= 0 {
+		return nil
+	}
+	k := min(n, alignCells)
+	cause, rec := mapRecord(m, img)
+	return &Finding{
+		ID: fmt.Sprintf("R9@0x%x:%d", m.Start, n*w), Rule: "R9", Confidence: None,
+		Message: fmt.Sprintf("%d-bit map at an odd address (ME7 stores 16-bit data at even addresses); %s", 8*w, describe(cause, rec)),
+		Addr:    m.Start, Points: n * w, Type: m.Type, Signed: m.Signed,
+		Values:  read(img, m.Start, k, m.Type, m.Signed),
+		Later:   read(img, m.Start+1, k, m.Type, m.Signed),
+		Earlier: read(img, m.Start-1, k, m.Type, m.Signed),
+		Record:  rec, Cause: cause,
+	}
+}
+
+// checkHeader applies rule R10 to a map: an ME7 curve, map or axis-point
+// table record starts with its point counts, one byte per axis, then the
+// axes, then the values, each 16-bit field at an even address
+// (docs/model.md). A map without image axes whose data reads as such a
+// record with its own point counts points at the record start. Report only.
+func checkHeader(m *kp.Map, img []byte, family string) *Finding {
+	n, w := int(m.Cols), m.Type.Width()
+	if family != ME7 || n < 2 || w == 0 || m.Type.Float() || imageAxis(m.X, n) || imageAxis(m.Y, int(m.Rows)) {
+		return nil
+	}
+	counts := mapCounts(m)
+	if len(counts) == 1 {
+		for _, h := range []int{1, 2} {
+			if c := read(img, m.Start-uint32(h), 1, intType(h), false); m.Start >= uint32(h) && c != nil && c[0] == int64(n) {
+				return nil // already after its count, as an axis-point table whose first point is n
+			}
+		}
+	}
+	for _, l := range layouts {
+		r, ok := inline(img, m.Start, l, w)
+		if len(l) != len(counts) || !ok || !sameCounts(r.Counts, counts) {
+			continue
+		}
+		return &Finding{
+			ID: fmt.Sprintf("R10@0x%x:%d", m.Start, mapBytes(m)), Rule: "R10", Confidence: None,
+			Message: fmt.Sprintf("map without image axes starts on its own point counts and monotonic axes; %s", describe(RecordStart, &r)),
+			Addr:    m.Start, Points: mapBytes(m), Type: m.Type, Signed: m.Signed,
+			Values: read(img, r.Axes[0].Addr, r.Counts[0], intType(r.Axes[0].Bits/8), false),
+			Record: &r, Cause: RecordStart,
+		}
+	}
+	return nil
 }
 
 func ptr[T any](v T) *T { return &v }

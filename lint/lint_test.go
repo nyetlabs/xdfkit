@@ -16,23 +16,27 @@ import (
 // want counts map axes per rule, from the prototype run on ecuxplot's data
 // (the archived packs, with OEM images from the corpus)
 // (keyed by map ID and axis, as the prototype did). R8, which the prototype
-// lacked, counts map IDs with a stale end address. 8D0907558M's R2 and R4
-// differ: the prototype read "subtract" axes as forward sums, and six axes
-// that are increasing that way but negative as WinOLS reads them are R4 here.
+// lacked, counts map IDs with a stale end address. R9, which it lacked too,
+// counts maps and axes at odd addresses, and takes over the prototype's R3
+// and R6 on KFFRMIN X and LAMFA X (8D0907551G, 4Z7907551R), R6 on LAMFA X
+// (06A906032HS, 8N0906018CB) and on KFMLDMN Y (4D1907558). R10 finds
+// nothing in these packs. 8D0907558M's R2 and R4 differ: the prototype read
+// "subtract" axes as forward sums, and six axes that are increasing that way
+// but negative as WinOLS reads them are R4 here.
 var want = map[string]map[string]int{
-	"06A906032HS": {"R3": 7, "R6": 1},
-	"06A906032LP": {"R1": 16, "R3": 6, "R6": 1},
-	"4D1907558":   {"R3": 1, "R6": 9},
-	"4Z7907551AA": {"R6": 1, "R8": 26},
-	"4Z7907551R":  {"R1": 24, "R3": 1, "R6": 1},
-	"8D0907551F":  {"R1": 20, "R6": 2},
-	"8D0907551G":  {"R1": 23, "R3": 1, "R6": 1},
+	"06A906032HS": {"R3": 7, "R9": 26},
+	"06A906032LP": {"R1": 16, "R3": 6, "R6": 1, "R9": 30},
+	"4D1907558":   {"R3": 1, "R6": 8, "R9": 6},
+	"4Z7907551AA": {"R6": 1, "R8": 26, "R9": 4},
+	"4Z7907551R":  {"R1": 24, "R9": 44},
+	"8D0907551F":  {"R1": 20, "R6": 2, "R9": 45},
+	"8D0907551G":  {"R1": 23, "R9": 18},
 	"8D0907551H":  {"R6": 3},
 	"8D0907551K":  {"R6": 2, "R8": 64},
 	"8D0907551M":  {"R1": 1, "R6": 3, "R8": 13},
 	"8D0907558E":  {"R2": 216},
 	"8D0907558M":  {"R2": 68, "R4": 45, "R6": 3, "R8": 333},
-	"8N0906018CB": {"R1": 13, "R6": 1},
+	"8N0906018CB": {"R1": 13, "R9": 25},
 }
 
 func load(t *testing.T, stem string) (*kp.File, []byte) {

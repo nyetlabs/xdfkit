@@ -1,5 +1,5 @@
 {
-  "about": "Synthetic lint fixtures (lint/fixture_test.go, docs/autocorrect.md): no OEM data. Each case builds an image holding its Bosch ident and the raw axis values (8-bit axes get a count byte before them unless count is given), and a KP file from the maps. want lists every finding: rule ID, confidence, and the map axes it names (MAP/x, or MAP/ for R8).",
+  "about": "Synthetic lint fixtures (lint/fixture_test.go, docs/autocorrect.md): no OEM data. Each case builds an image holding its Bosch ident and the raw axis values (8-bit axes get a count byte before them unless count is given; at and atBits write the values at another address or width than the axis defines, bits sets a map's cell width; an axis with points instead of values writes nothing; a map without x has cols ordinal points, without y rows, and data bytes written at at, else at its address), and a KP file from the maps. want lists every finding: rule ID, confidence, the map axes it names (MAP/x, or MAP/ for map findings), and for R9 and R10 the cause and the record's first axis and values addresses.",
   "cases": [
     {
       "name": "me7",
@@ -13,7 +13,19 @@
         {"id": "SIGNED", "addr": "0x8050", "x": {"addr": "0x1030", "values": [240, 248, 0, 8]}},
         {"id": "CONST", "addr": "0x8060", "x": {"addr": "0x1040", "values": [5, 5, 5, 5]}},
         {"id": "ZIGZAG", "addr": "0x8070", "x": {"addr": "0x1050", "values": [1, 9, 3, 7]}},
-        {"id": "STALE", "addr": "0x8080", "end": "0x8090", "x": {"addr": "0x1000", "values": [10, 20, 30, 40]}, "y": {"addr": "0x1060", "values": [1, 2]}}
+        {"id": "STALE", "addr": "0x8080", "end": "0x8090", "x": {"addr": "0x1000", "values": [10, 20, 30, 40]}, "y": {"addr": "0x1060", "values": [1, 2]}},
+        {"id": "ODD_MAP", "addr": "0x8091", "bits": 16, "x": {"addr": "0x1000", "values": [10, 20, 30, 40]}},
+        {"id": "EARLY", "addr": "0x80a0", "x": {"addr": "0x1201", "bits": 16, "at": "0x1202", "values": [1000, 2000, 3000, 4000]}},
+        {"id": "NARROW", "addr": "0x80b0", "x": {"addr": "0x1301", "bits": 16, "at": "0x1300", "atBits": 8, "values": [10, 20, 30, 40]}},
+        {"id": "HEADER8", "addr": "0x8100", "bits": 16, "cols": 4, "data": [4, 10, 20, 30, 40, 0, 1, 0]},
+        {"id": "HEADER16", "addr": "0x8120", "bits": 16, "cols": 3, "data": [3, 0, 16, 0, 32, 0, 48, 0]},
+        {"id": "NOT_HEADER", "addr": "0x8140", "cols": 4, "data": [4, 10, 30, 20, 40]},
+        {"id": "TABLE", "addr": "0x8162", "bits": 16, "cols": 4, "at": "0x8160", "data": [4, 0, 4, 0, 8, 0, 12, 0, 16, 0, 20, 0]},
+        {"id": "HEADER2D", "addr": "0x8180", "rows": 2, "cols": 3, "data": [2, 3, 1, 2, 5, 6, 7, 9, 9, 9, 9, 9, 9]},
+        {"id": "VALUES_PAD", "addr": "0x2005", "bits": 16, "at": "0x2000", "data": [4, 10, 20, 30, 40, 0, 1, 0, 2, 0, 3, 0, 4, 0], "x": {"addr": "0x2001", "points": 4}},
+        {"id": "TABLE_LATE", "addr": "0x2103", "bits": 16, "cols": 4, "at": "0x2100", "data": [4, 0, 100, 0, 200, 0, 44, 1, 144, 1]},
+        {"id": "AXIS_PAD", "addr": "0x220e", "at": "0x2200", "data": [3, 4, 1, 2, 3, 0, 10, 0, 20, 0, 30, 0, 40, 0], "x": {"addr": "0x2205", "bits": 16, "points": 4}, "y": {"addr": "0x2202", "points": 3}},
+        {"id": "SHAPE", "addr": "0x2507", "bits": 16, "cols": 8, "at": "0x2500", "data": [2, 3, 1, 2, 5, 6, 7, 0, 1, 0, 2, 0, 3, 0]}
       ],
       "want": [
         {"id": "R1@0x1010:4", "confidence": "high", "maps": ["SHARED_A/x", "SHARED_B/x"]},
@@ -21,7 +33,17 @@
         {"id": "R3@0x1030:4", "confidence": "medium", "maps": ["SIGNED/x"]},
         {"id": "R6@0x1040:4", "confidence": "n/a", "maps": ["CONST/x"]},
         {"id": "R6@0x1050:4", "confidence": "n/a", "maps": ["ZIGZAG/x"]},
-        {"id": "R8@0x8080:8", "confidence": "high", "maps": ["STALE/"]}
+        {"id": "R8@0x8080:8", "confidence": "high", "maps": ["STALE/"]},
+        {"id": "R10@0x8100:8", "confidence": "n/a", "maps": ["HEADER8/"], "cause": "record-start", "axis": "0x8101", "values": "0x8106"},
+        {"id": "R10@0x8120:6", "confidence": "n/a", "maps": ["HEADER16/"], "cause": "record-start", "axis": "0x8122", "values": "0x8128"},
+        {"id": "R10@0x8180:6", "confidence": "n/a", "maps": ["HEADER2D/"], "cause": "record-start", "axis": "0x8182", "values": "0x8187"},
+        {"id": "R9@0x1201:4", "confidence": "n/a", "maps": ["EARLY/x"]},
+        {"id": "R9@0x1301:4", "confidence": "n/a", "maps": ["NARROW/x"], "cause": "axis-width", "axis": "0x1300"},
+        {"id": "R9@0x2005:8", "confidence": "n/a", "maps": ["VALUES_PAD/"], "cause": "values-pad", "axis": "0x2001", "values": "0x2006"},
+        {"id": "R9@0x2103:8", "confidence": "n/a", "maps": ["TABLE_LATE/"], "cause": "table-late", "values": "0x2102"},
+        {"id": "R9@0x2205:4", "confidence": "n/a", "maps": ["AXIS_PAD/x"], "cause": "axis-pad", "axis": "0x2206"},
+        {"id": "R9@0x2507:16", "confidence": "n/a", "maps": ["SHAPE/"], "cause": "shape", "axis": "0x2502", "values": "0x2508"},
+        {"id": "R9@0x8091:8", "confidence": "n/a", "maps": ["ODD_MAP/"]}
       ]
     },
     {
