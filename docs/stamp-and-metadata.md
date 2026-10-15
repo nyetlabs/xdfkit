@@ -57,7 +57,7 @@ jq -S 'del(.stamp)' file.json | shasum -a 256
 jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
 ```
 
-- `xdfkit verify file` checks every digest it knows and prints the overall result with each digest's: `clean`, `edited`, `mixed` (the digests disagree), `unknown` (no digest in a supported form) or `unstamped`. It exits 1 when a file is not clean. `xdfkit verify --status file` prints only that status word and exits 0 when the file could be read. A reader that loads an `edited` file uses it as written and says so. `mixed` and `unknown` still need a look.
+- `xdfkit verify file` checks every digest it knows and prints the overall result with each digest's: `clean`, `edited`, `mixed` (the digests disagree), `unknown` (no digest in a supported form) or `unstamped`. It exits 1 when a file is not clean. `xdfkit verify --status file` prints only that status word and exits 0 when the file could be read. A reader that loads an `edited` file uses it as written and does not warn. `xdfkit verify` reports `edited`. `mixed` and `unknown` still need a look.
 - An edit is any value change, added or removed key, or reordered array. Whitespace and key order count under neither digest. Respelling a number (`1` as `1.0`) counts only under `jq -S .` (jq 1.7+ keeps literals) and shows as `mixed`.
 - The stamp detects hand edits, not tampering: anyone can recompute it. It isn't a signature.
 

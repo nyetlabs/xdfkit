@@ -81,9 +81,10 @@ type ConvertResponse struct {
 // or an XDF, with its metadata file if given, into To (json, yaml, kp, csv or
 // xdf). JSON and YAML output is the stamped canonical model; Name, the input's
 // file name, goes into its provenance. KP input to KP output is re-encoded as
-// is. XDF output comes with its metadata file. Loading a hand-edited document,
-// an XDF edited since its metadata file was written, or a template other than
-// the file the model was read from, adds a warning.
+// is. XDF output comes with its metadata file. Loading a document whose stamp
+// is mixed or unknown, an XDF edited since its metadata file was written, or
+// a template other than the file the model was read from, adds a warning. An
+// edited stamp is used as written and does not warn.
 func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	resp := ConvertResponse{From: Detect(in), To: req.To}
 	if req.Meta != nil && resp.From != XDF {
@@ -285,7 +286,8 @@ func Merge(base []byte, req MergeRequest) ([]byte, MergeResponse, error) {
 }
 
 // loadModel reads a KP file, a model JSON or YAML document, or an XDF with
-// its metadata file (nil: none). A hand-edited document adds a warning.
+// its metadata file (nil: none). A mixed or unknown stamp adds a warning.
+// An edited stamp is used as written.
 func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, error) {
 	switch Detect(in) {
 	case KP:
@@ -319,9 +321,7 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 	}
 	var warnings []string
 	switch v.Status {
-	case "clean", "unstamped":
-	case "edited":
-		warnings = append(warnings, "changed since it was stamped; using the file as written")
+	case "clean", "unstamped", "edited":
 	default:
 		warnings = append(warnings, "stamp "+v.String())
 	}
