@@ -1,6 +1,6 @@
 # Test corpus
 
-`ecu-corpus` (`github.com/nyetlabs/ecu-corpus`, private) supplies the OEM flash images and `categories.json` that xdfkit's tests read. It is the `corpus/` submodule (shallow, `update = none`). Tests do not read `defs/`.
+`ecu-corpus` (`github.com/nyetlabs/ecu-corpus`, private) supplies the OEM flash images and `categories.json` that xdfkit's tests read. It is the `ecu-corpus/` submodule (shallow, `update = none`). Tests do not read `defs/`.
 
 ## What tests read
 
@@ -12,7 +12,7 @@ Without a manifest those tests skip. `XDFKIT_REQUIRE_CORPUS=1` makes that a fail
 
 ## Where the checkout is
 
-`XDFKIT_CORPUS` if set, else `../ecu-corpus` when that directory has `corpus.tsv`, else `corpus/` at the module root.
+`XDFKIT_CORPUS` if set, else `../ecu-corpus` when that directory has `corpus.tsv`, else `ecu-corpus/` at the module root.
 
 ```sh
 make corpus        # submodule at its pinned commit
@@ -21,4 +21,4 @@ make corpus-bump   # submodule at the ecu-corpus head
 
 ## CI
 
-`.github/workflows/build.yml` checks out `corpus/` with a short-lived token from the `nyetlabs-corpus-reader` GitHub App (organization variable `CORPUS_APP_CLIENT_ID`, secret `CORPUS_APP_KEY`), for the `ecu-corpus` URL only. Fork PRs have no secrets and skip. `.github/workflows/corpus-bump.yml` moves the submodule to the corpus head and opens a pull request. `release.yml` reuses the build and must pass `secrets: inherit`.
+`.github/workflows/build.yml` checks out `ecu-corpus/` with a short-lived token from the `nyetlabs-corpus-reader` GitHub App (organization variable `CORPUS_APP_CLIENT_ID`, secret `CORPUS_APP_KEY`), for the `ecu-corpus` URL only. Fork PRs have no secrets and skip. `.github/workflows/corpus-bump.yml` moves the submodule to the corpus head and opens a pull request. `release.yml` reuses the build and must pass `secrets: inherit`.

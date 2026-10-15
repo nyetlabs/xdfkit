@@ -102,7 +102,7 @@ flowchart LR
 - `kp/` (KP reader and writer), `lint/` (autocorrect), `mapcsv/` (CSV map list), `xdf/` (XDF writer, reader and metadata file).
 - Planned: `capi/` (C ABI shared library, cgo), `a2l/`, `dam/`, `addrmap/`, `cmd/sampdiff/`
 - `Makefile` (lint, test, build, package; version from git tags), `.github/` (build and release workflows, Dependabot), `cliff.toml` (release notes).
-- `docs/`, `testdata/` (committed fixtures), `testdata/local/` (gitignored: private samples, never committed; tests that need them skip when absent), `corpus/` (the `ecu-corpus` git submodule, see `corpus.md`)
+- `docs/`, `testdata/` (committed fixtures), `testdata/local/` (gitignored: private samples, never committed; tests that need them skip when absent), `ecu-corpus/` (the `ecu-corpus` git submodule, see `corpus.md`)
 
 ## Verification
 

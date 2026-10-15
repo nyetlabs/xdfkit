@@ -73,13 +73,13 @@ package:
 	scripts/package '$(VERSION)' '$(ALIASES)' '$(PLATFORMS)'
 
 # --checkout overrides update = none in .gitmodules.
-corpus:
-	git submodule update --init --checkout --depth 1 corpus
+corpus ecu-corpus/corpus.tsv:
+	git submodule update --init --checkout --depth 1 ecu-corpus
 
 bump corpus-bump:
-	git submodule update --init --checkout --remote --depth 1 corpus
-	@git -C corpus log -1 --format='corpus now at %h %s'
-	@git status --short corpus
+	git submodule update --init --checkout --remote --depth 1 ecu-corpus
+	@git -C ecu-corpus log -1 --format='corpus now at %h %s'
+	@git status --short ecu-corpus
 
 clean:
 	rm -rf build dist
