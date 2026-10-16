@@ -127,7 +127,7 @@ type Value struct {
 type Conversion struct {
 	Factor     float64 `json:"factor" doc:"Multiplier."`
 	Offset     float64 `json:"offset" doc:"Added after the multiplication."`
-	Reciprocal bool    `json:"reciprocal,omitzero" doc:"KP reciprocal flag; exact formula unconfirmed."`
+	Reciprocal bool    `json:"reciprocal,omitzero" doc:"Physical value is factor/raw + offset."`
 }
 
 // View holds display settings.

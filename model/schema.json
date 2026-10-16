@@ -129,7 +129,7 @@
           "type": "number"
         },
         "reciprocal": {
-          "description": "KP reciprocal flag; exact formula unconfirmed.",
+          "description": "Physical value is factor/raw + offset.",
           "type": "boolean"
         }
       },

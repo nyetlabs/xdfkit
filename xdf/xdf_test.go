@@ -237,6 +237,47 @@ func TestVisLevel(t *testing.T) {
 	}
 }
 
+// TestVisLevelFromArchive: KP marks survive into XDF and back from the XDF
+// alone (vislevel attribute), without a metadata file.
+func TestVisLevelFromArchive(t *testing.T) {
+	dir := testenv.Archive(t)
+	m := readModel(t, dir, "4D1907558")
+	var marked int
+	for _, o := range m.Objects {
+		if o.VisLevel == 1 {
+			marked++
+		}
+	}
+	if marked != 15 {
+		t.Fatalf("archive model has %d vislevel 1, want 15", marked)
+	}
+	x, err := Write(m, nil, "4D1907558")
+	if err != nil {
+		t.Fatal(err)
+	}
+	v, _, err := Read(x, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var n1, n2 int
+	for _, o := range v.Objects {
+		switch o.VisLevel {
+		case 1:
+			n1++
+		case 2:
+			n2++
+		default:
+			t.Errorf("%s: vislevel %d, want 1 or 2", o.Key, o.VisLevel)
+		}
+	}
+	if n1 != marked {
+		t.Errorf("XDF alone: %d vislevel 1, want %d", n1, marked)
+	}
+	if n2 != len(m.Objects)-marked {
+		t.Errorf("XDF alone: %d vislevel 2, want %d", n2, len(m.Objects)-marked)
+	}
+}
+
 // TestLinkedAxis: an image axis links to the curve at its address that holds
 // its breakpoints (same count, storage and conversion up to KP rounding) and
 // keeps its own location; any other axis stays embedded.

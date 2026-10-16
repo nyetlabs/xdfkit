@@ -532,7 +532,7 @@ func Apply(f *kp.File, fs []Finding) error {
 }
 
 // recordFix proposes an R9/R10 change from the cause and record. Low
-// confidence; apply with --only until a WinOLS check on a moved map.
+// confidence; apply with --only or --min-confidence low.
 func recordFix(cause string, r *Record) *Fix {
 	if r == nil {
 		return nil

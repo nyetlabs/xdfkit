@@ -21,7 +21,7 @@ type Map struct {
 	IDFlag         byte        `json:"idFlag"`                   // 0 (unconfirmed)
 	IDState        int32       `json:"idState,omitzero" kp:"v2"` // 0 or 1, mostly per pack (unconfirmed); was wrongly named Marked
 	Range          [3][2]int64 `json:"range"`                    // map properties value range, low and high, for 8-, 16- and 32-bit data (32-bit unconfirmed)
-	Reciprocal     bool        `json:"reciprocal"`               // the script's bKehrwert (unconfirmed)
+	Reciprocal     bool        `json:"reciprocal"`               // bKehrwert: physical = factor/raw + offset
 	Signed         bool        `json:"signed"`                   // bVorzeichen (unconfirmed)
 	Difference     bool        `json:"difference"`               // bDelta: map window "difference" toggle (unconfirmed)
 	Percent        bool        `json:"percent"`                  // bProzent: map window "percent" toggle (unconfirmed)
@@ -87,8 +87,8 @@ type Axis struct {
 	Base          int32      `json:"base"`
 	Mirror        bool       `json:"mirror" kp:"hook"`                 // "mirror map": shown in descending order; v2: int32, v1: byte
 	MirrorPad     Hex        `json:"mirrorPad,omitzero" kp:"v2,len=9"` // zeros (unconfirmed)
-	Reciprocal    bool       `json:"reciprocal"`
-	Precision     int32      `json:"precision"` // -1 on some unused slots
+	Reciprocal    bool       `json:"reciprocal"`                       // bKehrwert: physical = factor/raw + offset
+	Precision     int32      `json:"precision"`                        // -1 on some unused slots
 	Signed        bool       `json:"signed"`
 	Values        Hex        `json:"values" kp:"bytes"` // free editable values in the axis type, 4 bytes per point
 	DataHeader    int32      `json:"dataHeader"`        // the script's DataHeader: header bytes before the axis data (unconfirmed)
