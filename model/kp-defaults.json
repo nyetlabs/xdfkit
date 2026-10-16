@@ -65,6 +65,7 @@
     },
     "map": {
       "addr2ImageSize": "0x100000",
+      "idState": 1,
       "imageSize": "0x100000",
       "linkId": -1,
       "range": [

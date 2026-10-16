@@ -210,7 +210,6 @@ func objectFromKP(km *kp.Map, inFolder bool) *Object {
 		Comment:     km.Comment,
 		Shape:       shapes[km.Organization],
 		Inverse:     km.Organization == kp.OrgTwoDInv,
-		Marked:      km.Marked != 0,
 		Address:     Addr(km.Start),
 		Rows:        int(km.Rows),
 		Cols:        int(km.Cols),
@@ -219,6 +218,9 @@ func objectFromKP(km *kp.Map, inFolder bool) *Object {
 		View:        View{Base: int(km.Base), Difference: km.Difference, Percent: km.Percent},
 		X:           axisFromKP(km.X),
 		Y:           axisFromKP(km.Y),
+	}
+	if km.Marked != 0 {
+		o.VisLevel = 1
 	}
 	if inFolder {
 		o.Categories = []int{int(km.FolderID)}
@@ -274,7 +276,7 @@ func (o *Object) kpMap(i int) *kp.Map {
 	if len(o.Categories) > 0 {
 		km.FolderID = int32(o.Categories[0])
 	}
-	if o.Marked {
+	if o.VisLevel == 1 {
 		km.Marked = 1
 	}
 	return km

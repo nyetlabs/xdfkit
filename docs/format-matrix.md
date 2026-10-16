@@ -43,7 +43,7 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed 
 | Axes | Point count from image | ? | ? | Y | ? | N | N | Y |
 | Axes | Stored as differences | Y | Y | Y | ? | P | Y | Y |
 | Axes | Rescale / curve | N | N | Y | N | P | N | Y |
-| Tool-specific | Map mark / visibility | N | Y | N | ? | P | Y | Y |
+| Tool-specific | Map mark / visibility | N | Y | N | ? | Y | Y | Y |
 | Tool-specific | Patches | N | N | N | N | Y | N | Y |
 | Tool-specific | Measurements | N | N | Y | N | N | N | Y |
 
@@ -86,7 +86,7 @@ Names and limits for the rows above:
 - Point count from image. A2L `NO_AXIS_PTS` in the record layout. Model `header` is a byte count; the point count is not read.
 - Stored as differences. KP `EEPROM, subtract` counts gaps down from 256 (`kp-format.md`). `add` and `backwards` are still unknown. ME7 packs include absolute axes labelled subtract. A2L `DEPOSIT DIFFERENCE`. XDF writes static labels from the image, or a live helper table of `CELL()` equations whose XML is unconfirmed. The model stores `absolute`, `add`, `subtract`, and `backwards`.
 - Rescale / curve. A2L `RES_AXIS`, `CURVE_AXIS`. XDF axis "Normalized" through `XDFFUNCTION`. How close that is to `CURVE_AXIS` is unconfirmed.
-- Map mark / visibility. KP v2 `Marked` is 0 or 1. Whether it is the map-list marker is unconfirmed. XDF `vislevel` is a tree-filter level ("Show Up To" / "Show Only"), not a mark. Attribute or element, range, and default are unconfirmed, and it is not written. Model `marked`. XDF keeps that in the metadata file.
+- Map mark / visibility. KP `Marked` (byte 0 or 1) is the WinOLS map-list marker (confirmed). Model `vislevel` is the TunerPro level (integer): KP `Marked` ↔ `vislevel` 1; unmarked is 0 and written as XDF `vislevel` 2. KP v2 `IDState` is a different 0/1 field (unconfirmed; KP residue only). XDF writes and reads `vislevel` as an attribute on `XDFCONSTANT` / `XDFTABLE` ("Show Up To N" means level ≤ N; "Show Only N" is exact). The metadata file carries `vislevel` when the model level differs from the XDF view (unmarked 0 versus written 2).
 - Patches. XDF `XDFPATCH`.
 - Measurements. A2L `MEASUREMENT`, which ecuxplot can log.
 
@@ -98,6 +98,6 @@ Names and limits for the rows above:
 | KP v2 | 23 | 3 | 12 | 2 |
 | A2L | 31 | 2 | 6 | 0 |
 | DAMOS | 8 | 2 | 9 | 20 |
-| XDF | 22 | 11 | 6 | 0 |
+| XDF | 23 | 10 | 6 | 0 |
 | Model (schema 1) | 18 | 6 | 16 | 0 |
 | Model (target) | 39 | 0 | 1 | 0 |

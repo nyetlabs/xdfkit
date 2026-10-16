@@ -69,7 +69,7 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 
 | Field | Type | |
 | --- | --- | --- |
-| `Selected` | byte | changes between exports of one project |
+| `Marked` | byte | 0 or 1. WinOLS map-list marker (Insert/delete marker; filter Only marked / Only unmarked). Confirmed on TLDOBAN-50a / 51-marker / 52-unmarker in `testdata/local/outgoing/sweep/`. Model `vislevel` 1 when set, else 0 |
 | `LinkID` | int32, v2 | |
 | `Comment` | string, v2 | |
 | `CommentFlag` | byte, v2 | |
@@ -83,7 +83,7 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 | `ID` | string | short name. mapdump drops anything after a space or `?` |
 | `IDPad` | int32 | 0 |
 | `IDFlag` | byte | 0 |
-| `Marked` | int32, v2 | 0 or 1. The model field is `marked`; output writes 0 when it is absent |
+| `IDState` | int32, v2 | 0 or 1. Meaning unconfirmed; often constant per pack. Residue only (not in the model). Was wrongly named Marked before the map-list marker was confirmed |
 | `Range` | int64[3][2] | [below](#range) |
 | `Reciprocal`, `Signed`, `Difference`, `Percent` | byte | 0 or 1, in that order |
 | `Cols`, `Rows` | int32 | |
@@ -136,7 +136,7 @@ The 80 bytes after the Y axis:
 | 0x45 | `ViewOffset` | float64 | |
 | 0x4D | `Term2` | byte[3] | 1, 1, 1. The first two must be 1 |
 
-Opening a map in WinOLS can change `Cursor`, `Selected`, and `ViewScale`.
+Opening a map in WinOLS can change `Cursor`, `Marked`, and `ViewScale`.
 
 ## Axis
 
@@ -202,5 +202,5 @@ Compared with an imported pack:
 
 - Header id 0x124 and version `OLS 5.0 (Windows)`, as [above](#versions)
 - `End` rewritten to start plus byte length where the pack had a stale end
-- `Cursor`, `Selected`, and `ViewScale` changed on maps opened in the session
+- `Cursor`, `Marked`, and `ViewScale` changed on maps opened in the session
 - The `intern` stream matches zlib level 9, memLevel 8, as in the archived packs

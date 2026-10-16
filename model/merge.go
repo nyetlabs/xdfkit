@@ -428,8 +428,8 @@ func defaultDiff(base, in *Object) []string {
 	if !sameLimits(base.Value, in.Value) {
 		s = append(s, "limits")
 	}
-	if base.Marked != in.Marked {
-		s = append(s, "marked")
+	if base.VisLevel != in.VisLevel {
+		s = append(s, "vislevel")
 	}
 	if base.Inverse != in.Inverse {
 		s = append(s, "inverse")

@@ -8,7 +8,8 @@ Every JSON and XDF output carries a stamp that tells whether its data was hand e
 - `canon/` computes `C` itself (no jq at runtime); tests require identical bytes from real jq. Unedited files are therefore a `jq -S .` fixed point.
 - Unlike Go's `encoding/json`, jq doesn't escape `<`, `>`, `&`, U+2028 or U+2029, writes exponents as `1E-7` (jq 1.8; 1.6 differs again), and struct fields come out sorted like map keys.
 - Numbers are spelled as jq 1.8 reprints them, by Go type (Typed numbers): integers as integers, floats as shortest round-trip decimals with `.0` on whole values (`-30.0`, `1000000000000000000000.0`), plain decimals from 1e-6 up, and jq's exponent form below (`4.7E-7`), since jq 1.8 rewrites `0.00000047` that way. Addresses stay below 2^53.
-- Real cases: factors `4.7E-7` (FMDWAT) and `5.96E-8` (FVERZDYN) in five ecuxplot packs, offset `-7.31383E-307` (junk, unconfirmed) on DELTATA in three. Their `jq -S .` digest assumes jq 1.8's spelling (RFC 8785 is unaffected).
+- Real cases: factors `4.7E-7` (FMDWAT) and `5.96E-8` (FVERZDYN) in five ecuxplot packs, offset `-7.31383E-307` (junk, unconfirmed) on DELTATA in three.
+- The `jq -S .` digest uses jq 1.8's exponent spelling for values below 1e-6. The canon name stays `jq -S .` (no jq version in the name). Checking that digest by hand needs jq 1.8 or later; older jq can disagree on those numbers and look like an edit. RFC 8785 is unaffected.
 
 ## Typed numbers
 
@@ -50,7 +51,7 @@ Implemented in `canon/typed.go` (`Marshal`, `MarshalStamped`, `Unmarshal`). JSON
 }
 ```
 
-- The `jq -S .` digest can be checked with jq alone; the RFC 8785 one needs a JCS tool (a digest command in xdfkit is planned):
+- The `jq -S .` digest can be checked with jq 1.8 alone; the RFC 8785 one needs a JCS tool (a digest command in xdfkit is planned):
 
 ```sh
 jq -S 'del(.stamp)' file.json | shasum -a 256
@@ -92,12 +93,12 @@ Implemented in `xdf/meta.go` (`xdf.Meta`, `xdf.Read`).
 ```
 
 - `model`: a JSON Merge Patch (RFC 7396) from the view without its objects to the model without its objects: provenance, categories (KP folder ids and order; the XDF numbers categories by sorted name), project fields the XDF lost.
-- `objects`: per object, keyed by its XDF `uniqueid`, the merge patch from its view to the model object, left out when empty. Typical entries: the key, the full id (the XDF title has only its first word), the comment (merged into the XDF description), category ids, `inverse`, `marked`, `value.description`, the display base, axis `mirror`, `header` and `signature`, the storage of "subtract" axes written as labels, and precision the writer limited to six digits. Keyed by uniqueid rather than title because titles repeat; TunerPro keeps uniqueids through a save (observed on 8D0907551M).
+- `objects`: per object, keyed by its XDF `uniqueid`, the merge patch from its view to the model object, left out when empty. Typical entries: the key, the full id (the XDF title has only its first word), the comment (merged into the XDF description), category ids, `inverse`, `vislevel` when the model level differs from the XDF attribute (unmarked 0 versus written 2), `value.description`, the display base, axis `mirror`, `header` and `signature`, the storage of "subtract" axes written as labels, and precision the writer limited to six digits. Keyed by uniqueid rather than title because titles repeat; TunerPro keeps uniqueids through a save (observed on 8D0907551M).
 - `xdf`: the digests of the view (see XDF stamp).
 - Its own `stamp`.
 - Reconstruction (`xdf.Read`): model = XDF view merged with metadata, by uniqueid.
   - Digest matches `xdf.digests`: the merge is exact, so XDF plus metadata reproduces the model and JSON to XDF to JSON is lossless (tested on every archived pack, with and without image).
-  - Digest differs (edited in TunerPro): warning. The project takes the `model` patch over the XDF's header, and XDF categories missing from the metadata are added. Each object takes the XDF's values, and keeps the metadata's for what XDF can't express (key, `inverse`, `marked`, `value.description`, display settings, axis `mirror`, `header`, `signature`, axis storage the XDF can't show) and where the metadata's value lowers to what the XDF holds (id, description and comment when the title and description are unchanged; category, shape, units, conversion, precision). Unedited objects therefore come out as before. A warning names each object whose metadata fields were not applied; it can't name which XDF values changed, because the metadata file doesn't hold the original view.
+  - Digest differs (edited in TunerPro): warning. The project takes the `model` patch over the XDF's header, and XDF categories missing from the metadata are added. Each object takes the XDF's values, and keeps the metadata's for what XDF can't express (key, `inverse`, `value.description`, display settings, axis `mirror`, `header`, `signature`, axis storage the XDF can't show) and where the metadata's value lowers to what the XDF holds (id, description and comment when the title and description are unchanged; category, shape, units, conversion, precision; `vislevel` when the writer would emit the XDF's attribute from the metadata level). Unedited objects therefore come out as before. A warning names each object whose metadata fields were not applied; it can't name which XDF values changed, because the metadata file doesn't hold the original view.
   - Objects in the metadata but missing from the XDF are dropped with a warning; objects new in the XDF (or with a repeated uniqueid) have no metadata, get a key from their title, and are reported.
   - Metadata stamp doesn't match: someone hand edited the metadata file. Warn and use it anyway.
   - No metadata file: the plain XDF view, with provenance format `xdf`.

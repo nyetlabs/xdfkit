@@ -5,7 +5,7 @@ package kp
 type Map struct {
 	Index          int         `json:"index" kp:"-"`
 	Key            string      `json:"-" kp:"-"`                // model object key when the map came from model JSON; lint only
-	Selected       byte        `json:"selected"`                // selected in the map list (unconfirmed): changes between exports of the same project
+	Marked         byte        `json:"marked"`                  // 0 or 1: WinOLS map-list marker (Insert/delete marker; Only marked / Only unmarked)
 	LinkID         int32       `json:"linkId,omitzero" kp:"v2"` // -1: id of a linked map, -1 for none (unconfirmed)
 	Comment        string      `json:"comment,omitzero" kp:"v2"`
 	CommentFlag    byte        `json:"commentFlag,omitzero" kp:"v2"` // 0 (unconfirmed)
@@ -17,14 +17,14 @@ type Map struct {
 	Base           int32       `json:"base"`
 	FolderID       int32       `json:"folderId"`
 	ID             string      `json:"id"`
-	IDPad          int32       `json:"idPad"`                   // 0 (unconfirmed)
-	IDFlag         byte        `json:"idFlag"`                  // 0 (unconfirmed)
-	Marked         int32       `json:"marked,omitzero" kp:"v2"` // 0 or 1, mostly per pack (unconfirmed)
-	Range          [3][2]int64 `json:"range"`                   // map properties value range, low and high, for 8-, 16- and 32-bit data (32-bit unconfirmed)
-	Reciprocal     bool        `json:"reciprocal"`              // the script's bKehrwert (unconfirmed)
-	Signed         bool        `json:"signed"`                  // bVorzeichen (unconfirmed)
-	Difference     bool        `json:"difference"`              // bDelta: map window "difference" toggle (unconfirmed)
-	Percent        bool        `json:"percent"`                 // bProzent: map window "percent" toggle (unconfirmed)
+	IDPad          int32       `json:"idPad"`                    // 0 (unconfirmed)
+	IDFlag         byte        `json:"idFlag"`                   // 0 (unconfirmed)
+	IDState        int32       `json:"idState,omitzero" kp:"v2"` // 0 or 1, mostly per pack (unconfirmed); was wrongly named Marked
+	Range          [3][2]int64 `json:"range"`                    // map properties value range, low and high, for 8-, 16- and 32-bit data (32-bit unconfirmed)
+	Reciprocal     bool        `json:"reciprocal"`               // the script's bKehrwert (unconfirmed)
+	Signed         bool        `json:"signed"`                   // bVorzeichen (unconfirmed)
+	Difference     bool        `json:"difference"`               // bDelta: map window "difference" toggle (unconfirmed)
+	Percent        bool        `json:"percent"`                  // bProzent: map window "percent" toggle (unconfirmed)
 	Cols           int32       `json:"cols"`
 	Rows           int32       `json:"rows"`
 	Cursor         [2]int32    `json:"cursor"` // editor state, the last cursor cell (unconfirmed)

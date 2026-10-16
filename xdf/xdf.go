@@ -92,6 +92,7 @@ type categoryMem struct {
 type table struct {
 	XMLName     xml.Name    `xml:"XDFTABLE"`
 	UniqueID    string      `xml:"uniqueid,attr"`
+	VisLevel    string      `xml:"vislevel,attr"`
 	Flags       string      `xml:"flags,attr"`
 	Title       string      `xml:"title,omitempty"`
 	Description string      `xml:"description,omitempty"`
@@ -102,6 +103,7 @@ type table struct {
 type constant struct {
 	XMLName     xml.Name    `xml:"XDFCONSTANT"`
 	UniqueID    string      `xml:"uniqueid,attr"`
+	VisLevel    string      `xml:"vislevel,attr"`
 	Title       string      `xml:"title,omitempty"`
 	Description string      `xml:"description,omitempty"`
 	CategoryMem categoryMem `xml:"CATEGORYMEM"`
@@ -355,10 +357,11 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 	}
 	mem := categoryMem{Category: cat + 1}
 	uid := hex(index + 1)
+	vl := xdfVisLevel(o)
 	prec := limitPrecision(o.Value, o.Data.Bits, o.Data.Signed)
 	if o.Shape == "value" {
 		return &constant{
-			UniqueID: uid, Title: title, Description: desc, CategoryMem: mem,
+			UniqueID: uid, VisLevel: vl, Title: title, Description: desc, CategoryMem: mem,
 			Data:       cells(o.Data, o.Address),
 			Units:      trim(o.Value.Units),
 			OutputType: outputType(prec, o.View.Base),
@@ -366,7 +369,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 			Math:       formula(o.Value.Conversion),
 		}, nil
 	}
-	t := &table{UniqueID: uid, Flags: "0x0", Title: title, Description: desc, CategoryMem: mem}
+	t := &table{UniqueID: uid, VisLevel: vl, Flags: "0x0", Title: title, Description: desc, CategoryMem: mem}
 	for _, a := range []struct {
 		id   string
 		x    *model.Axis
@@ -706,6 +709,15 @@ func javaFixed(f float64, prec int) string {
 }
 
 func hex(v int) string { return fmt.Sprintf("0x%X", v) }
+
+// xdfVisLevel is the XDF vislevel attribute: the model's level when set,
+// otherwise 2 (unmarked; level 1 is the WinOLS map-list marker).
+func xdfVisLevel(o *model.Object) string {
+	if o.VisLevel > 0 {
+		return strconv.Itoa(o.VisLevel)
+	}
+	return "2"
+}
 
 // trim drops leading and trailing spaces and control characters, as Java's
 // String.trim does, and turns line ends into LF, as XML readers do.

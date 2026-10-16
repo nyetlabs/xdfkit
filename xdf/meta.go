@@ -182,7 +182,12 @@ func merge(v *model.Model, uids []string, folds map[string]string, mf *metaFile)
 // what the XDF holds. The caller sets the categories.
 func reconcile(v, c *model.Object) *model.Object {
 	o := *v
-	o.Key, o.Inverse, o.Marked, o.View = c.Key, c.Inverse, c.Marked, c.View
+	o.Key, o.Inverse, o.View = c.Key, c.Inverse, c.View
+	// VisLevel: XDF expresses it. Keep the metadata's when the writer would
+	// emit the XDF's attribute from it (unmarked 0 writes as 2), else the XDF's.
+	if v.VisLevel == 0 || xdfVisLevel(c) == xdfVisLevel(v) {
+		o.VisLevel = c.VisLevel
+	}
 	o.Alternates = c.Alternates
 	if t, d := text(c); t == v.ID && d == v.Description {
 		o.ID, o.Description, o.Comment = c.ID, c.Description, c.Comment

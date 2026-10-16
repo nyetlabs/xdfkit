@@ -36,6 +36,7 @@ type rdoc struct {
 type robject struct {
 	XMLName     xml.Name
 	UniqueID    string        `xml:"uniqueid,attr"`
+	VisLevel    string        `xml:"vislevel,attr"`
 	Title       string        `xml:"title"`
 	Description string        `xml:"description"`
 	CategoryMem []categoryMem `xml:"CATEGORYMEM"`
@@ -177,6 +178,15 @@ func foldOf(desc string) (primary, rest string, ok bool) {
 // object converts an XDFTABLE or XDFCONSTANT; cats holds the category ids.
 func (r *robject) object(prec int, cats map[int]bool) (*model.Object, []string, error) {
 	o := &model.Object{ID: trim(r.Title), Description: trim(r.Description)}
+	var warnings []string
+	if s := strings.TrimSpace(r.VisLevel); s != "" {
+		n, err := strconv.Atoi(s)
+		if err != nil || n < 1 {
+			warnings = append(warnings, fmt.Sprintf("vislevel %q ignored", r.VisLevel))
+		} else {
+			o.VisLevel = n
+		}
+	}
 	for _, c := range r.CategoryMem {
 		if cats[c.Category-1] && !slices.Contains(o.Categories, c.Category-1) {
 			o.Categories = append(o.Categories, c.Category-1)
@@ -201,7 +211,6 @@ func (r *robject) object(prec int, cats map[int]bool) (*model.Object, []string, 
 	if err != nil || addr > 0xFFFFFFFF {
 		return nil, nil, fmt.Errorf("cell address %q", z.Data.Address)
 	}
-	var warnings []string
 	o.Address, o.Data = model.Addr(addr), z.Data.data()
 	o.Value, o.View, err = z.value(prec)
 	if err != nil {

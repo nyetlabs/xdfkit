@@ -77,6 +77,11 @@ func diff(path string, got, want *node, out *[]string, limit int) {
 		// mapdump didn't link axes
 		got = &node{Name: got.Name, Attrs: map[string]string{"type": "1"}}
 	}
+	if _, ok := got.Attrs["vislevel"]; ok {
+		// mapdump didn't write vislevel (marked → 1, unmarked → 2)
+		got = &node{Name: got.Name, Attrs: maps.Clone(got.Attrs), Text: got.Text, Kids: got.Kids}
+		delete(got.Attrs, "vislevel")
+	}
 	if e, ok := want.Attrs["equation"]; ok && got.Name == "MATH" {
 		// mapdump wrote offsets too small to show
 		if i := strings.LastIndex(e, "+ "); i >= 0 {
@@ -177,6 +182,58 @@ func TestArchive(t *testing.T) {
 			}
 			long(root)
 		})
+	}
+}
+
+// TestVisLevel writes marked (1), unmarked (2) and an explicit higher level,
+// reads them back, and keeps unmarked as model 0 through the metadata file.
+func TestVisLevel(t *testing.T) {
+	cell := func(id string, addr model.Addr, level int) *model.Object {
+		return &model.Object{
+			Key: id, ID: id, Shape: "value", Address: addr, Rows: 1, Cols: 1,
+			Data: model.Data{Bits: 8}, Value: model.Value{Conversion: model.Conversion{Factor: 1}},
+			VisLevel: level,
+		}
+	}
+	m := &model.Model{Schema: model.SchemaID, Objects: []*model.Object{
+		cell("MARKED", 0x10, 1),
+		cell("PLAIN", 0x20, 0),
+		cell("L3", 0x30, 3),
+	}}
+	x, err := Write(m, nil, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(x)
+	for _, want := range []string{
+		`uniqueid="0x1" vislevel="1"`,
+		`uniqueid="0x2" vislevel="2"`,
+		`uniqueid="0x3" vislevel="3"`,
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("missing %s", want)
+		}
+	}
+	v, _, err := Read(x, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v.Objects[0].VisLevel != 1 || v.Objects[1].VisLevel != 2 || v.Objects[2].VisLevel != 3 {
+		t.Errorf("view levels %d %d %d", v.Objects[0].VisLevel, v.Objects[1].VisLevel, v.Objects[2].VisLevel)
+	}
+	meta, err := Meta(m, x, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ws, err := Read(x, meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range ws {
+		t.Error(w)
+	}
+	if got.Objects[0].VisLevel != 1 || got.Objects[1].VisLevel != 0 || got.Objects[2].VisLevel != 3 {
+		t.Errorf("with meta: levels %d %d %d", got.Objects[0].VisLevel, got.Objects[1].VisLevel, got.Objects[2].VisLevel)
 	}
 }
 
