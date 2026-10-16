@@ -103,7 +103,7 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 
 Three low/high pairs, in order: 8-bit, 16-bit, 32-bit. WinOLS writes the pair for the map's width, as typed in Value range. An 8-bit map uses the first pair (TLDOBAN, 10 to 90). A 16-bit map uses the second (NMAX, 1000 to 6000; KFMIOP, 10 to 90). Defaults are 0 and 255, 0 and 65535, 0 and 4294967295. A negative low is sign-extended.
 
-Without a template, the pair for the map's width is the model's min and max when both are set, ordered low to high. Otherwise it is the conversion of the raw endpoints, rounded to integers. A reciprocal conversion maps the low raw value to the high physical value, so those ends are ordered after the conversion. The other two pairs stay at the defaults.
+The field cannot be omitted. Without a template, the pair for the map's width is the model's min and max when both are set, ordered low to high. Otherwise it is the conversion of the raw endpoints, rounded to integers. A reciprocal conversion maps the low raw value to the high physical value, so those ends are ordered after the conversion. The other two pairs stay at the defaults.
 
 ### Addresses
 

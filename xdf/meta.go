@@ -257,8 +257,9 @@ func value(o *model.Value, c model.Value, d model.Data) {
 	}
 }
 
-// limitsMatch reports whether v's min and max are the range limits invents
-// for c, so a round trip does not store that range as a real limit.
+// limitsMatch reports whether v's min and max are the conversion of the raw
+// endpoints for c. That span is not a known range, so a round trip does not
+// store it.
 func limitsMatch(v *model.Value, c model.Conversion, d model.Data) bool {
 	if v.Min == nil || v.Max == nil {
 		return false

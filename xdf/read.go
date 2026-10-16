@@ -273,9 +273,9 @@ func (a *raxis) value(prec int) (model.Value, model.View, error) {
 	return model.Value{Units: trim(a.Units), Precision: prec, Conversion: c}, v, err
 }
 
-// keepLimits stores min and max when they differ from the range the writer
-// invents from the conversion. A match is omitted, so a round trip does not
-// grow limits onto every map.
+// keepLimits stores min and max when they are not the conversion of the raw
+// endpoints. That span is not a known range, so a round trip does not grow
+// it onto every map.
 func keepLimits(v *model.Value, minS, maxS string, d model.Data) {
 	minS, maxS = strings.TrimSpace(minS), strings.TrimSpace(maxS)
 	if minS == "" && maxS == "" {

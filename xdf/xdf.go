@@ -397,7 +397,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 	if o.Cols > 1 {
 		z.Data.ColCount = o.Cols
 	}
-	applyRange(&z, o.Value.Conversion, o.Data, o.Value.Min, o.Value.Max)
+	applyRange(&z, o.Value.Min, o.Value.Max)
 	z.OutputType = outputType(prec, o.View.Base, shown(o.Value.Conversion, o.Data, o.Address, o.Rows*o.Cols, image))
 	if prec != 0 {
 		z.OutputType = "1"
@@ -471,7 +471,7 @@ func breakpoints(id string, x *model.Axis, size int, image []byte) (axis, error)
 		a.Data = cells(d, *x.Address)
 		a.Data.MajorStrideBits = d.Bits
 		a.EmbedInfo = &embedInfo{Type: 1}
-		applyRange(&a, c, d, x.Value.Min, x.Value.Max)
+		applyRange(&a, x.Value.Min, x.Value.Max)
 		a.Math = formula(c)
 		return a, nil
 	}
@@ -558,14 +558,15 @@ func shown(c model.Conversion, d model.Data, addr model.Addr, n int, image []byt
 	return out
 }
 
-// applyRange writes min and max. Both stored limits win, ordered low to high.
-// Otherwise the range is model.Limits.
-func applyRange(a *axis, c model.Conversion, d model.Data, vmin, vmax *float64) {
-	lo, hi, ok := model.Limits(c, d)
-	if vmin != nil && vmax != nil {
-		lo, hi, ok = *vmin, *vmax, true
+// applyRange writes min and max when the model has both, ordered low to
+// high. A missing pair is left out. The conversion of the raw endpoints is
+// not a known range.
+func applyRange(a *axis, vmin, vmax *float64) {
+	if vmin == nil || vmax == nil {
+		return
 	}
-	if !ok {
+	lo, hi := *vmin, *vmax
+	if math.IsNaN(lo+hi) || math.IsInf(lo, 0) || math.IsInf(hi, 0) {
 		return
 	}
 	if lo > hi {

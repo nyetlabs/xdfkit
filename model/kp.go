@@ -325,7 +325,8 @@ func kpValue(v Value) kp.Value {
 
 // kpValueRange sets the value-range pair for the map's width when the map
 // did not come from a template. Both model limits, ordered low to high, win.
-// Otherwise the pair is the conversion of the raw endpoints.
+// Otherwise the pair is the conversion of the raw endpoints. The field
+// cannot be omitted.
 func kpValueRange(km *kp.Map, o *Object) {
 	lo, hi, ok := Limits(o.Value.Conversion, o.Data)
 	if o.Value.Min != nil && o.Value.Max != nil {
@@ -341,10 +342,12 @@ func kpValueRange(km *kp.Map, o *Object) {
 	km.Range[s][0], km.Range[s][1] = int64(math.Round(lo)), int64(math.Round(hi))
 }
 
-// Limits is the physical low and high of an integer cell: the conversion of
-// the raw endpoints, ordered. Identity uses the unsigned span. A reciprocal
-// conversion maps the low raw value to the high physical value. Float and a
-// width of 0 have none.
+// Limits is the conversion of the raw endpoints, ordered. Identity uses the
+// unsigned span. A reciprocal conversion maps the low raw value to the high
+// physical value. Float and a width of 0 have none. The KP writer uses this
+// span when the model has no min and max, because that field cannot be
+// omitted. The XDF writer does not. The XDF reader leaves out a min and max
+// that are only this span.
 func Limits(c Conversion, d Data) (lo, hi float64, ok bool) {
 	if d.Float || d.Bits <= 0 || d.Bits > 32 {
 		return 0, 0, false

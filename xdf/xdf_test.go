@@ -115,8 +115,12 @@ func diff(path string, got, want *node, out *[]string, limit int) {
 		// integer output type blanks a 0 in TunerPro; mapdump wrote it for every precision of 0
 		want.Kids = slices.DeleteFunc(slices.Clone(want.Kids), func(n *node) bool { return n.Name == "outputtype" && n.Text == "2" })
 	}
-	if !slices.ContainsFunc(want.Kids, func(n *node) bool { return n.Name == "min" }) {
-		// identity axes carry the unsigned raw span; mapdump wrote min and max on the cells only
+	hasMin := func(n *node) bool { return n.Name == "min" }
+	switch {
+	case !slices.ContainsFunc(got.Kids, hasMin):
+		// mapdump writes the raw span; a missing model range is not that claim
+		want.Kids = slices.DeleteFunc(slices.Clone(want.Kids), func(n *node) bool { return n.Name == "min" || n.Name == "max" })
+	case !slices.ContainsFunc(want.Kids, hasMin):
 		got.Kids = slices.DeleteFunc(slices.Clone(got.Kids), func(n *node) bool { return n.Name == "min" || n.Name == "max" })
 	}
 	for i := range max(len(got.Kids), len(want.Kids)) {
@@ -412,7 +416,7 @@ func TestMapdump(t *testing.T) {
 
 // TestShownFormat checks the TunerPro display of a zero and of an identity
 // conversion. Integer output type is used only when every value is a positive
-// whole number. An identity conversion's min and max are the unsigned raw span.
+// whole number. Min and max are written only when the model has both.
 func TestShownFormat(t *testing.T) {
 	img := make([]byte, 32)
 	img[0], img[1] = 0, 5
@@ -464,11 +468,11 @@ func TestShownFormat(t *testing.T) {
 	if got["POS/outputtype"] != "2" {
 		t.Errorf("positive cell output type %q", got["POS/outputtype"])
 	}
-	if got["T/z/min"] != "0.000000" || got["T/z/max"] != "255.000000" {
-		t.Errorf("signed identity cells %q %q", got["T/z/min"], got["T/z/max"])
+	if _, ok := got["T/z/min"]; ok {
+		t.Errorf("invented cell range %q", got["T/z/min"])
 	}
-	if got["T/x/min"] != "0.000000" || got["T/x/max"] != "255.000000" {
-		t.Errorf("signed identity axis %q %q", got["T/x/min"], got["T/x/max"])
+	if _, ok := got["T/x/min"]; ok {
+		t.Errorf("invented axis range %q", got["T/x/min"])
 	}
 	if _, ok := got["T/y/outputtype"]; ok {
 		t.Errorf("ordinal axis output type %q", got["T/y/outputtype"])
