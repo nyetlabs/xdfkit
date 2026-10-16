@@ -21,6 +21,8 @@ make build && sudo make install
 | Format | Read | Write | Notes |
 | --- | --- | --- | --- |
 | WinOLS KP | yes | yes | Converts back unchanged |
+| A2L | yes | | ASAM MCD-2 MC text |
+| DAMOS `.dam` | yes | | ASAP2DAM text |
 | TunerPro XDF | yes | yes | Converts back unchanged with its `.meta.json` |
 | JSON, YAML | yes | yes | Editable by hand; edits are detected |
 | CSV map list | | yes | For spreadsheets |

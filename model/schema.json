@@ -295,6 +295,8 @@
           "enum": [
             "kp",
             "xdf",
+            "a2l",
+            "damos",
             "image"
           ],
           "type": "string"

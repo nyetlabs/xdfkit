@@ -1,6 +1,6 @@
 # Test corpus
 
-`ecu-corpus` (`github.com/nyetlabs/ecu-corpus`, private) supplies the OEM flash images and `categories.json` that xdfkit's tests read. It is the `ecu-corpus/` submodule (shallow, `update = none`). Tests do not read `defs/`.
+`ecu-corpus` (`github.com/nyetlabs/ecu-corpus`, private) supplies the OEM flash images and `categories.json` that xdfkit's tests read. It is the `ecu-corpus/` submodule (shallow, `update = none`). Tests do not read `defs/`, except `dam/oracle_test.go`, which compares the committed `testdata/damos/` files with that software's definition JSON.
 
 ## What tests read
 

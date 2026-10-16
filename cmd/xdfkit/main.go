@@ -40,8 +40,8 @@ A single hyphen is for single-letter options, which also have long names:
 -f --format, -i --image, -r --ref, -o --output, -n --dry-run, -m --write-meta.
 Long options take two hyphens. Options may come before or after the files.
 
-Converts between KP, XDF and the model JSON or YAML, and writes CSV; the
-input format is detected from the contents, the output format comes from -f,
+Converts between KP, A2L, DAMOS, XDF and the model JSON or YAML, and writes
+CSV; the input format is detected from the contents, the output format comes from -f,
 else the output extension (.yml is yaml), else json. YAML is the model JSON in
 YAML syntax, with the same typed numbers and stamp. Input "-" reads stdin;
 output other than KP without an output file goes to stdout. Existing output
