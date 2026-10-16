@@ -17,22 +17,20 @@ make help       # all targets
 
 ## Formats
 
-Every conversion goes through one model, so any input converts to any output. Dashed lines are planned: A2L and DAMOS input. KP is the route into WinOLS.
+Every conversion goes through one model, so any input converts to any output. A2L and DAMOS are read into that model. KP is the route into WinOLS. There are no A2L or DAMOS writers.
 
 ```mermaid
 flowchart LR
   kpin["WinOLS KP"] --> model
   xdfin["TunerPro XDF"] --> model
   jsonin["JSON / YAML"] --> model
-  a2l["A2L"] -.-> model
-  damos["DAMOS"] -.-> model
+  a2l["A2L"] --> model
+  damos["DAMOS"] --> model
   model(("model"))
   model --> kpout["WinOLS KP"]
   model --> xdfout["TunerPro XDF"]
   model --> jsonout["JSON / YAML"]
   model --> csv["CSV map list"]
-  classDef planned stroke-dasharray: 5 5
-  class a2l,damos planned
 ```
 
 ## Architecture
@@ -42,6 +40,8 @@ flowchart LR
   cli["cmd/xdfkit"] --> api["api"]
   bindings["bindings (planned)"] -.-> api
   api --> kp["kp"]
+  api --> a2l["a2l"]
+  api --> dam["dam"]
   api --> model["model"]
   api --> xdf["xdf"]
   api --> mapcsv["mapcsv"]
@@ -57,7 +57,7 @@ me7-logger imports `model`, `xdf` and `canon` (`docs/integrations.md`): after ch
 
 - Commit messages start with a prefix that `cliff.toml` groups: `feat`/`add`, `fix`, `docs`, `refactor`, `chore`, `ci`, `build`, `test`, `style`, `chore(deps)`.
 - Never edit or regenerate `testdata/archive/ecuxplot/` (see its README). `images.tsv` names each archived pack's corpus image for tests.
-- Private definition files (DAMOS, A2L, OLS) go only in the gitignored `testdata/local/`; never commit them.
+- Reader fixtures live in `testdata/a2l/` and `testdata/damos/`. Other private files (images, OLS, WinOLS sweeps) stay in the gitignored `testdata/local/`. Tests do not read that directory.
 - `docs/` describes how things are, including spec not implemented yet; plans are kept outside the repo.
 
 ## Releases

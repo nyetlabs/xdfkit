@@ -18,7 +18,7 @@ Converts map definitions between WinOLS KP, A2L, DAMOS, TunerPro XDF and a canon
   - Edit stamp: every JSON output (model and metadata file) and every XDF carries SHA-256 digests of its canonical text (RFC 8785 and `jq -S .`; for XDF, of the JSON view its elements parse to), so readers can tell whether the data was hand edited after xdfkit wrote it. See `stamp-and-metadata.md`.
 - Inputs: KP v1 (header codes 0x71/0x74) and KP v2 (0x124/0x149), exactly as ecuxplot's mapdump reads them (`org.nyet.mappack.Parser` in [ecuxplot](https://github.com/nyetlabs/ecuxplot)); A2L; DAMOS `.dam`; canonical JSON or YAML; XDF, with its metadata file if there is one (implemented), or an embedded model block (not yet).
 - Users are assumed to have no licensed WinOLS options. The route into WinOLS is KP (lossless for what the model and template carry; the format is undocumented). A2L/DAMOS/XDF into WinOLS goes through the model and the KP writer.
-- Reader order: A2L before DAMOS. A2L follows a public spec (no `?` in `format-matrix.md`), so it proves the model as a pivot end to end soonest; it needs the model's `image` identity and the A2L parts (shared axes, conversions, record layouts) first. DAMOS has no spec and the most unknowns (19 `?`), so it follows once sample files and a field mapping against matching images exist.
+- Reader order: A2L (`a2l/`) before DAMOS (`dam/`). Both emit schema 1 objects with axes and conversions inlined and addresses lowered to file offsets (`model.md`). Shared-axis, conversion and record-layout lists, and `image` identity, are not read yet. A2L follows ASAM MCD-2 MC. DAMOS has no public spec; the reader uses the record layout and `/REP` order in `model.md` and warns where that does not cover a field.
 - No A2L or DAMOS writers. In every WinOLS version checked (1.222 and 1.505 manuals, current product pages), DAMOS and A2L can only be imported, and only through the licensed Damos plugin (now OLS521, €785). The import is one-way, mostly limited to 1D/2D maps, and in EVC's words uses heuristics, so "the result isn't 100% safe".
 
 ## Implementation
@@ -71,11 +71,9 @@ flowchart LR
     damIn["DAMOS .dam"] --> damReader
     jsonIn["JSON or YAML"] --> jsonReader
     xdfIn["XDF with metadata file"] --> xdfReader
-    binIn["image .bin (optional)"] --> addrMap
     kpReader --> model
-    a2lReader --> addrMap
-    damReader --> addrMap
-    addrMap["CPU address and file offset"] --> model
+    a2lReader --> model
+    damReader --> model
     jsonReader --> model
     xdfReader --> model
     model["Canonical model"] --> jsonWriter
@@ -84,23 +82,23 @@ flowchart LR
     model --> lowerXdf["XDF lowering"] --> xdfWriter --> xdfOut[XDF]
 ```
 
-- `model`: specified in `model.md` (schema 1 implemented for KP). Over time it holds every field in the capability matrix, one record per object: id, description, comment, categories, address (file offset plus original CPU address and segment when known), element type/width/sign/endianness, bit mask, shape (value, 1D, 2D, nD, block, string), row/column-major order and record layout, conversion (linear, rational, formula, enum table), units, precision, display base, limits, difference/percent flags, search signatures, and axes (embedded, shared reference, fixed values, point count read from the image, stored as differences). Shared objects (axes, conversions, record layouts) are referenced by id, not inlined, so A2L structure survives.
+- `model`: specified in `model.md`. Schema 1 inlines each object's axes and conversion. A record holds id, description, comment, categories, address (a file offset), element type/width/sign/endianness, shape (value, 1D, 2D), conversion (factor, offset, reciprocal), units, precision, display base, limits, difference and percent flags, and axes. Shared-axis, conversion and record-layout lists, the original CPU address, bit masks, formulas and enum tables are not in schema 1.
 - No per-source residue in the model: the KP writer takes what the model doesn't carry from a template KP, by default an empty WinOLS map pack plus generated per-field defaults (`model.md`, KP output). As fields get identified, they become model fields.
 - `json` reader/writer: the JSON Schema is generated from the model types, committed as `model/schema.json`, and validated in tests. Output is the canonical `jq -S .` form (sorted keys, 2-space indent; see `stamp-and-metadata.md`), so diffs stay readable. YAML is converted node for node to and from that JSON (`canon/yaml.go`), so it goes through the same typed reader and stamp.
-- `addrMap`: converts between CPU addresses and file offsets using MEMORY_SEGMENT plus the `.bin`, with a manual `--base` override, matching WinOLS's offset convention (the "-" and "+" offsets in its import dialog). Both addresses are kept in the model when known.
+- Address lowering is inside `a2l/` and `dam/` (`model.md`). A2L uses a `MEMORY_SEGMENT` that contains the address, otherwise the ME7 window at 0x800000. DAMOS subtracts 0x800000 in that window. A separate `addrmap/` package, a `--base` override, and keeping the original CPU address are not implemented.
 - Each writer has a lowering pass that reports, per object, what it dropped or approximated. The loss report goes to stderr, or to a file with `--report`.
 
 ## Repo layout
 
-- `cmd/xdfkit/` CLI: `xdfkit [-i image.bin] [-f json|yaml|kp|csv|xdf] input.{kp,json,yaml,xdf} [out]` (planned: `--base 0x...`, `--report f`, A2L and DAMOS input), with input format detected from the file contents (a leading `{` is JSON, a leading `<` is XDF, the KP signature is KP, anything else is YAML; output format from `-f`, else the output extension, `.yml` meaning YAML); `XXX2YYY` conversion commands (see Implementation, CLI naming); subcommands `xdfkit lint` and `xdfkit fix` (see Autocorrect) and `xdfkit merge` (below)
+- `cmd/xdfkit/` CLI: `xdfkit [-i image.bin] [-f json|yaml|kp|csv|xdf] input [out]` (planned: `--base 0x...`, `--report f`), with input format detected from the file contents (a leading `{` is JSON, a leading `<` is XDF, the KP signature is KP, `ASAP2_VERSION` is A2L, an ASAP2DAM banner is DAMOS, anything else is YAML; output format from `-f`, else the output extension, `.yml` meaning YAML); `XXX2YYY` conversion commands (see Implementation, CLI naming); subcommands `xdfkit lint` and `xdfkit fix` (see Autocorrect) and `xdfkit merge` (below)
 - `api/`: the façade (typed `Convert`, `Merge`, `Verify`, `Lint`, `Fix`, `Version`, and the generic `Call(method, request, input)` that returns canonical JSON responses or `{"error": ...}` and recovers panics). The version string lives here (`api.Version`, set by the Makefile). `Call` method `merge` takes the base definition as its input.
 - `internal/testenv`: test inputs (ecuxplot data, jq; skip, or fail with `XDFKIT_REQUIRE_DATA`).
 - `internal/corpus`: test access to `ecu-corpus`, from `../ecu-corpus` or the submodule (manifest lookups by name or SHA-256, skip or fail when absent).
 - `model/`: the canonical model, its KP conversion, and the schema generator with the committed `schema.json`.
-- `kp/` (KP reader and writer), `lint/` (autocorrect), `mapcsv/` (CSV map list), `xdf/` (XDF writer, reader and metadata file).
-- Planned: `capi/` (C ABI shared library, cgo), `a2l/`, `dam/`, `addrmap/`, `cmd/sampdiff/`
+- `kp/` (KP reader and writer), `lint/` (autocorrect), `mapcsv/` (CSV map list), `xdf/` (XDF writer, reader and metadata file), `a2l/` (A2L reader), `dam/` (DAMOS reader).
+- Planned: `capi/` (C ABI shared library, cgo), `addrmap/`, `cmd/sampdiff/`
 - `Makefile` (lint, test, build, package; version from git tags), `.github/` (build and release workflows, Dependabot), `cliff.toml` (release notes).
-- `docs/`, `testdata/` (committed fixtures), `testdata/local/` (gitignored: private samples, never committed; tests that need them skip when absent), `ecu-corpus/` (the `ecu-corpus` git submodule, see `corpus.md`)
+- `docs/`, `testdata/` (committed fixtures, including `testdata/a2l/` and `testdata/damos/`), `testdata/local/` (gitignored; tests do not read it), `ecu-corpus/` (the `ecu-corpus` git submodule, see `corpus.md`)
 
 ## Verification
 
@@ -112,3 +110,4 @@ flowchart LR
 - Feature-sweep samples: each variant's JSON differs from the base sample only in the field that was changed.
 - WinOLS 2.24 (checked by hand in the GUI): synthesized KP imports cleanly, by trial and error until it does. XDF checked in TunerPro.
 - A2L reader: checked against the ASAM spec and real A2L files with known values, not against WinOLS.
+- DAMOS reader: on 06A906032S, names, file offsets, storage, axis addresses and shape agree with the corpus definition converted from that DAMOS (shared axes, which that definition left as single values, take their length and address from the axis-point table). The model round-trips through KP and XDF.

@@ -27,7 +27,7 @@ type Model struct {
 
 // Provenance identifies the original file.
 type Provenance struct {
-	Format    string     `json:"format" doc:"Source format; image: located in a flash image by a program such as me7info." enum:"kp|xdf|image"`
+	Format    string     `json:"format" doc:"Source format; image: located in a flash image by a program such as me7info." enum:"kp|xdf|a2l|damos|image"`
 	Origin    string     `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), manual (made by hand, as KP map packs usually are), auto (found in the image by a program)." enum:"damos|a2l|manual|auto"`
 	File      string     `json:"file,omitempty" doc:"Original file name."`
 	SHA256    string     `json:"sha256" doc:"SHA-256 of the original file (the image, for format image), lowercase hex." pattern:"^[0-9a-f]{64}$"`
