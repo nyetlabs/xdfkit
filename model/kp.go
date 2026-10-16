@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -168,9 +169,11 @@ func (m *Model) KP(template *kp.File) (*kp.File, error) {
 	}
 	for i, o := range m.Objects {
 		var r map[string]any
+		fromTemplate := false
 		if q := maps[o.Key]; len(q) > 0 {
 			r = q[0]
 			maps[o.Key] = q[1:]
+			fromTemplate = true
 		} else {
 			r = map[string]any{}
 			for k, v := range d["map"] {
@@ -185,6 +188,9 @@ func (m *Model) KP(template *kp.File) (*kp.File, error) {
 		km := new(kp.Map)
 		if err := restore(km, o.kpMap(i), r); err != nil {
 			return nil, fmt.Errorf("object %s: %w", o.Key, err)
+		}
+		if !fromTemplate {
+			kpValueRange(km, o)
 		}
 		km.Index, km.Key = i, o.Key
 		f.Project.Maps = append(f.Project.Maps, km)
@@ -251,7 +257,7 @@ func (o *Object) kpMap(i int) *kp.Map {
 		Organization: org,
 		Type:         t,
 		Width:        int32(t.Width()),
-		Base:         int32(o.View.Base),
+		Base:         kpBase(o.View.Base),
 		ID:           o.ID,
 		Reciprocal:   o.Value.Conversion.Reciprocal,
 		Signed:       o.Data.Signed,
@@ -317,6 +323,53 @@ func kpValue(v Value) kp.Value {
 	return kp.Value{Description: v.Description, Units: v.Units, Factor: v.Conversion.Factor, Offset: v.Conversion.Offset}
 }
 
+// kpValueRange sets the value-range pair for the map's width when the map
+// did not come from a template. Both model limits, ordered low to high, win.
+// Otherwise the pair is the conversion of the raw endpoints.
+func kpValueRange(km *kp.Map, o *Object) {
+	lo, hi, ok := Limits(o.Value.Conversion, o.Data)
+	if o.Value.Min != nil && o.Value.Max != nil {
+		lo, hi, ok = *o.Value.Min, *o.Value.Max, true
+	}
+	if !ok || math.IsNaN(lo+hi) || math.IsInf(lo, 0) || math.IsInf(hi, 0) {
+		return
+	}
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	s := min(o.Data.Bits/16, 2)
+	km.Range[s][0], km.Range[s][1] = int64(math.Round(lo)), int64(math.Round(hi))
+}
+
+// Limits is the physical low and high of an integer cell: the conversion of
+// the raw endpoints, ordered. Identity uses the unsigned span. A reciprocal
+// conversion maps the low raw value to the high physical value. Float and a
+// width of 0 have none.
+func Limits(c Conversion, d Data) (lo, hi float64, ok bool) {
+	if d.Float || d.Bits <= 0 || d.Bits > 32 {
+		return 0, 0, false
+	}
+	rlo, rhi := int64(0), int64(1)<<d.Bits-1
+	ident := c.Factor == 1 && c.Offset == 0 && !c.Reciprocal
+	switch {
+	case d.Signed && !ident:
+		rlo, rhi = -(1 << (d.Bits - 1)), 1<<(d.Bits-1)-1
+	case c.Reciprocal:
+		rlo = 1
+	}
+	a, b := c.Apply(float64(rlo)), c.Apply(float64(rhi))
+	return math.Min(a, b), math.Max(a, b), true
+}
+
+// Apply is factor*raw+offset, or factor/raw+offset when reciprocal. The
+// product is a separate step so it does not fuse, matching mapdump's Java.
+func (c Conversion) Apply(raw float64) float64 {
+	if c.Reciprocal {
+		return c.Factor/raw + c.Offset
+	}
+	return float64(raw*c.Factor) + c.Offset
+}
+
 // Axis sources and storage by KP datasource (docs/kp-format.md).
 var axisSources = []struct{ source, stored string }{
 	kp.DSOrdinal:         {"ordinal", ""},
@@ -372,7 +425,7 @@ func (x *Axis) kpAxis() *kp.Axis {
 	a.Value = kpValue(x.Value)
 	a.Reciprocal = x.Value.Conversion.Reciprocal
 	a.Precision = int32(x.Value.Precision)
-	a.Base = int32(x.View.Base)
+	a.Base = kpBase(x.View.Base)
 	for ds, s := range axisSources {
 		if s.source == x.Source && s.stored == x.Stored {
 			a.DataSource = kp.DataSource(ds)
@@ -383,7 +436,19 @@ func (x *Axis) kpAxis() *kp.Axis {
 	}
 	if x.Data != nil {
 		a.Type, a.Signed = kpType(*x.Data), x.Data.Signed
-		a.Width = int32(a.Type.Width())
+	} else {
+		// No storage. Type 0 has no width. An 8-bit ordinal is the unused-slot width.
+		a.Type = 1
 	}
+	a.Width = int32(a.Type.Width())
 	return a
+}
+
+// kpBase is the KP display base. 0 is omitted in the model; WinOLS crashes
+// when a map with base 0 is opened. 10, 16 and 2 are written as given.
+func kpBase(b int) int32 {
+	if b == 0 {
+		return 10
+	}
+	return int32(b)
 }

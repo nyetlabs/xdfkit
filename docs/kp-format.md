@@ -103,6 +103,8 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 
 Three low/high pairs, in order: 8-bit, 16-bit, 32-bit. WinOLS writes the pair for the map's width, as typed in Value range. An 8-bit map uses the first pair (TLDOBAN, 10 to 90). A 16-bit map uses the second (NMAX, 1000 to 6000; KFMIOP, 10 to 90). Defaults are 0 and 255, 0 and 65535, 0 and 4294967295. A negative low is sign-extended.
 
+Without a template, the pair for the map's width is the model's min and max when both are set, ordered low to high. Otherwise it is the conversion of the raw endpoints, rounded to integers. A reciprocal conversion maps the low raw value to the high physical value, so those ends are ordered after the conversion. The other two pairs stay at the defaults.
+
 ### Addresses
 
 `End` is `Start` plus the map's byte length, one past the last byte. WinOLS recomputes a stale end on export. `xdfkit fix` rule R8 does the same (`autocorrect.md`).
@@ -174,7 +176,7 @@ In v2 the list is empty except on free-editable axes. In v1 both axis records ho
 | Organisation | 2 single, 3 1D, 4 2D, 5 2D inverse |
 | Value type | 1 8-bit, 2 16-bit HiLo, 3 16-bit LoHi, 4 32-bit HiLo, 5 32-bit LoHi, 6 float HiLo, 7 float LoHi |
 | Data source | 0 ordinal, 1 EEPROM, 2 EEPROM add, 3 EEPROM subtract, 4 free editable, 5 EEPROM backwards |
-| Display base | 10, 16, 2 |
+| Display base | 10, 16, 2. An omitted base is written as 10. WinOLS crashes when a map whose base is 0 is opened. |
 
 Datasource 4 and 5 are free editable then EEPROM backwards. The WinOLS UI lists those two in the other order.
 

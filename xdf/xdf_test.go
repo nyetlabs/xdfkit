@@ -94,6 +94,11 @@ func diff(path string, got, want *node, out *[]string, limit int) {
 			}
 		}
 	}
+	if got.Name == "LABEL" && want.Attrs["value"] == "" && got.Attrs["value"] == "0" {
+		// mapdump left index 0 blank when the precision was 0; the value is an attribute
+		want = &node{Name: want.Name, Attrs: maps.Clone(want.Attrs), Text: want.Text, Kids: want.Kids}
+		want.Attrs["value"] = "0"
+	}
 	if got.String() != want.String() {
 		*out = append(*out, fmt.Sprintf("%s: got %s, want %s", path, got, want))
 		return
@@ -105,6 +110,14 @@ func diff(path string, got, want *node, out *[]string, limit int) {
 	if want.Name == "XDFAXIS" && !slices.ContainsFunc(got.Kids, isUnits) {
 		// mapdump wrote the KP's units on axes the model doesn't have
 		want.Kids = slices.DeleteFunc(slices.Clone(want.Kids), func(n *node) bool { return isUnits(n) && n.Text == "-" })
+	}
+	if !slices.ContainsFunc(got.Kids, func(n *node) bool { return n.Name == "outputtype" && n.Text == "2" }) {
+		// integer output type blanks a 0 in TunerPro; mapdump wrote it for every precision of 0
+		want.Kids = slices.DeleteFunc(slices.Clone(want.Kids), func(n *node) bool { return n.Name == "outputtype" && n.Text == "2" })
+	}
+	if !slices.ContainsFunc(want.Kids, func(n *node) bool { return n.Name == "min" }) {
+		// identity axes carry the unsigned raw span; mapdump wrote min and max on the cells only
+		got.Kids = slices.DeleteFunc(slices.Clone(got.Kids), func(n *node) bool { return n.Name == "min" || n.Name == "max" })
 	}
 	for i := range max(len(got.Kids), len(want.Kids)) {
 		p := fmt.Sprintf("%s/%d", path, i)
@@ -395,4 +408,98 @@ func TestMapdump(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestShownFormat checks the TunerPro display of a zero and of an identity
+// conversion. Integer output type is used only when every value is a positive
+// whole number. An identity conversion's min and max are the unsigned raw span.
+func TestShownFormat(t *testing.T) {
+	img := make([]byte, 32)
+	img[0], img[1] = 0, 5
+	img[8], img[9], img[10], img[11] = 1, 2, 3, 4
+	cell := func(id string, addr model.Addr) *model.Object {
+		return &model.Object{
+			Key: id, ID: id, Shape: "value", Address: addr, Rows: 1, Cols: 1,
+			Data: model.Data{Bits: 8}, Value: model.Value{Conversion: model.Conversion{Factor: 1}},
+		}
+	}
+	x := model.Addr(8)
+	d := model.Data{Bits: 8, Signed: true}
+	table := &model.Object{
+		Key: "T", ID: "T", Shape: "1d", Address: 8, Rows: 1, Cols: 4,
+		Data: d, Value: model.Value{Conversion: model.Conversion{Factor: 1}},
+		X: &model.Axis{Source: "image", Stored: "absolute", Address: &x, Data: &d,
+			Value: model.Value{Conversion: model.Conversion{Factor: 1}}},
+		Y: &model.Axis{Source: "ordinal", Value: model.Value{Conversion: model.Conversion{Factor: 1}}},
+	}
+	m := &model.Model{Schema: model.SchemaID, Objects: []*model.Object{
+		cell("ZERO", 0), cell("POS", 1), table,
+	}}
+	root := parse(t, mustWrite(t, m, img))
+	got := map[string]string{}
+	var walk func(*node, string)
+	walk = func(n *node, key string) {
+		for _, c := range n.Kids {
+			if c.Name == "title" {
+				key = c.Text
+			}
+		}
+		if n.Name == "XDFAXIS" {
+			key += "/" + n.Attrs["id"]
+		}
+		if n.Name == "outputtype" || n.Name == "min" || n.Name == "max" {
+			got[key+"/"+n.Name] = n.Text
+		}
+		if n.Name == "LABEL" && n.Attrs["index"] == "0" {
+			got[key+"/label0"] = n.Attrs["value"]
+		}
+		for _, c := range n.Kids {
+			walk(c, key)
+		}
+	}
+	walk(root, "")
+	if _, ok := got["ZERO/outputtype"]; ok {
+		t.Errorf("zero cell output type %q", got["ZERO/outputtype"])
+	}
+	if got["POS/outputtype"] != "2" {
+		t.Errorf("positive cell output type %q", got["POS/outputtype"])
+	}
+	if got["T/z/min"] != "0.000000" || got["T/z/max"] != "255.000000" {
+		t.Errorf("signed identity cells %q %q", got["T/z/min"], got["T/z/max"])
+	}
+	if got["T/x/min"] != "0.000000" || got["T/x/max"] != "255.000000" {
+		t.Errorf("signed identity axis %q %q", got["T/x/min"], got["T/x/max"])
+	}
+	if _, ok := got["T/y/outputtype"]; ok {
+		t.Errorf("ordinal axis output type %q", got["T/y/outputtype"])
+	}
+	if got["T/y/label0"] != "0" {
+		t.Errorf("ordinal label 0 %q", got["T/y/label0"])
+	}
+	if got["T/z/outputtype"] != "2" {
+		t.Errorf("positive table output type %q", got["T/z/outputtype"])
+	}
+}
+
+func TestSwappedLimits(t *testing.T) {
+	lo, hi := 90.0, 10.0
+	m := &model.Model{Schema: model.SchemaID, Objects: []*model.Object{{
+		Key: "A", ID: "A", Shape: "1d", Address: 0, Rows: 1, Cols: 1,
+		Data:  model.Data{Bits: 8},
+		Value: model.Value{Min: &lo, Max: &hi, Conversion: model.Conversion{Factor: 1, Reciprocal: true}},
+		X:     &model.Axis{Source: "ordinal", Value: model.Value{Conversion: model.Conversion{Factor: 1}}},
+	}}}
+	b := mustWrite(t, m, make([]byte, 16))
+	if !bytes.Contains(b, []byte("<min>10.000000</min>")) || !bytes.Contains(b, []byte("<max>90.000000</max>")) {
+		t.Fatalf("range not ordered")
+	}
+}
+
+func mustWrite(t *testing.T, m *model.Model, img []byte) []byte {
+	t.Helper()
+	b, err := Write(m, img, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return b
 }

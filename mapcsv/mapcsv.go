@@ -166,15 +166,9 @@ func ranges(o *model.Object, image []byte) ([]string, error) {
 			hi, rhi = v, u
 		}
 	}
-	a, b := convert(o.Value.Conversion, lo), convert(o.Value.Conversion, hi)
+	c := o.Value.Conversion
+	a, b := c.Apply(lo), c.Apply(hi)
 	return []string{javaDouble(math.Min(a, b)), javaDouble(math.Max(a, b)), hex(rlo), hex(rhi)}, nil
-}
-
-func convert(c model.Conversion, raw float64) float64 {
-	if c.Reciprocal {
-		return c.Factor/raw + c.Offset
-	}
-	return float64(raw*c.Factor) + c.Offset // no fused multiply-add, as in Java
 }
 
 // refName is the name (KP name, model description) of the first object in ref

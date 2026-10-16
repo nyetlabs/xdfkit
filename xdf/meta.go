@@ -263,7 +263,7 @@ func limitsMatch(v *model.Value, c model.Conversion, d model.Data) bool {
 	if v.Min == nil || v.Max == nil {
 		return false
 	}
-	lo, hi, ok := limits(c, d)
+	lo, hi, ok := model.Limits(c, d)
 	if !ok {
 		return false
 	}

@@ -364,7 +364,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 			UniqueID: uid, VisLevel: vl, Title: title, Description: desc, CategoryMem: mem,
 			Data:       cells(o.Data, o.Address),
 			Units:      trim(o.Value.Units),
-			OutputType: outputType(prec, o.View.Base),
+			OutputType: outputType(prec, o.View.Base, shown(o.Value.Conversion, o.Data, o.Address, 1, image)),
 			DecimalPl:  decimalPl(prec),
 			Math:       formula(o.Value.Conversion),
 		}, nil
@@ -397,12 +397,8 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 	if o.Cols > 1 {
 		z.Data.ColCount = o.Cols
 	}
-	if o.Value.Min != nil && o.Value.Max != nil {
-		z.Min, z.Max = javaFixed(*o.Value.Min, 6), javaFixed(*o.Value.Max, 6)
-	} else if lo, hi, ok := limits(o.Value.Conversion, o.Data); ok {
-		z.Min, z.Max = javaFixed(lo, 6), javaFixed(hi, 6)
-	}
-	z.OutputType = outputType(prec, o.View.Base)
+	applyRange(&z, o.Value.Conversion, o.Data, o.Value.Min, o.Value.Max)
+	z.OutputType = outputType(prec, o.View.Base, shown(o.Value.Conversion, o.Data, o.Address, o.Rows*o.Cols, image))
 	if prec != 0 {
 		z.OutputType = "1"
 	}
@@ -465,29 +461,31 @@ func breakpoints(id string, x *model.Axis, size int, image []byte) (axis, error)
 		}
 	}
 	a.DecimalPl = decimalPl(prec)
-	a.OutputType = outputType(prec, base)
 	var raw []float64
 	if !ordinal && x.Stored == "subtract" {
 		raw = subtracted(x, size, image)
 	}
 	if !ordinal && raw == nil {
-		a.Data = cells(*x.Data, *x.Address)
-		a.Data.MajorStrideBits = x.Data.Bits
+		d := *x.Data
+		a.OutputType = outputType(prec, base, shown(c, d, *x.Address, size, image))
+		a.Data = cells(d, *x.Address)
+		a.Data.MajorStrideBits = d.Bits
 		a.EmbedInfo = &embedInfo{Type: 1}
+		applyRange(&a, c, d, x.Value.Min, x.Value.Max)
 		a.Math = formula(c)
 		return a, nil
 	}
 	a.Data = embedded{ElementSizeBits: 16, MajorStrideBits: -32}
+	vals := make([]float64, size)
 	for i := range size {
-		l := label{Index: i}
-		switch {
-		case raw != nil:
-			l.Value = javaFixed(convert(c, raw[i]), prec)
-		case i > 0 || prec != 0:
-			l.Value = javaFixed(convert(c, float64(i)), prec)
+		v := float64(i)
+		if raw != nil {
+			v = raw[i]
 		}
-		a.Labels = append(a.Labels, l)
+		vals[i] = c.Apply(v)
+		a.Labels = append(a.Labels, label{Index: i, Value: javaFixed(vals[i], prec)})
 	}
+	a.OutputType = outputType(prec, base, vals)
 	a.Math = formula(model.Conversion{Factor: 1})
 	return a, nil
 }
@@ -511,16 +509,69 @@ func cells(d model.Data, addr model.Addr) embedded {
 	return e
 }
 
-// outputType is TunerPro's output type for whole numbers (2 integer, 3 hex);
-// other values use the header default, 1 (float).
-func outputType(prec, base int) string {
+// outputType is TunerPro's output type. 3 is hex. 2 is integer, and TunerPro
+// shows a 0 in that format as a blank cell, so it is used only when every
+// value is a positive whole number. Anything else uses the header default, 1
+// (float). Precision other than 0 already asks for a decimal display.
+func outputType(prec, base int, vals []float64) string {
 	switch {
 	case prec != 0:
 		return ""
 	case base == 16:
 		return "3"
+	case positiveInts(vals):
+		return "2"
 	}
-	return "2"
+	return ""
+}
+
+// positiveInts reports that every value is a whole number greater than 0.
+func positiveInts(vals []float64) bool {
+	if len(vals) == 0 {
+		return false
+	}
+	for _, v := range vals {
+		if v != math.Trunc(v) || v <= 0 || math.IsInf(v, 0) {
+			return false
+		}
+	}
+	return true
+}
+
+// shown is the converted value of n cells at addr, or nil when the image
+// does not hold them.
+func shown(c model.Conversion, d model.Data, addr model.Addr, n int, image []byte) []float64 {
+	w := d.Bits / 8
+	start := int(addr)
+	if d.Float || w == 0 || n < 1 || image == nil || start < 0 || start+n*w > len(image) {
+		return nil
+	}
+	var order binary.ByteOrder = binary.BigEndian
+	if d.Endian == "little" {
+		order = binary.LittleEndian
+	}
+	out := make([]float64, n)
+	for i := range n {
+		p := image[start+i*w:]
+		out[i] = c.Apply(float64(rawInt(p, order, w, d.Signed)))
+	}
+	return out
+}
+
+// applyRange writes min and max. Both stored limits win, ordered low to high.
+// Otherwise the range is model.Limits.
+func applyRange(a *axis, c model.Conversion, d model.Data, vmin, vmax *float64) {
+	lo, hi, ok := model.Limits(c, d)
+	if vmin != nil && vmax != nil {
+		lo, hi, ok = *vmin, *vmax, true
+	}
+	if !ok {
+		return
+	}
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	a.Min, a.Max = javaFixed(lo, 6), javaFixed(hi, 6)
 }
 
 // decimalPl is the decimal places, left out at the header default of 2.
@@ -548,13 +599,6 @@ func formula(c model.Conversion) equation {
 	return e
 }
 
-func convert(c model.Conversion, raw float64) float64 {
-	if c.Reciprocal {
-		return c.Factor/raw + c.Offset
-	}
-	return float64(raw*c.Factor) + c.Offset // no fused multiply-add, as in Java
-}
-
 // limitPrecision cuts the decimal places so that the largest value of the
 // type has at most maxDigits digits. It reproduces mapdump's arithmetic,
 // including Java's 32-bit int shift, so that 32-bit unsigned cells (and axes
@@ -568,7 +612,7 @@ func limitPrecision(v model.Value, bits int, signed bool) int {
 	if v.Conversion.Reciprocal {
 		raw = 1
 	}
-	intDigits := javaInt(math.Floor(math.Log10(convert(v.Conversion, raw))) + 1)
+	intDigits := javaInt(math.Floor(math.Log10(v.Conversion.Apply(raw))) + 1)
 	prec := v.Precision
 	if int64(prec)+int64(intDigits) > maxDigits {
 		prec = 0
@@ -592,25 +636,6 @@ func javaInt(f float64) int32 {
 	return int32(f)
 }
 
-// limits returns the converted minimum and maximum over the raw range of an
-// integer type.
-func limits(c model.Conversion, d model.Data) (lo, hi float64, ok bool) {
-	if d.Float || d.Bits == 0 {
-		return 0, 0, false
-	}
-	var rlo, rhi int64
-	switch {
-	case d.Signed:
-		rlo, rhi = -(1 << (d.Bits - 1)), 1<<(d.Bits-1)-1
-	case c.Reciprocal:
-		rlo, rhi = 1, 1<<d.Bits-1
-	default:
-		rhi = 1<<d.Bits - 1
-	}
-	a, b := convert(c, float64(rlo)), convert(c, float64(rhi))
-	return math.Min(a, b), math.Max(a, b), true
-}
-
 // subtracted returns the points of a "subtract" axis as WinOLS shows them:
 // point i is 2^bits minus the sum of raw values i to n-1. Nil if the axis is
 // float or doesn't fit in the image.
@@ -627,24 +652,27 @@ func subtracted(x *model.Axis, size int, image []byte) []float64 {
 	out := make([]float64, size)
 	t := int64(1) << (8 * w)
 	for i := size - 1; i >= 0; i-- {
-		c := image[start+i*w:]
-		var u uint64
-		switch w {
-		case 1:
-			u = uint64(c[0])
-		case 2:
-			u = uint64(order.Uint16(c))
-		default:
-			u = uint64(order.Uint32(c))
-		}
-		raw := int64(u)
-		if x.Data.Signed {
-			raw = int64(u<<(64-8*w)) >> (64 - 8*w)
-		}
-		t -= raw
+		t -= rawInt(image[start+i*w:], order, w, x.Data.Signed)
 		out[i] = float64(t)
 	}
 	return out
+}
+
+// rawInt reads one integer cell. A signed cell is sign-extended.
+func rawInt(p []byte, order binary.ByteOrder, w int, signed bool) int64 {
+	var u uint64
+	switch w {
+	case 1:
+		u = uint64(p[0])
+	case 2:
+		u = uint64(order.Uint16(p))
+	default:
+		u = uint64(order.Uint32(p))
+	}
+	if !signed {
+		return int64(u)
+	}
+	return int64(u<<(64-8*w)) >> (64 - 8*w)
 }
 
 // plain spells f with the shortest digits that identify it, without exponent

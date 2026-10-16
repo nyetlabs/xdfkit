@@ -327,3 +327,56 @@ func TestSchemaValidates(t *testing.T) {
 		}
 	})
 }
+
+// TestOmittedBase writes an omitted display base as 10, keeps an explicit
+// base, and gives an axis with no storage a real width.
+func TestOmittedBase(t *testing.T) {
+	m := &Model{Schema: SchemaID, Objects: []*Object{{
+		Key: "A", ID: "A", Shape: "2d", Address: 0x100, Rows: 2, Cols: 2,
+		Data:  Data{Bits: 16, Endian: "little"},
+		Value: Value{Conversion: Conversion{Factor: 1}},
+		X:     &Axis{Source: "unknown", Value: Value{Conversion: Conversion{Factor: 1}}},
+		Y:     &Axis{Source: "ordinal", View: View{Base: 16}, Value: Value{Conversion: Conversion{Factor: 1}}},
+	}}}
+	f, err := m.KP(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mp := f.Project.Maps[0]
+	if mp.Base != 10 || mp.X.Base != 10 {
+		t.Fatalf("base map %d x %d", mp.Base, mp.X.Base)
+	}
+	if mp.X.Type != 1 || mp.X.Width != 1 || mp.X.DataSource != kp.DSOrdinal {
+		t.Fatalf("x type %s width %d source %s", mp.X.Type, mp.X.Width, mp.X.DataSource)
+	}
+	if mp.Y.Base != 16 || mp.Y.Width != 1 {
+		t.Fatalf("y base %d width %d", mp.Y.Base, mp.Y.Width)
+	}
+}
+
+// TestKPRange fills a missing value range from the conversion of the raw
+// endpoints, and orders a reciprocal map's limits low to high.
+func TestKPRange(t *testing.T) {
+	lo, hi := 90.0, 10.0
+	cell := func(key string, bits int, v Value) *Object {
+		return &Object{
+			Key: key, ID: key, Shape: "value", Address: 0x1000, Rows: 1, Cols: 1,
+			Data: Data{Bits: bits}, Value: v,
+		}
+	}
+	m := &Model{Schema: SchemaID, Objects: []*Object{
+		cell("SCALE", 8, Value{Conversion: Conversion{Factor: 0.75}}),
+		cell("INV", 8, Value{Conversion: Conversion{Factor: 255, Reciprocal: true}}),
+		cell("SWAPPED", 8, Value{Min: &lo, Max: &hi, Conversion: Conversion{Factor: 1, Reciprocal: true}}),
+		cell("ID", 16, Value{Conversion: Conversion{Factor: 1}}),
+	}}
+	f, err := m.KP(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rng := func(i, slot int) [2]int64 { return f.Project.Maps[i].Range[slot] }
+	// 0.75*255 rounds to 191. Reciprocal raw 1 and 255 swap to 1..255.
+	if rng(0, 0) != [2]int64{0, 191} || rng(1, 0) != [2]int64{1, 255} || rng(2, 0) != [2]int64{10, 90} || rng(3, 1) != [2]int64{0, 65535} {
+		t.Fatalf("%v %v %v %v", rng(0, 0), rng(1, 0), rng(2, 0), rng(3, 1))
+	}
+}

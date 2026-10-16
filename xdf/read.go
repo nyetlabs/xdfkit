@@ -281,7 +281,7 @@ func keepLimits(v *model.Value, minS, maxS string, d model.Data) {
 	if minS == "" && maxS == "" {
 		return
 	}
-	lo, hi, ok := limits(v.Conversion, d)
+	lo, hi, ok := model.Limits(v.Conversion, d)
 	if ok && (javaFixed(lo, 6) == minS && javaFixed(hi, 6) == maxS || sameLimit(minS, lo) && sameLimit(maxS, hi)) {
 		return
 	}
