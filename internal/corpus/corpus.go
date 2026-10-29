@@ -116,7 +116,7 @@ func read(dir string) (*Corpus, error) {
 	for i, h := range strings.Split(lines[0], "\t") {
 		col[h] = i
 	}
-	for _, h := range []string{"name", "sha256", "size", "family", "ident", "oem", "release", "checksums", "rsa"} {
+	for _, h := range []string{"name", "sha256", "size", "family", "ident", "oem", "checksums", "rsa"} {
 		if _, ok := col[h]; !ok {
 			return nil, fmt.Errorf("%s: no %q column", path, h)
 		}
@@ -136,7 +136,7 @@ func read(dir string) (*Corpus, error) {
 		c.Images = append(c.Images, Image{
 			Name: f[col["name"]], SHA256: f[col["sha256"]], Size: size,
 			Family: f[col["family"]], Ident: f[col["ident"]], OEM: f[col["oem"]],
-			Release: f[col["release"]], Checksums: f[col["checksums"]], RSA: f[col["rsa"]],
+			Checksums: f[col["checksums"]], RSA: f[col["rsa"]],
 		})
 	}
 	return c, nil
