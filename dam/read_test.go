@@ -136,3 +136,18 @@ func TestNotDAMOS(t *testing.T) {
 		t.Fatal("expected an error")
 	}
 }
+
+func TestCP850Descriptions(t *testing.T) {
+	// 0x9A Ü, 0x94 ö, 0xE1 ß (CP850); 0xB0 ° (Latin-1, not CP850 shade).
+	m, _, err := Read([]byte("*** ASAP2DAM ***\n/EPR, {P}, {1}, X\n"+
+		"1, /REG, lin, {}, 0, 0, {}, 0\n/REP, 1, 0, 0, 1, 0, 0;\n"+
+		"1, /SPZ, KOE, {\x9abertragung \xb0KW Gr\x94\xe1e}, 1, $800010, $800010\n"+
+		"/SPW, 1, 1, 0, 1\n/SPX, 0, 0, 0, 0, 0\n"), "cp850.dam")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "Übertragung °KW Größe"
+	if m.Objects[0].Description != want {
+		t.Fatalf("description %q want %q", m.Objects[0].Description, want)
+	}
+}

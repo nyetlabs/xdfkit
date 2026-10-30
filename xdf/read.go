@@ -25,6 +25,7 @@ type rdoc struct {
 		Description string `xml:"description"`
 		Defaults    struct {
 			SigDigits *int `xml:"sigdigits,attr"`
+			LSBFirst  *int `xml:"lsbfirst,attr"`
 		} `xml:"DEFAULTS"`
 		Categories []category `xml:"CATEGORY"`
 	} `xml:"XDFHEADER"`
@@ -113,6 +114,13 @@ func view(b []byte) (m *model.Model, uids, warnings []string, folds map[string]s
 	if h.Defaults.SigDigits != nil {
 		prec = *h.Defaults.SigDigits
 	}
+	// Wider cells with no mmedtypeflags follow DEFAULTS lsbfirst; when that
+	// is also missing, little-endian (C167 / ME7). mapdump omits the flag
+	// for unsigned big-endian KP types, which is wrong on those bins.
+	defaultLE := true
+	if h.Defaults.LSBFirst != nil {
+		defaultLE = *h.Defaults.LSBFirst != 0
+	}
 	type entry struct {
 		uid string
 		n   uint64
@@ -127,7 +135,7 @@ func view(b []byte) (m *model.Model, uids, warnings []string, folds map[string]s
 			ignored[r.XMLName.Local]++
 			continue
 		}
-		o, ws, err := r.object(prec, cats)
+		o, ws, err := r.object(prec, cats, defaultLE)
 		name := fmt.Sprintf("%s %s %q", r.XMLName.Local, r.UniqueID, trim(r.Title))
 		for _, w := range ws {
 			warnings = append(warnings, name+": "+w)
@@ -176,7 +184,7 @@ func foldOf(desc string) (primary, rest string, ok bool) {
 }
 
 // object converts an XDFTABLE or XDFCONSTANT; cats holds the category ids.
-func (r *robject) object(prec int, cats map[int]bool) (*model.Object, []string, error) {
+func (r *robject) object(prec int, cats map[int]bool, defaultLE bool) (*model.Object, []string, error) {
 	o := &model.Object{ID: trim(r.Title), Description: trim(r.Description)}
 	var warnings []string
 	if s := strings.TrimSpace(r.VisLevel); s != "" {
@@ -211,7 +219,7 @@ func (r *robject) object(prec int, cats map[int]bool) (*model.Object, []string, 
 	if err != nil || addr > 0xFFFFFFFF {
 		return nil, nil, fmt.Errorf("cell address %q", z.Data.Address)
 	}
-	o.Address, o.Data = model.Addr(addr), z.Data.data()
+	o.Address, o.Data = model.Addr(addr), z.Data.data(defaultLE)
 	o.Value, o.View, err = z.value(prec)
 	if err != nil {
 		warnings = append(warnings, err.Error())
@@ -222,7 +230,7 @@ func (r *robject) object(prec int, cats map[int]bool) (*model.Object, []string, 
 			id string
 			x  **model.Axis
 		}{{"x", &o.X}, {"y", &o.Y}} {
-			if *a.x, err = r.axis(a.id, prec); err != nil {
+			if *a.x, err = r.axis(a.id, prec, defaultLE); err != nil {
 				warnings = append(warnings, fmt.Sprintf("axis %s: %v", a.id, err))
 			}
 		}
@@ -232,7 +240,7 @@ func (r *robject) object(prec int, cats map[int]bool) (*model.Object, []string, 
 
 // axis converts a table's x or y axis: ordinal for labels (nil for one label
 // or none), else an image axis.
-func (r *robject) axis(id string, prec int) (*model.Axis, error) {
+func (r *robject) axis(id string, prec int, defaultLE bool) (*model.Axis, error) {
 	i := slices.IndexFunc(r.Axes, func(a raxis) bool { return a.ID == id })
 	if i < 0 {
 		return nil, nil
@@ -250,7 +258,7 @@ func (r *robject) axis(id string, prec int) (*model.Axis, error) {
 	if aerr != nil || addr > 0xFFFFFFFF {
 		return nil, fmt.Errorf("address %q", a.Data.Address)
 	}
-	ad, d := model.Addr(addr), a.Data.data()
+	ad, d := model.Addr(addr), a.Data.data(defaultLE)
 	x.Source, x.Stored, x.Address, x.Data = "image", "absolute", &ad, &d
 	return x, err
 }
@@ -300,14 +308,18 @@ func sameLimit(s string, f float64) bool {
 	return err == nil && v == f
 }
 
-func (e embedded) data() model.Data {
+func (e embedded) data(defaultLE bool) model.Data {
 	f, _ := parseHex(e.TypeFlags)
 	d := model.Data{Bits: e.ElementSizeBits, Signed: f&flagSigned != 0, Float: f&flagFloat != 0}
 	if d.Bits == 0 {
 		d.Bits = 8
 	}
 	if d.Bits > 8 {
-		d.Endian = map[bool]string{true: "little", false: "big"}[f&flagLE != 0]
+		le := defaultLE
+		if strings.TrimSpace(e.TypeFlags) != "" {
+			le = f&flagLE != 0
+		}
+		d.Endian = map[bool]string{true: "little", false: "big"}[le]
 	}
 	return d
 }

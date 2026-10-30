@@ -496,14 +496,17 @@ func cells(d model.Data, addr model.Addr) embedded {
 	if d.Signed {
 		f |= flagSigned
 	}
-	if d.Endian == "little" {
+	// Wider cells default to little when endian is unset (C167 / ME7). Always
+	// write mmedtypeflags for them so an explicit big (0x00) survives a read
+	// that treats a missing flag as the header default.
+	if d.Bits > 8 && d.Endian != "big" {
 		f |= flagLE
 	}
 	if d.Float {
 		f |= flagFloat
 	}
 	e := embedded{Address: hex(int(addr)), ElementSizeBits: d.Bits}
-	if f != 0 {
+	if f != 0 || d.Bits > 8 {
 		e.TypeFlags = fmt.Sprintf("0x%02X", f)
 	}
 	return e
@@ -546,16 +549,21 @@ func shown(c model.Conversion, d model.Data, addr model.Addr, n int, image []byt
 	if d.Float || w == 0 || n < 1 || image == nil || start < 0 || start+n*w > len(image) {
 		return nil
 	}
-	var order binary.ByteOrder = binary.BigEndian
-	if d.Endian == "little" {
-		order = binary.LittleEndian
-	}
+	order := byteOrder(d)
 	out := make([]float64, n)
 	for i := range n {
 		p := image[start+i*w:]
 		out[i] = c.Apply(float64(rawInt(p, order, w, d.Signed)))
 	}
 	return out
+}
+
+// byteOrder is the cell byte order; unset endian is little (C167 / ME7).
+func byteOrder(d model.Data) binary.ByteOrder {
+	if d.Endian == "big" {
+		return binary.BigEndian
+	}
+	return binary.LittleEndian
 }
 
 // applyRange writes min and max when the model has both, ordered low to
@@ -646,10 +654,7 @@ func subtracted(x *model.Axis, size int, image []byte) []float64 {
 	if w == 0 || x.Data.Float || start+size*w > len(image) {
 		return nil
 	}
-	var order binary.ByteOrder = binary.BigEndian
-	if x.Data.Endian == "little" {
-		order = binary.LittleEndian
-	}
+	order := byteOrder(*x.Data)
 	out := make([]float64, size)
 	t := int64(1) << (8 * w)
 	for i := size - 1; i >= 0; i-- {

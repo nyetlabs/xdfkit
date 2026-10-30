@@ -64,7 +64,7 @@ Names and limits for the rows above:
 - Strings. A2L `ASCII`. XDF `outputtype` 4.
 - Integer. A2L also has 64-bit. Model `bits` 8/16/32 and `signed`.
 - Float. KP and the model are 32-bit (`eFloatLoHi` / `eFloatHiLo`). A2L is 16/32/64-bit. XDF has a 32-bit float flag, added in 5.00.8008 (2012). 64-bit is unconfirmed. That build allowed no equation on float data except `X`; whether the limit remains is unconfirmed.
-- Endianness. KP HiLo/LoHi is the type enum. A2L `BYTE_ORDER`, with a module default. DAMOS may be global. XDF `mmedtypeflags`. Model `endian`.
+- Endianness. KP HiLo/LoHi is the type enum. A2L `BYTE_ORDER`, with a module default. DAMOS may be global. XDF `mmedtypeflags` (absent wider-cell flags follow `DEFAULTS lsbfirst`, else little). Model `endian`.
 - Row vs column major. KP `2d Inverse`: 252 of 4170 maps in 8D0907551G, 99 of 471 in 8D0907551M. A2L `RECORD_LAYOUT`. XDF major stride and flags. Model `inverse` from KP.
 - Gaps / alignment. A2L `RECORD_LAYOUT` positions and `ALIGNMENT_*`. DAMOS pads a 16-bit field to an even address, and an inline map whose axes are both 16-bit stores each count as a 16-bit word (`model.md`). XDF stride only. The model does not store the gap.
 - Bit mask. KP is not decoded; it may sit in an unknown block. A2L `BIT_MASK`. XDF `XDFFLAG`, one bit.

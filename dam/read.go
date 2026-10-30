@@ -13,12 +13,14 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/text/encoding/charmap"
+
 	"go.nyet.org/xdfkit/model"
 )
 
 // Read parses a DAMOS file. name is the provenance file name.
 func Read(b []byte, name string) (*model.Model, []string, error) {
-	text := latin1(b)
+	text := cp850(b)
 	if !strings.Contains(text[:min(len(text), 4096)], "ASAP2DAM") {
 		return nil, nil, fmt.Errorf("dam: not an ASAP2DAM file")
 	}
@@ -620,10 +622,18 @@ func fields(line string) []string {
 	return out
 }
 
-func latin1(b []byte) string {
+// cp850 decodes ASAP2DAM text. Bosch DAMOS files use DOS code page 850
+// for the C1 range and German letters (0x9A is Ü, 0x81 is ü, 0xE1 is ß);
+// treating those bytes as Latin-1 leaves C1 controls. Byte 0xB0 is written
+// as the degree sign (°), as in Latin-1, not CP850's light shade.
+func cp850(b []byte) string {
 	r := make([]rune, len(b))
 	for i, c := range b {
-		r[i] = rune(c)
+		if c == 0xB0 {
+			r[i] = '°'
+			continue
+		}
+		r[i] = charmap.CodePage850.DecodeByte(c)
 	}
 	return string(r)
 }
