@@ -176,7 +176,7 @@ func (r *reader) characteristic(body []token) (*model.Object, string, []string) 
 		return nil, "CHARACTERISTIC", []string{"characteristic: short record"}
 	}
 	name := body[0].s
-	desc := unquote(body[1])
+	desc := cleanText(unquote(body[1]))
 	kind := body[2].s
 	addr, ok := parseAddr(body[3].s)
 	if !ok {
@@ -797,6 +797,11 @@ func unquote(t token) string {
 		return ""
 	}
 	return s
+}
+
+// cleanText drops tabs from A2L display text (Bosch often uses TAB after a colon).
+func cleanText(s string) string {
+	return strings.TrimSpace(strings.ReplaceAll(s, "\t", " "))
 }
 
 func has(toks []token, s string) bool {

@@ -243,7 +243,7 @@ func emit(rec record, regs map[int]*reg, tables map[int]record) (*model.Object, 
 		warnings = append(warnings, rec.name+": "+c.warn)
 	}
 	o := &model.Object{
-		ID: rec.name, Description: rec.desc, Address: off,
+		ID: rec.name, Description: cleanText(rec.desc), Address: off,
 		Data: dataOf(bits, signed), Value: val,
 	}
 	switch rec.typ {
@@ -634,6 +634,11 @@ func add(m map[string]int, k string) map[string]int {
 	}
 	m[k]++
 	return m
+}
+
+// cleanText drops tabs from DAMOS display text (often TAB after a colon).
+func cleanText(s string) string {
+	return strings.TrimSpace(strings.ReplaceAll(s, "\t", " "))
 }
 
 func capWarnings(ws []string) []string {
