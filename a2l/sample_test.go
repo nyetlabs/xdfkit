@@ -10,7 +10,8 @@ import (
 
 func TestSamples(t *testing.T) {
 	root := testenv.ModuleRoot()
-	for _, name := range []string{"022906032CE-6733.A2L", "4B0906018CM-0008.A2L"} {
+	for _, name := range []string{
+		"022906032CE-6733.A2L", "4B0906018CM-0008.A2L", "8N0906018BB-0002.A2L"} {
 		p := filepath.Join(root, "testdata", "a2l", name)
 		b, err := os.ReadFile(p)
 		if err != nil || len(b) == 0 {

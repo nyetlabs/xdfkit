@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,9 +131,10 @@ func TestEdit(t *testing.T) {
 }
 
 // TestKPDefaultsFile: the committed kp-defaults.json holds, per layout and
-// record kind, each field's commonest residue over ecuxplot's packs, where it
-// is commoner than no residue and not 0 (go test ./model -run TestKPDefaultsFile
-// -update rewrites it).
+// record kind, each field's commonest residue over ecuxplot's packs (and a
+// local OLS5 pack when present), where it is commoner than no residue and not
+// 0 (go test ./model -run TestKPDefaultsFile -update rewrites it). Without the
+// local OLS5 file, a committed "ols5" block is kept as-is.
 func TestKPDefaultsFile(t *testing.T) {
 	total := map[string]int{}
 	seen := map[string]map[string]map[string]int{}
@@ -151,16 +151,8 @@ func TestKPDefaultsFile(t *testing.T) {
 			seen[kind][k][string(b)]++
 		}
 	}
-	for _, p := range testenv.Packs(t) {
-		in, err := os.ReadFile(p)
-		if err != nil {
-			t.Fatal(err)
-		}
-		f, err := kp.Parse(in)
-		if err != nil {
-			t.Fatal(err)
-		}
-		m, l := FromKP(f), fmt.Sprintf("v%d/", f.Layout())
+	survey := func(f *kp.File) {
+		m, l := FromKP(f), f.Layout().DefaultsKey()+"/"
 		for i, c := range m.Categories {
 			r, _ := residue(f.Project.Folders[i], c.kpFolder())
 			add(l+"folder", r)
@@ -174,6 +166,30 @@ func TestKPDefaultsFile(t *testing.T) {
 			}
 			add(l+"map", r)
 		}
+	}
+	for _, p := range testenv.Packs(t) {
+		in, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f, err := kp.Parse(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		survey(f)
+	}
+	ols5KP := filepath.Join(testenv.ModuleRoot(), "testdata", "local", "8N0906018BC_0002_366366.kp")
+	ols5Surveyed := false
+	if in, err := os.ReadFile(ols5KP); err == nil {
+		f, err := kp.Parse(in)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if f.Layout() != kp.OLS5 {
+			t.Fatalf("%s: layout %v, want OLS5", ols5KP, f.Layout())
+		}
+		survey(f)
+		ols5Surveyed = true
 	}
 	gen := map[string]map[string]map[string]json.RawMessage{}
 	for kind, fields := range seen {
@@ -206,6 +222,15 @@ func TestKPDefaultsFile(t *testing.T) {
 				t.Fatal(err)
 			}
 			gen[l][rec][k] = json.RawMessage(b)
+		}
+	}
+	if !ols5Surveyed {
+		var committed map[string]map[string]map[string]json.RawMessage
+		if err := json.Unmarshal(kpDefaultsJSON, &committed); err != nil {
+			t.Fatal(err)
+		}
+		if committed["ols5"] != nil {
+			gen["ols5"] = committed["ols5"]
 		}
 	}
 	b, err := json.MarshalIndent(gen, "", "  ")

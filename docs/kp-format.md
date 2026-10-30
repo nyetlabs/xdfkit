@@ -10,8 +10,11 @@ The Go structs are the record layouts. `kp/codec.go` walks fields in declaration
 | --- | --- | --- | --- | --- |
 | v1 | 0x71 or 0x74 | 0 | 0x5c | inline |
 | v2 | 0x124 or 0x149 | file length | 0x60 | zip entry `intern` |
+| OLS5 | 0x255 | file length | 0x60 | zip entry `intern` |
 
 0x149 is accepted. The archived packs use 0x124. WinOLS 2.24 writes v2 with header id 0x124 and version string `OLS 5.0 (Windows)`. The filename string is the name the file was exported under, usually upper case.
+
+OLS5 is the WinOLS 5 pack layout (header `0x255`). It is read-only: `Encode` returns an error until a WinOLS 5 save oracle exists. Outer filename and version strings have no trailing NUL. Map value ranges are six `float64`s in the file and are stored in the existing `[3][2]int64` slots (values seen so far are whole). Empty map-block strings may use length `-1` (no NUL). Folder `Pad` is 36 bytes. `EndTag` is 8 bytes (`99 78 00 42 02 00 00 00`). Per-layout defaults for KP-only residue use the `"ols5"` key in `kp-defaults.json` (from a local sample when regenerating).
 
 Every archived pack ends with `33 88 72 98`. `EndOffset` is the offset of that marker (file length minus 4). WinOLS imports a file whose length changed without updating `EndOffset`, and raises its crash-report dialog.
 
@@ -28,31 +31,31 @@ flowchart TD
   E --> F[Maps]
   F --> G["MapsTag, folders, trailing bytes"]
   F --> H["v1: count, then records"]
-  F --> I["v2: zip length, then the zip"]
+  F --> I["v2/OLS5: zip length, then the zip"]
   I --> J["intern: flag 0, count, records"]
 ```
 
-The bytes from 0x18 to the end of the fixed header are zeros (`FixedHeader`). The header between the version string and `EndOffset` is `HeaderBody`. Both, and `Project.Trailing`, are kept raw. They change between saves and are not map data. The header walk is `kp.walkHeader`.
+The bytes from 0x18 to the end of the fixed header are zeros (`FixedHeader`). The header between the version string and `EndOffset` is `HeaderBody`. Both, and `Project.Trailing`, are kept raw. They change between saves and are not map data. The header walk is `kp.walkHeader`. On OLS5 the body stays opaque except for locating the end-tag magic.
 
 After `EndOffset`:
 
-- `EndTag`, 12 bytes: `00 00 00 00 99 78 00 42 02 00 00 00`
-- Project name, int32[4] `NameTag`, v2 `NamePad` (4 zeros)
-- Project version, int32[4] `VersionTag` (equal to `NameTag`), v2 `VersionPad` (4 zeros)
-- int32 `Build`, v2 `BuildFlag` (1)
+- `EndTag`, 12 bytes on v1/v2: `00 00 00 00 99 78 00 42 02 00 00 00`; OLS5: 8 bytes `99 78 00 42 02 00 00 00`
+- Project name, int32[4] `NameTag`, v2 `NamePad` (4 zeros); OLS5 uses a longer name trailer instead of the v1/v2 tags
+- Project version, int32[4] `VersionTag` (equal to `NameTag`), v2 `VersionPad` (4 zeros); OLS5 likewise
+- int32 `Build`, v2/OLS5 `BuildFlag` (1)
 
 `NameTag`, `VersionTag`, `Build`, and `MapsTag` are the same in every archived pack and in WinOLS 2.24 exports, including an empty project.
 
 Maps, then int32[3] `MapsTag`, then the folder table:
 
 - v1: int32 count, then the map records
-- v2: int32 zip length, then the zip. The folder table follows the zip. The inflated `intern` entry is one byte 0 (`InternFlag`), an int32 count, then the map records
+- v2 and OLS5: int32 zip length, then the zip. The folder table follows the zip. The inflated `intern` entry is one byte 0 (`InternFlag`), an int32 count, then the map records
 
-Each folder is int32 id, int32 `BuiltIn`, name, 2 bytes `Flags` (`01 01`), int32 `Style` (`0x1000000`), and in v2 15 zero bytes `Pad`. `BuiltIn` is 9000 on My maps, 9001 on Hexdump, and 0 on every other folder. mapdump sorts folders by name, drops duplicate names, and renumbers folder ids. This reader keeps the table as stored.
+Each folder is int32 id, int32 `BuiltIn`, name, 2 bytes `Flags` (`01 01`), int32 `Style` (`0x1000000`), and in v2 15 zero bytes `Pad` (OLS5: 36). `BuiltIn` is 9000 on My maps, 9001 on Hexdump, and 0 on every other folder. mapdump sorts folders by name, drops duplicate names, and renumbers folder ids. This reader keeps the table as stored.
 
 ## Round trip
 
-`Parse` and `Encode` share one walk, so every byte is a field or a raw block. Encode writes the v2 length at 0x14 and `EndOffset` back into the `File`.
+`Parse` and `Encode` share one walk, so every byte is a field or a raw block. Encode writes the v2 length at 0x14 and `EndOffset` back into the `File`. OLS5 Encode is not supported yet.
 
 - v1: parse then encode is byte-identical, including JSON in between
 - v2: the original zip is reused while the map block is unchanged. A changed block is re-deflated with Go `compress/flate` at level 9. The inflated block, and the file outside the zip, match aside from the two lengths

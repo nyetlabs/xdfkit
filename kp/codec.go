@@ -23,7 +23,7 @@ import (
 // `kp:"opt,opt..."` options:
 //
 //   - not stored (derived or bookkeeping); unexported fields are skipped too
-//     v1, v2   stored only in that layout
+//     v1, v2, ols5, v2only   layout filter (v2 means v2 or OLS5; v2only is v2 alone)
 //     len=N    Hex: N raw bytes
 //     count    slice: int32 element count, then the elements
 //     bytes    slice: int32 byte length, then the elements
@@ -42,7 +42,7 @@ type codec struct {
 	want  map[string]bool
 	path  string
 	found map[string]Location
-	block bool // coding the v2 map block
+	block bool // coding the v2/OLS5 map block
 }
 
 // Location is where a field is stored: in the file, or for v2 maps in the
@@ -67,12 +67,16 @@ type field struct {
 	index      int
 	goName     string
 	name       string // JSON name
-	only       Layout
+	layouts    uint8  // bit mask of Layout values; 0 means every layout
 	n          int
 	skip, hook bool
 	count      bool
 	bytes      bool
 	rest       bool
+}
+
+func (f field) in(l Layout) bool {
+	return f.layouts == 0 || f.layouts&(1<<l) != 0
 }
 
 var fieldCache sync.Map // reflect.Type -> []field
@@ -95,9 +99,13 @@ func fieldsOf(t reflect.Type) []field {
 			case o == "-":
 				f.skip = true
 			case o == "v1":
-				f.only = V1
+				f.layouts |= 1 << V1
 			case o == "v2":
-				f.only = V2
+				f.layouts |= 1<<V2 | 1<<OLS5 // v2 or WinOLS 5
+			case o == "v2only":
+				f.layouts |= 1 << V2
+			case o == "ols5":
+				f.layouts |= 1 << OLS5
 			case o == "count":
 				f.count = true
 			case o == "bytes":
@@ -149,8 +157,21 @@ func (c *codec) record(p any) { c.structFields(reflect.ValueOf(p).Elem()) }
 func (c *codec) list(p any) { c.value(reflect.ValueOf(p).Elem(), field{count: true}) }
 
 func (c *codec) structFields(v reflect.Value) {
+	if c.layout == OLS5 {
+		switch s := v.Addr().Interface().(type) {
+		case *Map:
+			s.codeOLS5(c)
+			if ck, ok := v.Addr().Interface().(checker); ok {
+				ck.check(c)
+			}
+			return
+		case *Axis:
+			s.codeOLS5(c)
+			return
+		}
+	}
 	for _, f := range fieldsOf(v.Type()) {
-		if f.skip || (f.only != 0 && f.only != c.layout) {
+		if f.skip || !f.in(c.layout) {
 			continue
 		}
 		old := c.enter(f.name)
@@ -421,7 +442,13 @@ func (c *codec) term(what string) {
 }
 
 // str codes a length-prefixed ISO-8859-15 string; non-empty strings carry a trailing NUL.
-func (c *codec) str(p *string) {
+// Empty strings are length 0, or on OLS5 also length -1.
+func (c *codec) str(p *string) { c.strOpt(p, true) }
+
+// strRaw is str without a trailing NUL (OLS5 value/axis strings, outer filename).
+func (c *codec) strRaw(p *string) { c.strOpt(p, false) }
+
+func (c *codec) strOpt(p *string, nul bool) {
 	if c.enc {
 		b, err := toLatin9(*p)
 		if err != nil {
@@ -429,20 +456,37 @@ func (c *codec) str(p *string) {
 		}
 		c.count(len(b))
 		if len(b) > 0 {
-			c.put(append(b, 0)...)
+			if nul {
+				c.put(append(b, 0)...)
+			} else {
+				c.put(b...)
+			}
 		}
 		return
 	}
-	n := c.count(0)
+	var n int32
+	c.i32(&n)
+	if n < 0 {
+		// WinOLS 5 empty strings may use -1; v1/v2 use 0, and -1 is a terminator.
+		if c.layout == OLS5 {
+			*p = ""
+			return
+		}
+		c.pos -= 4
+		c.fail("negative count %d", n)
+	}
 	if n == 0 {
 		*p = ""
 		return
 	}
-	if n > len(c.b)-c.pos {
+	if int(n) > len(c.b)-c.pos {
 		c.pos -= 4
 		c.fail("bad string length %d", n)
 	}
-	*p = latin9(c.take(n))
+	*p = latin9(c.take(int(n)))
+	if !nul {
+		return
+	}
 	if c.take(1)[0] != 0 {
 		c.pos--
 		c.fail("string not NUL terminated")

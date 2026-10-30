@@ -57,8 +57,8 @@ type Map struct {
 }
 
 func (m *Map) check(c *codec) {
-	if m.Term2[0] != 1 || m.Term2[1] != 1 {
-		c.pos -= 3
+	if len(m.Term2) < 2 || m.Term2[0] != 1 || m.Term2[1] != 1 {
+		c.pos -= len(m.Term2)
 		c.fail("unexpected term2 %v", m.Term2)
 	}
 	twoD := m.Organization == OrgTwoD || m.Organization == OrgTwoDInv

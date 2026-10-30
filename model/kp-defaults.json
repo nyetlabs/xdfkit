@@ -1,4 +1,60 @@
 {
+  "ols5": {
+    "folder": {
+      "flags": "0000",
+      "pad": "00000000000001000000000000000000000000000000000000000000ffffffff00000000"
+    },
+    "map": {
+      "addr2ImageSize": "0x100000",
+      "imageSize": "0x100000",
+      "linkId": -1,
+      "range": [
+        [
+          0,
+          255
+        ],
+        [
+          0,
+          "0xFFFF"
+        ],
+        [
+          0,
+          "0xFFFFFFFF"
+        ]
+      ],
+      "rightPane": 2,
+      "term2": "0101",
+      "view2DRef": -1,
+      "view2DScale": [
+        1.0,
+        1.0
+      ],
+      "view3DRotation": [
+        300.0,
+        1.0
+      ],
+      "viewFlag": 1,
+      "viewFlags": [
+        1,
+        1
+      ],
+      "viewMode": 1,
+      "viewScaleRef": -1
+    },
+    "slot": {
+      "base": 16,
+      "mirror": true,
+      "precision": -1,
+      "signatureByte": -1,
+      "type": "u8",
+      "value": {
+        "description": "",
+        "factor": 1.0,
+        "units": ""
+      },
+      "width": 1
+    }
+  },
   "v1": {
     "axis": {
       "values": "00000000"
