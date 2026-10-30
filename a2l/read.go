@@ -483,12 +483,23 @@ func parseCompu(body []token) (compu, bool) {
 	return c, true
 }
 
-// ratFunc is ASAM MCD-2 MC RAT_FUNC: phys = (a*raw² + b*raw + c) / (d*raw² + e*raw + f).
+// ratFunc is ASAM MCD-2 MC RAT_FUNC with COEFFS as internal = f(phys):
+//
+//	int = (a*phys² + b*phys + c) / (d*phys² + e*phys + f)
+//
+// The model stores phys = factor*raw + offset (or factor/raw + offset when
+// reciprocal). Linear (a = d = e = 0, b and f nonzero) is factor f/b and
+// offset -c/b. Reciprocal (a = b = d = f = 0, e nonzero) is factor c/e.
+// That matches KP/XDF on Bosch ME7 exports (e.g. COEFFS 0 1 0 0 0 0.01 → 0.01).
 func ratFunc(a, b, c, d, e, f float64) (model.Conversion, string) {
 	z := func(x float64) bool { return math.Abs(x) < 1e-12 }
 	switch {
-	case z(a) && z(d) && z(e) && !z(f):
-		return model.Conversion{Factor: b / f, Offset: c / f}, ""
+	case z(a) && z(d) && z(e) && !z(b) && !z(f):
+		off := -c / b
+		if z(off) {
+			off = 0
+		}
+		return model.Conversion{Factor: f / b, Offset: off}, ""
 	case z(a) && z(b) && z(d) && z(f) && !z(e):
 		return model.Conversion{Factor: c / e, Reciprocal: true}, ""
 	default:
