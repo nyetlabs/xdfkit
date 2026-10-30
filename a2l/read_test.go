@@ -182,7 +182,7 @@ func TestRead(t *testing.T) {
 		t.Fatalf("axis pts %+v", sst)
 	}
 	blk := byID["Block"]
-	if blk == nil || blk.Shape != "1d" || blk.Cols != 8 || blk.Address != 0x20 || blk.X == nil || blk.X.Source != "ordinal" {
+	if blk == nil || blk.Shape != "1d" || blk.Cols != 8 || blk.Address != 0x10020 || blk.X == nil || blk.X.Source != "ordinal" {
 		t.Fatalf("valblk %+v", blk)
 	}
 	if _, ok := byID["Cube"]; ok {

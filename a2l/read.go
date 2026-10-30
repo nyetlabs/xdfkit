@@ -390,14 +390,18 @@ func (r *reader) axisObject(a *axisPts) (*model.Object, bool) {
 	}, true
 }
 
+// lower maps an ECU address to a file offset. ME7 OEM images (and DAMOS) use
+// offset = addr - 0x800000. Prefer that over MEMORY_SEGMENT bases: Bosch A2Ls
+// list DATA segments such as Dst810000 at 0x810000, and segment-relative
+// offsets drop 0x10000 and break axes (R6 on the image).
 func (r *reader) lower(addr uint32) (model.Addr, bool) {
+	if addr >= 0x800000 && addr < 0x1000000 {
+		return model.Addr(addr - 0x800000), true
+	}
 	for _, s := range r.segs {
 		if s.size > 0 && addr >= s.addr && addr < s.addr+s.size {
 			return model.Addr(addr - s.addr), true
 		}
-	}
-	if addr >= 0x800000 && addr < 0x1000000 {
-		return model.Addr(addr - 0x800000), true
 	}
 	if addr < 0x800000 {
 		return model.Addr(addr), true
