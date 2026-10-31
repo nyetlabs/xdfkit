@@ -50,8 +50,10 @@ fills the KP fields the model doesn't carry from --template (the KP file the
 JSON came from reproduces it), else from defaults. CSV output is
 mapdump's map list: -i adds the value ranges from the image, and each -r adds a
 column with the names of the matching maps in that KP, JSON or YAML definition.
-XDF output is TunerPro's format; -i adds the file region and the labels of
-"subtract" axes, and the definition title is the output file's name. An XDF
+XDF output is TunerPro's format. -i adds the file region. "subtract" axes
+are live helper tables; --static-axes writes them as labels from the image
+instead (TunerPro before 5.00.8414). The definition title is the output
+file's name. An XDF
 output file comes with its metadata file, NAME.meta.json next to NAME.xdf,
 holding what XDF can't express. XDF input reads the metadata file given by
 --meta, else NAME.meta.json next to it if it exists; with it, an XDF unchanged
@@ -314,6 +316,7 @@ func mergeCmd(args []string) error {
 	comment := fs.String("comment", "", "comment policy: keep, append or replace")
 	format := fs.StringP("format", "f", "", "output format: json, yaml, kp or xdf")
 	image := fs.StringP("image", "i", "", "flash image, for XDF output")
+	staticAxes := fs.Bool("static-axes", false, "write subtract axes as labels from the image")
 	meta := fs.String("meta", "", "metadata file of the base XDF (default: NAME.meta.json next to it)")
 	force := fs.Bool("force", false, "overwrite an existing output file")
 	pos, err := parse(fs, args)
@@ -354,7 +357,7 @@ func mergeCmd(args []string) error {
 	req := api.MergeRequest{
 		To: *format, Name: name, Title: xdfTitle(*format, out),
 		Smart: *smart, Update: *update, Overwrite: *overwrite,
-		Description: *desc, Comment: *comment,
+		Description: *desc, Comment: *comment, StaticAxes: *staticAxes,
 	}
 	if *image != "" {
 		if req.Image, err = os.ReadFile(*image); err != nil {
@@ -414,6 +417,7 @@ func convert(args []string) error {
 	force := fs.Bool("force", false, "overwrite an existing output file")
 	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
 	image := fs.StringP("image", "i", "", "flash image, for CSV value ranges and XDF")
+	staticAxes := fs.Bool("static-axes", false, "write subtract axes as labels from the image")
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
 	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, manual or auto")
 	tuner := fs.String("tuner", "", "category table: keep only its maps and their axes")
@@ -452,7 +456,7 @@ func convert(args []string) error {
 	if in == "-" {
 		name = ""
 	}
-	req := api.ConvertRequest{To: *format, Name: name, Origin: *origin, Title: xdfTitle(*format, out)}
+	req := api.ConvertRequest{To: *format, Name: name, Origin: *origin, Title: xdfTitle(*format, out), StaticAxes: *staticAxes}
 	if *template != "" {
 		if req.Template, err = os.ReadFile(*template); err != nil {
 			return err

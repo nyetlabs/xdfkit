@@ -66,9 +66,7 @@ jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
 
 - An XDF has no JSON of its own, so its digest covers the XDF view: the model JSON that xdfkit's XDF reader builds from the XDF elements alone (`xdf.Read` without a metadata file), without object keys, which the reader derives from the titles of all objects. That excludes comments, the embedded block, the stamp line itself, and label values (the model has no field for them), and objects are sorted by uniqueid. Digests: the same two forms as the JSON stamp, over the XDF view.
 - This catches real edits made in TunerPro (values, addresses, scaling, axes, added or deleted tables). It ignores TunerPro reformatting, attribute order and table order.
-- Where it is stored:
-  - In the metadata file: `xdf.digests` (both forms, for the whole view). Implemented.
-  - Best effort, in the XDF itself (not written yet; the reader already leaves it out of the view): one line `xdfkit-stamp: sha256:<digest>` in the `XDFHEADER` description, a field TunerPro shows and preserves. That line is excluded from the XDF view. TunerPro keeps it through a save (confirmed), writing that line break as `&#010;` and others as `&#013;&#010;`, so readers accept both.
+- Where it is stored: in the metadata file, `xdf.digests` (both forms, for the whole view). The XDF itself has no stamp line. A header description line that starts with `xdfkit-stamp:` is left out of the view.
 - A tuner subset (`model.md`, `provenance.subset`) adds the line `xdfkit-subset: tuner sha256:<table>` to the same description. The reader takes it out of the project name and into `provenance.subset`, so a tuner XDF read without its metadata file, or with another XDF's, still reads as a subset.
 
 ## Metadata file
@@ -93,7 +91,7 @@ Implemented in `xdf/meta.go` (`xdf.Meta`, `xdf.Read`).
 ```
 
 - `model`: a JSON Merge Patch (RFC 7396) from the view without its objects to the model without its objects: provenance, categories (KP folder ids and order; the XDF numbers categories by sorted name), project fields the XDF lost.
-- `objects`: per object, keyed by its XDF `uniqueid`, the merge patch from its view to the model object, left out when empty. Typical entries: the key, the full id (the XDF title has only its first word), the comment (merged into the XDF description), category ids, `inverse`, `vislevel` when the model level differs from the XDF attribute (unmarked 0 versus written 2), `value.description`, the display base, axis `mirror`, `header` and `signature`, the storage of "subtract" axes written as labels, and precision the writer limited to six digits. Keyed by uniqueid rather than title because titles repeat; TunerPro keeps uniqueids through a save (observed on 8D0907551M).
+- `objects`: per object, keyed by its XDF `uniqueid`, the merge patch from its view to the model object, left out when empty. Typical entries: the key, the full id (the XDF title has only its first word), the comment (merged into the XDF description), category ids, `inverse`, `vislevel` when the model level differs from the XDF attribute (unmarked 0 versus written 2), `value.description`, the display base, axis `mirror`, `header` and `signature`, the storage of "subtract" axes (the live helper is not part of the model), and precision the writer limited to six digits. Keyed by uniqueid rather than title because titles repeat; TunerPro keeps uniqueids through a save (observed on 8D0907551M).
 - `xdf`: the digests of the view (see XDF stamp).
 - Its own `stamp`.
 - Reconstruction (`xdf.Read`): model = XDF view merged with metadata, by uniqueid.

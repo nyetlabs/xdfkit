@@ -1,8 +1,8 @@
 // Package xdf writes a model as a TunerPro XDF file (XML, format 1.50), as
 // ecuxplot's mapdump did (docs/design.md): categories sorted by name with
 // "My maps" first, objects in address order, precision limited to the six
-// digits TunerPro shows, and "EEPROM, subtract" axes written as labels read
-// from the image, since XDF can't compute them. Non-ASCII text is written as
+// digits TunerPro shows, and "EEPROM, subtract" axes written as a live helper
+// table (docs/kp-format.md). Non-ASCII text is written as
 // character references: TunerPro reads XDF as Windows-1252.
 //
 // Deliberate differences from mapdump: no "Written <date>" comment, so the
@@ -130,8 +130,8 @@ type axis struct {
 	OutputType string     `xml:"outputtype,omitempty"`
 	EmbedInfo  *embedInfo `xml:"embedinfo"`
 	*link
-	Labels []label  `xml:"LABEL"`
-	Math   equation `xml:"MATH"`
+	Labels []label    `xml:"LABEL"`
+	Math   []equation `xml:"MATH"`
 }
 
 type embedded struct {
@@ -166,15 +166,31 @@ type label struct {
 
 type equation struct {
 	Equation string `xml:"equation,attr"`
+	Row      string `xml:"row,attr,omitempty"`
 	Var      struct {
 		ID string `xml:"id,attr"`
 	} `xml:"VAR"`
 }
 
+// livePrefix starts a helper table's description. The reader leaves those
+// tables out of the model; the metadata file keeps the axis.
+const livePrefix = "xdfkit-live:"
+
 // Write returns m as XDF. title is the definition title (the file stem).
-// Without an image there is no file region, and "subtract" axes are written
-// as plain image axes.
+// "EEPROM, subtract" axes are live helper tables. Without an image there is
+// no file region.
 func Write(m *model.Model, image []byte, title string) ([]byte, error) {
+	return write(m, image, title, false)
+}
+
+// WriteLabels is Write with "subtract" axes as static labels read from the
+// image (TunerPro before 5.00.8414). Without an image those axes are plain
+// image axes.
+func WriteLabels(m *model.Model, image []byte, title string) ([]byte, error) {
+	return write(m, image, title, true)
+}
+
+func write(m *model.Model, image []byte, title string, labels bool) ([]byte, error) {
 	desc := trim(m.Project.Name)
 	if p := m.Provenance; p != nil && p.Subset != nil {
 		desc = strings.TrimPrefix(desc+"\n"+subsetPrefix+" "+p.Subset.Kind+" sha256:"+p.Subset.Table, "\n")
@@ -197,11 +213,36 @@ func Write(m *model.Model, image []byte, title string) ([]byte, error) {
 	}
 	index := map[*model.Object]int{}
 	at := map[model.Addr][]*model.Object{}
+	exp := 0
 	for i, o := range m.Objects {
 		index[o] = i
 		at[o.Address] = append(at[o.Address], o)
+		exp += len(expansions(o))
 	}
+	hnext := len(m.Objects) + exp
+	helpers := map[string]*table{}
+	var helperOrder []string
 	link := func(self *model.Object, x *model.Axis, n int) string {
+		if !labels && liveOK(x, n) {
+			c := x.Value.Conversion
+			k := fmt.Sprintf("%d/%d/%s/%d/%s/%s", *x.Address, x.Data.Bits, x.Data.Endian, n, plain(c.Factor), plain(c.Offset))
+			if t, ok := helpers[k]; ok {
+				return t.UniqueID
+			}
+			hnext++
+			id := hex(hnext)
+			cat := 0
+			if len(self.Categories) > 0 {
+				cat = catIndex[self.Categories[0]]
+			}
+			t := liveTable(id, x, n, categoryMem{Category: cat + 1})
+			helpers[k] = t
+			helperOrder = append(helperOrder, k)
+			return id
+		}
+		if x == nil || x.Address == nil {
+			return ""
+		}
 		for _, t := range at[*x.Address] {
 			if t != self && linkable(t, x, n) {
 				return hex(index[t] + 1)
@@ -211,13 +252,13 @@ func Write(m *model.Model, image []byte, title string) ([]byte, error) {
 	}
 	next := len(m.Objects)
 	for _, o := range byAddress(m) {
-		obj, err := object(o, index[o], catIndex, link, image)
+		obj, err := object(o, index[o], catIndex, link, image, labels)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", o.Key, err)
 		}
 		d.Objects = append(d.Objects, obj)
 		for _, c := range expansions(o) {
-			obj, err = object(c, next, catIndex, link, image)
+			obj, err = object(c, next, catIndex, link, image, labels)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", o.Key, err)
 			}
@@ -225,6 +266,9 @@ func Write(m *model.Model, image []byte, title string) ([]byte, error) {
 			d.Objects = append(d.Objects, obj)
 			next++
 		}
+	}
+	for _, k := range helperOrder {
+		d.Objects = append(d.Objects, helpers[k])
 	}
 	var b bytes.Buffer
 	e := xml.NewEncoder(&b)
@@ -349,7 +393,7 @@ func byAddress(m *model.Model) []*model.Object {
 // object is the XDFCONSTANT or XDFTABLE of o; index is its position in the
 // source, which numbers it. link returns the uniqueid of the curve an image
 // axis of n points links to, or "".
-func object(o *model.Object, index int, catIndex map[int]int, link func(*model.Object, *model.Axis, int) string, image []byte) (any, error) {
+func object(o *model.Object, index int, catIndex map[int]int, link func(*model.Object, *model.Axis, int) string, image []byte, labels bool) (any, error) {
 	title, desc := text(o)
 	cat := 0
 	if len(o.Categories) > 0 {
@@ -375,7 +419,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 		x    *model.Axis
 		size int
 	}{{"x", o.X, o.Cols}, {"y", o.Y, o.Rows}} {
-		x, err := breakpoints(a.id, a.x, a.size, image)
+		x, err := breakpoints(a.id, a.x, a.size, image, labels)
 		if err != nil {
 			return nil, err
 		}
@@ -391,7 +435,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 		Data:      cells(o.Data, o.Address),
 		Units:     trim(o.Value.Units),
 		DecimalPl: &prec,
-		Math:      formula(o.Value.Conversion),
+		Math:      eqs(o.Value.Conversion),
 	}
 	z.Data.RowCount = o.Rows
 	if o.Cols > 1 {
@@ -441,7 +485,7 @@ func labels(x *model.Axis) bool {
 // breakpoints is the XDFAXIS of a table's x or y axis: labels for axes not
 // read from the image (ordinal, editable, unknown, missing, "backwards") and
 // for "subtract" axes, else the breakpoints' image location.
-func breakpoints(id string, x *model.Axis, size int, image []byte) (axis, error) {
+func breakpoints(id string, x *model.Axis, size int, image []byte, static bool) (axis, error) {
 	a := axis{ID: id, UniqueID: "0x0", IndexCount: &size, link: &link{}}
 	ordinal := labels(x)
 	if !ordinal && (x.Address == nil || x.Data == nil) {
@@ -461,6 +505,12 @@ func breakpoints(id string, x *model.Axis, size int, image []byte) (axis, error)
 		}
 	}
 	a.DecimalPl = decimalPl(prec)
+	if !ordinal && !static && liveOK(x, size) {
+		a.Data = embedded{ElementSizeBits: 16, MajorStrideBits: -32}
+		a.EmbedInfo = &embedInfo{Type: 3}
+		a.Math = eqs(model.Conversion{Factor: 1})
+		return a, nil
+	}
 	var raw []float64
 	if !ordinal && x.Stored == "subtract" {
 		raw = subtracted(x, size, image)
@@ -472,7 +522,7 @@ func breakpoints(id string, x *model.Axis, size int, image []byte) (axis, error)
 		a.Data.MajorStrideBits = d.Bits
 		a.EmbedInfo = &embedInfo{Type: 1}
 		applyRange(&a, x.Value.Min, x.Value.Max)
-		a.Math = formula(c)
+		a.Math = eqs(c)
 		return a, nil
 	}
 	a.Data = embedded{ElementSizeBits: 16, MajorStrideBits: -32}
@@ -486,8 +536,71 @@ func breakpoints(id string, x *model.Axis, size int, image []byte) (axis, error)
 		a.Labels = append(a.Labels, label{Index: i, Value: javaFixed(vals[i], prec)})
 	}
 	a.OutputType = outputType(prec, base, vals)
-	a.Math = formula(model.Conversion{Factor: 1})
+	a.Math = eqs(model.Conversion{Factor: 1})
 	return a, nil
+}
+
+func eqs(c model.Conversion) []equation { return []equation{formula(c)} }
+
+// liveOK reports an unsigned integer "subtract" axis the live helper can show.
+func liveOK(x *model.Axis, n int) bool {
+	if x == nil || x.Stored != "subtract" || x.Address == nil || x.Data == nil || n < 1 {
+		return false
+	}
+	d := x.Data
+	return !d.Float && !d.Signed && (d.Bits == 8 || d.Bits == 16 || d.Bits == 32) && !x.Value.Conversion.Reciprocal
+}
+
+// liveTable is the helper at the axis address: one column, n rows, each row
+// an equation. TunerPro 6.00.0149.00 shows that pattern (docs/kp-format.md).
+func liveTable(id string, x *model.Axis, n int, cat categoryMem) *table {
+	one := 1
+	stub := embedded{ElementSizeBits: 16, MajorStrideBits: -32}
+	ident := eqs(model.Conversion{Factor: 1})
+	z := axis{
+		ID: "z", Data: cells(*x.Data, *x.Address), Units: trim(x.Value.Units),
+		DecimalPl: decimalPl(limitPrecision(x.Value, x.Data.Bits, false)),
+		Math:      liveEquations(x, n),
+	}
+	z.Data.RowCount = n
+	z.Data.ColCount = 1
+	return &table{
+		UniqueID: id, VisLevel: "2", Flags: "0x0",
+		Title: hex(int(*x.Address)), Description: livePrefix, CategoryMem: cat,
+		Axes: []axis{
+			{ID: "x", UniqueID: "0x0", Data: stub, IndexCount: &one, link: &link{}, Math: ident},
+			{ID: "y", UniqueID: "0x0", Data: stub, IndexCount: &n, link: &link{}, Math: ident},
+			z,
+		},
+	}
+}
+
+func liveEquations(x *model.Axis, n int) []equation {
+	span := int64(1) << x.Data.Bits
+	f, off := x.Value.Conversion.Factor, x.Value.Conversion.Offset
+	term := plain(f) + " * X"
+	if f == 1 {
+		term = "X"
+	}
+	cell := "CELL(ROW()+1;0;FALSE) - " + term
+	last := fmt.Sprintf("(%d - X) * %s", span, plain(f))
+	switch {
+	case math.Abs(off) < minOffset:
+	case off < 0:
+		last += " - " + plain(-off)
+	default:
+		last += "+ " + plain(off)
+	}
+	out := make([]equation, n)
+	for i := range n {
+		eq := cell
+		if i == n-1 {
+			eq = last
+		}
+		out[i] = equation{Equation: eq, Row: strconv.Itoa(i + 1)}
+		out[i].Var.ID = "X"
+	}
+	return out
 }
 
 // cells is the EMBEDDEDDATA locating cells or breakpoints of type d.

@@ -142,6 +142,15 @@ func diff(path string, got, want *node, out *[]string, limit int) {
 
 func isUnits(n *node) bool { return n.Name == "units" }
 
+func liveNode(n *node) bool {
+	for _, c := range n.Kids {
+		if c.Name == "description" && strings.HasPrefix(c.Text, livePrefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func readModel(t *testing.T, dir, stem string) *model.Model {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(dir, stem+".kp"))
@@ -183,7 +192,13 @@ func TestArchive(t *testing.T) {
 			if len(root.Kids) != 1 || root.Kids[0].Name != "XDFFORMAT" {
 				t.Fatalf("root %v", root.Kids)
 			}
-			if n := len(root.Kids[0].Kids) - 1; n != len(m.Objects) {
+			n := 0
+			for _, k := range root.Kids[0].Kids {
+				if k.Name != "XDFHEADER" && !liveNode(k) {
+					n++
+				}
+			}
+			if n != len(m.Objects) {
 				t.Errorf("%d objects, want %d", n, len(m.Objects))
 			}
 			var long func(*node)
@@ -397,7 +412,7 @@ func TestMapdump(t *testing.T) {
 	for _, path := range xdfs {
 		stem := strings.TrimSuffix(filepath.Base(path), ".xdf")
 		t.Run(stem, func(t *testing.T) {
-			got, err := Write(readModel(t, dir, stem), corpus.ArchiveImage(t, stem), stem)
+			got, err := WriteLabels(readModel(t, dir, stem), corpus.ArchiveImage(t, stem), stem)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -496,6 +511,77 @@ func TestSwappedLimits(t *testing.T) {
 	b := mustWrite(t, m, make([]byte, 16))
 	if !bytes.Contains(b, []byte("<min>10.000000</min>")) || !bytes.Contains(b, []byte("<max>90.000000</max>")) {
 		t.Fatalf("range not ordered")
+	}
+}
+
+// TestLiveSubtract writes an 8-bit subtract axis as the helper TunerPro
+// 6.00.0149.00 displayed, and reads it back through the metadata file.
+func TestLiveSubtract(t *testing.T) {
+	addr := model.Addr(0x941C)
+	ax := &model.Axis{
+		Source: "image", Stored: "subtract", Address: &addr,
+		Data: &model.Data{Bits: 8},
+		Value: model.Value{
+			Units: "grad C", Precision: 2,
+			Conversion: model.Conversion{Factor: 0.75, Offset: -48},
+		},
+	}
+	obj := func(id string, a model.Addr) *model.Object {
+		x := *ax
+		return &model.Object{
+			Key: id, ID: id, Shape: "1d", Address: a, Rows: 1, Cols: 4,
+			Data:  model.Data{Bits: 8},
+			Value: model.Value{Precision: 3, Conversion: model.Conversion{Factor: 0.0625}},
+			X:     &x,
+		}
+	}
+	m := &model.Model{Schema: model.SchemaID, Objects: []*model.Object{obj("FHSA.0", 0x9420), obj("FHSA.1", 0x9430)}}
+	b := mustWrite(t, m, nil)
+	s := string(b)
+	if strings.Count(s, `embedinfo type="3" linkobjid="0x3"`) != 2 {
+		t.Errorf("links: %s", s)
+	}
+	if strings.Count(s, `equation="CELL(ROW()+1;0;FALSE) - 0.75 * X"`) != 3 {
+		t.Errorf("cell rows: %s", s)
+	}
+	if strings.Count(s, `equation="(256 - X) * 0.75 - 48"`) != 1 {
+		t.Errorf("last row: %s", s)
+	}
+	if strings.Count(s, livePrefix) != 1 {
+		t.Errorf("helpers: %s", s)
+	}
+	meta, err := Meta(m, b, "xdfkit test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ws, err := Read(b, meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ws) != 0 {
+		t.Errorf("warnings %q", ws)
+	}
+	if g, w := marshal(t, got), marshal(t, m); !bytes.Equal(g, w) {
+		t.Errorf("round trip: %s", firstDiff(g, w))
+	}
+	v, _, err := Read(b, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(v.Objects) != 2 {
+		t.Errorf("view objects %d", len(v.Objects))
+	}
+	img := make([]byte, 0x9420)
+	copy(img[0x941C:], []byte{27, 13, 12, 60})
+	lb, err := WriteLabels(&model.Model{Schema: model.SchemaID, Objects: []*model.Object{obj("FHSA.0", 0x9420)}}, img, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(lb, []byte("CELL(ROW()")) {
+		t.Errorf("static labels wrote a helper: %s", lb)
+	}
+	if !bytes.Contains(lb, []byte(`value="60.00"`)) || !bytes.Contains(lb, []byte(`value="80.25"`)) || !bytes.Contains(lb, []byte(`value="99.00"`)) {
+		t.Errorf("labels: %s", lb)
 	}
 }
 

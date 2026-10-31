@@ -45,7 +45,8 @@ const (
 // Name is the input's file name, recorded in the model's provenance. Template
 // is a KP file for KP output from model JSON: KP fields the model doesn't
 // carry come from it (docs/model.md). Image is the flash image, for CSV value
-// columns and XDF (file size, "subtract" axis labels). Refs, for CSV output,
+// columns and XDF (file size; static subtract-axis labels when StaticAxes is
+// set). Refs, for CSV output,
 // are reference definitions (KP or model JSON) whose matching map names fill
 // one column each. Title is the XDF definition title (default: Name without
 // its extension). Meta is the metadata file of an XDF input
@@ -56,15 +57,16 @@ const (
 // category name maps to its map names): only its maps and the objects their
 // axes point at are kept, filed under its categories.
 type ConvertRequest struct {
-	To       string `json:"to"`
-	Name     string `json:"name,omitempty"`
-	Template []byte `json:"template,omitempty"`
-	Image    []byte `json:"image,omitempty"`
-	Refs     []Ref  `json:"refs,omitempty"`
-	Title    string `json:"title,omitempty"`
-	Meta     []byte `json:"meta,omitempty"`
-	Origin   string `json:"origin,omitempty"`
-	Tuner    []byte `json:"tuner,omitempty"`
+	To         string `json:"to"`
+	Name       string `json:"name,omitempty"`
+	Template   []byte `json:"template,omitempty"`
+	Image      []byte `json:"image,omitempty"`
+	Refs       []Ref  `json:"refs,omitempty"`
+	Title      string `json:"title,omitempty"`
+	Meta       []byte `json:"meta,omitempty"`
+	Origin     string `json:"origin,omitempty"`
+	Tuner      []byte `json:"tuner,omitempty"`
+	StaticAxes bool   `json:"staticAxes,omitempty"`
 }
 
 // Ref is a reference definition for CSV output; Name heads its column.
@@ -107,6 +109,9 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	}
 	if req.Title != "" && req.To != XDF {
 		return nil, resp, errors.New("a title applies only to XDF output")
+	}
+	if req.StaticAxes && req.To != XDF {
+		return nil, resp, errors.New("static axes apply only to XDF output")
 	}
 	if req.Origin != "" && resp.From != XDF && resp.From != A2L && resp.From != DAMOS && (resp.From != KP || req.To == KP) {
 		return nil, resp, errors.New("an origin applies only to a model converted from KP, XDF, A2L or DAMOS")
@@ -165,7 +170,7 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 		if title == "" {
 			title = strings.TrimSuffix(req.Name, path.Ext(req.Name))
 		}
-		out, err := xdf.Write(m, req.Image, title)
+		out, err := writeXDF(m, req.Image, title, req.StaticAxes)
 		if err != nil {
 			return nil, resp, err
 		}
@@ -184,6 +189,13 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	}
 	out, err := encodeModel(m, req.To, t)
 	return out, resp, err
+}
+
+func writeXDF(m *model.Model, image []byte, title string, static bool) ([]byte, error) {
+	if static {
+		return xdf.WriteLabels(m, image, title)
+	}
+	return xdf.Write(m, image, title)
 }
 
 // MergeRequest is the request for Merge. The base definition is the input.
@@ -208,6 +220,7 @@ type MergeRequest struct {
 	Comment      string `json:"comment,omitempty"`
 	Image        []byte `json:"image,omitempty"`
 	Title        string `json:"title,omitempty"`
+	StaticAxes   bool   `json:"staticAxes,omitempty"`
 }
 
 // MergeResponse reports the merge. Actions are added, kept, corrected,
@@ -243,6 +256,9 @@ func Merge(base []byte, req MergeRequest) ([]byte, MergeResponse, error) {
 	if req.Title != "" && to != XDF {
 		return nil, resp, errors.New("a title applies only to XDF output")
 	}
+	if req.StaticAxes && to != XDF {
+		return nil, resp, errors.New("static axes apply only to XDF output")
+	}
 	bm, warnings, err := loadModel(base, req.Name, req.Meta)
 	resp.Warnings = warnings
 	if err != nil {
@@ -272,7 +288,7 @@ func Merge(base []byte, req MergeRequest) ([]byte, MergeResponse, error) {
 		if title == "" {
 			title = strings.TrimSuffix(req.Name, path.Ext(req.Name))
 		}
-		out, err := xdf.Write(m, req.Image, title)
+		out, err := writeXDF(m, req.Image, title, req.StaticAxes)
 		if err != nil {
 			return nil, resp, err
 		}

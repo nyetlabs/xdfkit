@@ -199,7 +199,9 @@ The label in a pack can be wrong either way. KFFA X in 8D0907558E is a subtract 
 
 On M3 images the two bytes before one of these axes are the variable id and the point count.
 
-The model keeps `axis.stored` as written (`absolute`, `add`, `subtract`, or `backwards`). The XDF writer emits static labels computed from the image. Without an image it emits a plain image axis.
+The model keeps `axis.stored` as written (`absolute`, `add`, `subtract`, or `backwards`).
+
+The XDF writer emits a live helper table for an unsigned 8, 16 or 32-bit subtract axis that is not reciprocal. The helper is a 1-column table at the axis address, linked from the map axis with `embedinfo type="3"`. Its last row is `(2^bits - X) * factor + offset`; each earlier row is `CELL(ROW()+1;0;FALSE) - factor * X`, with the factor written before `X` (`0.75 * X`). Rows are numbered from 1. TunerPro 6.00.0149.00 shows FHSA.0 X that way: raw 27, 13, 12, 60 reads as 60, 80.25, 90, 99. Builds before 5.00.8414 (2014) miscompute the pattern. `--static-axes` writes static labels from the image instead; without an image those axes are plain image axes. A signed, float or reciprocal subtract axis uses the labels when an image is present, otherwise a plain image axis. The reader leaves the helper out of the model. The metadata file keeps the axis.
 
 ## WinOLS 2.24 exports
 

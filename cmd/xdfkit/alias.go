@@ -36,8 +36,9 @@ func alias(argv0 string) (string, bool) {
 // aliasOpts are the options of an alias writing XDF: the flash image, and
 // whether to write the metadata file.
 type aliasOpts struct {
-	image []byte
-	meta  bool
+	image      []byte
+	meta       bool
+	staticAxes bool
 }
 
 // runAlias converts each file to the same name with the new extension, next
@@ -52,8 +53,9 @@ func runAlias(name string, args []string) int {
 	if to == api.XDF {
 		fs.StringVarP(&image, "image", "i", "", "flash image")
 		fs.BoolVarP(&opt.meta, "write-meta", "m", false, "also write the metadata file")
-		opts = "[-i image] [-m] "
-		help = "-i (--image) adds the file region and the labels of \"subtract\" axes from\nthe flash image. -m (--write-meta) also writes FILE.meta.json, without which\nthe XDF doesn't convert back exactly.\n"
+		fs.BoolVar(&opt.staticAxes, "static-axes", false, "write subtract axes as labels from the image")
+		opts = "[-i image] [-m] [--static-axes] "
+		help = "-i (--image) adds the file region. Subtract axes are live helper tables;\n--static-axes writes them as labels from the image (TunerPro before 5.00.8414).\n-m (--write-meta) also writes FILE.meta.json, without which the XDF doesn't\nconvert back exactly.\n"
 	}
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "usage: %s %sFILE.%s...\n\nWrites FILE.%s next to each input. An existing file is not replaced.\n%s", name, opts, from, to, help)
@@ -112,7 +114,7 @@ func aliasFile(name, in, from, to string, opt aliasOpts) ([]string, error) {
 			return nil, fmt.Errorf("%s exists; not replacing it", o)
 		}
 	}
-	req := api.ConvertRequest{To: to, Name: filepath.Base(in), Title: xdfTitle(to, out), Image: opt.image}
+	req := api.ConvertRequest{To: to, Name: filepath.Base(in), Title: xdfTitle(to, out), Image: opt.image, StaticAxes: opt.staticAxes}
 	if from == api.XDF {
 		if req.Meta, err = readMeta(in); err != nil {
 			return nil, err

@@ -135,6 +135,9 @@ func view(b []byte) (m *model.Model, uids, warnings []string, folds map[string]s
 			ignored[r.XMLName.Local]++
 			continue
 		}
+		if strings.HasPrefix(strings.TrimSpace(r.Description), livePrefix) {
+			continue
+		}
 		o, ws, err := r.object(prec, cats, defaultLE)
 		name := fmt.Sprintf("%s %s %q", r.XMLName.Local, r.UniqueID, trim(r.Title))
 		for _, w := range ws {
