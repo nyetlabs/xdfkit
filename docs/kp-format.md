@@ -72,13 +72,13 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 
 | Field | Type | |
 | --- | --- | --- |
-| `Marked` | byte | 0 or 1. WinOLS map-list marker (Insert/delete marker; filter Only marked / Only unmarked). Confirmed on TLDOBAN-50a / 51-marker / 52-unmarker in `testdata/local/outgoing/sweep/`. Model `vislevel` 1 when set, else 0 |
+| `Marked` | byte | 0 or 1. WinOLS map-list marker (Insert/delete marker; filter Only marked / Only unmarked). Confirmed on TLDOBAN-50a / 51-marker / 52-unmarker. Model `vislevel` 1 when set, else 0 |
 | `LinkID` | int32, v2 | |
 | `Comment` | string, v2 | |
 | `CommentFlag` | byte, v2 | |
 | `Name` | string | long description |
 | `Organization` | int32 | [Enums](#enums) |
-| `RightPane` | int32 | |
+| `RightPane` | int32 | script `RWin` candidate (0 none, 1 hex, 2 bars, 3 both); unconfirmed in the map window |
 | `Type` | int32 | element type; [Enums](#enums) |
 | `Width` | int32 | element size in bytes; matches `Type` |
 | `Base` | int32 | 10, 16, or 2 |
@@ -104,9 +104,9 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 
 ### Range
 
-Three low/high pairs, in order: 8-bit, 16-bit, 32-bit. WinOLS writes the pair for the map's width, as typed in Value range. An 8-bit map uses the first pair (TLDOBAN, 10 to 90). A 16-bit map uses the second (NMAX, 1000 to 6000; KFMIOP, 10 to 90). Defaults are 0 and 255, 0 and 65535, 0 and 4294967295. A negative low is sign-extended.
+Three low/high pairs, in order: 8-bit, 16-bit, 32-bit. WinOLS writes the pair for the map's width, as typed in Value range (raw / eprom units, not factor-scaled). Toggling the map display between raw and scaled does not change the dialog numbers. An 8-bit map uses the first pair (TLDOBAN, 10 to 90). A 16-bit map uses the second (NMAX, 1000 to 6000; KFMIOP, 10 to 90). Defaults are 0 and 255, 0 and 65535, 0 and 4294967295. A negative low is sign-extended. The 32-bit pair is unconfirmed by a WinOLS save.
 
-The field cannot be omitted. Without a template, the pair for the map's width is the model's min and max when both are set, ordered low to high. Otherwise it is the conversion of the raw endpoints, rounded to integers. A reciprocal conversion maps the low raw value to the high physical value, so those ends are ordered after the conversion. The other two pairs stay at the defaults.
+The field cannot be omitted. Without a template, the pair for the map's width is the model's min and max converted from display units to raw (ordered low to high). Otherwise it is the default raw pair for the width. The other two pairs stay at the defaults. The model omits min and max when the KP pair is that default.
 
 ### Addresses
 
@@ -159,8 +159,14 @@ Both records are stored on every map. WinOLS uses X for a 1D map, X and Y for a 
 | `Precision` | int32 | |
 | `Signed` | byte | |
 | `Values` | length, then bytes | [below](#free-editable) |
-| `DataHeader` | int32 | |
-| `SignatureByte` | int32 | -1 is the usual value |
+| `DataHeader` | int32 | [below](#data-header-and-signature) |
+| `SignatureByte` | int32 | [below](#data-header-and-signature) |
+
+### Data header and signature
+
+`DataHeader` is the script's `DataHeader`: how many bytes before the axis data WinOLS treats as a header (0, 1, 2, or 4). Non-zero headers commonly hold the point count (one byte, or two for a word count). A 4-byte header on a word axis of a 2D map is often two little-endian uint16 counts, this axis then the other. Many image axes keep the field at 0 even when those bytes exist in the image, so it is a setting, not a discovery from the flash. Model `header`.
+
+`SignatureByte` is the script's `SignaturByte`. `-1` means none (the usual value). Otherwise it often matches the byte two before the axis (a variable id on M3 packs). Model `signature`, omitted for `-1`.
 
 ### Mirror
 
@@ -168,7 +174,7 @@ WinOLS "&Mirror map". The image stays in stored order. WinOLS shows the axis, an
 
 ### Free editable
 
-Datasource 4. `Values` is 4 bytes per point, with the axis point in the element type at the start of each group. Setting an 8-bit axis to 1..8 writes 32 bytes (`01` through `08`, then zeros), clears the address, and sets the factor to 1. Datasource 5 (EEPROM backwards) clears the list.
+Datasource 4. `Values` is length-prefixed; the length is always 4 bytes times the axis point count. The points are packed consecutively in the axis element type (little-endian for multi-byte), then zero-padded to that length. An 8-bit axis with values 1..8 is 32 bytes (`01`..`08`, then zeros). A 16-bit axis (KFMIOP-06 X) packs `u16` LE values the same way and pads to 4×points. Free editable also clears the axis address and sets its factor to 1. Datasource 5 (EEPROM backwards) clears the list.
 
 In v2 the list is empty except on free-editable axes. In v1 both axis records hold zeros, 4 bytes per stored row, on almost every map.
 

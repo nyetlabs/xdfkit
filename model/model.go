@@ -119,8 +119,8 @@ type Value struct {
 	Units       string     `json:"units,omitempty" doc:"Physical units."`
 	Precision   int        `json:"precision" doc:"Decimal places shown."`
 	Conversion  Conversion `json:"conversion" doc:"Raw to physical conversion."`
-	Min         *float64   `json:"min,omitempty" doc:"Lowest value shown. Omitted when the source has none."`
-	Max         *float64   `json:"max,omitempty" doc:"Highest value shown. Omitted when the source has none."`
+	Min         *float64   `json:"min,omitempty" doc:"Lowest value shown (display units). Omitted when the source has none or only the default raw span. KP stores the raw pair; read and write convert with the conversion."`
+	Max         *float64   `json:"max,omitempty" doc:"Highest value shown (display units). Omitted when the source has none or only the default raw span. KP stores the raw pair; read and write convert with the conversion."`
 }
 
 // Conversion turns a raw cell into a physical value: factor * raw + offset.
@@ -139,15 +139,16 @@ type View struct {
 
 // Axis gives the axis points of a curve or map.
 type Axis struct {
-	Source    string `json:"source" doc:"image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\"; the values are not in the model yet); unknown: an unnamed KP datasource (written back as ordinal)." enum:"image|ordinal|editable|unknown"`
-	Stored    string `json:"stored,omitempty" doc:"How image values are stored: absolute; subtract: 2^bits minus the sum of the remaining raw values (docs/kp-format.md); add and backwards: semantics unknown." enum:"absolute|add|subtract|backwards"`
-	Address   *Addr  `json:"address,omitempty" doc:"File offset of the first axis point, for image axes."`
-	Data      *Data  `json:"data,omitempty" doc:"Axis-point storage, for image axes."`
-	Value     Value  `json:"value" doc:"Axis-point meaning and conversion."`
-	View      View   `json:"view,omitzero" doc:"Display settings."`
-	Mirror    bool   `json:"mirror,omitzero" doc:"KP \"mirror map\" axis setting: WinOLS shows the axis in descending order; storage is unchanged."`
-	Header    int    `json:"header,omitzero" doc:"Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count."`
-	Signature *int   `json:"signature,omitempty" doc:"Marker value WinOLS associates with the axis (KP SignatureByte, the byte before the axis data; unconfirmed); omitted when none."`
+	Source    string    `json:"source" doc:"image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\"); unknown: an unnamed KP datasource (written back as ordinal)." enum:"image|ordinal|editable|unknown"`
+	Stored    string    `json:"stored,omitempty" doc:"How image values are stored: absolute; subtract: 2^bits minus the sum of the remaining raw values (docs/kp-format.md); add and backwards: semantics unknown." enum:"absolute|add|subtract|backwards"`
+	Address   *Addr     `json:"address,omitempty" doc:"File offset of the first axis point, for image axes."`
+	Data      *Data     `json:"data,omitempty" doc:"Axis-point storage, for image and editable axes."`
+	Value     Value     `json:"value" doc:"Axis-point meaning and conversion."`
+	View      View      `json:"view,omitzero" doc:"Display settings."`
+	Mirror    bool      `json:"mirror,omitzero" doc:"KP \"mirror map\" axis setting: WinOLS shows the axis in descending order; storage is unchanged."`
+	Header    int       `json:"header,omitzero" doc:"Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count."`
+	Signature *int      `json:"signature,omitempty" doc:"Marker value WinOLS associates with the axis (KP SignatureByte, the byte before the axis data; unconfirmed); omitted when none."`
+	Values    []float64 `json:"values,omitempty" doc:"Fixed axis points in display units, for editable axes. KP packs them as consecutive elements in the axis type, zero-padded to 4 bytes per point."`
 }
 
 // Addr is a file offset, written as a hex string ("0x13D52").

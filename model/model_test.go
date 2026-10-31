@@ -379,10 +379,11 @@ func TestOmittedBase(t *testing.T) {
 	}
 }
 
-// TestKPRange fills a missing value range from the conversion of the raw
-// endpoints, and orders a reciprocal map's limits low to high.
+// TestKPRange: without model limits the KP width pair is the default raw
+// span; display min/max convert to raw (and order low to high).
 func TestKPRange(t *testing.T) {
-	lo, hi := 90.0, 10.0
+	lo, hi := 1500.0, 250.0 // display; factor 0.25 → raw 6000, 1000
+	rlo, rhi := 10.0, 90.0  // display with factor 1 → raw 10, 90
 	cell := func(key string, bits int, v Value) *Object {
 		return &Object{
 			Key: key, ID: key, Shape: "value", Address: 0x1000, Rows: 1, Cols: 1,
@@ -391,8 +392,8 @@ func TestKPRange(t *testing.T) {
 	}
 	m := &Model{Schema: SchemaID, Objects: []*Object{
 		cell("SCALE", 8, Value{Conversion: Conversion{Factor: 0.75}}),
-		cell("INV", 8, Value{Conversion: Conversion{Factor: 255, Reciprocal: true}}),
-		cell("SWAPPED", 8, Value{Min: &lo, Max: &hi, Conversion: Conversion{Factor: 1, Reciprocal: true}}),
+		cell("LIMITS", 16, Value{Min: &lo, Max: &hi, Conversion: Conversion{Factor: 0.25}}),
+		cell("SWAP", 8, Value{Min: &rhi, Max: &rlo, Conversion: Conversion{Factor: 1}}),
 		cell("ID", 16, Value{Conversion: Conversion{Factor: 1}}),
 	}}
 	f, err := m.KP(nil)
@@ -400,8 +401,63 @@ func TestKPRange(t *testing.T) {
 		t.Fatal(err)
 	}
 	rng := func(i, slot int) [2]int64 { return f.Project.Maps[i].Range[slot] }
-	// 0.75*255 rounds to 191. Reciprocal raw 1 and 255 swap to 1..255.
-	if rng(0, 0) != [2]int64{0, 191} || rng(1, 0) != [2]int64{1, 255} || rng(2, 0) != [2]int64{10, 90} || rng(3, 1) != [2]int64{0, 65535} {
-		t.Fatalf("%v %v %v %v", rng(0, 0), rng(1, 0), rng(2, 0), rng(3, 1))
+	if rng(0, 0) != [2]int64{0, 255} || rng(1, 1) != [2]int64{1000, 6000} || rng(2, 0) != [2]int64{10, 90} || rng(3, 1) != [2]int64{0, 65535} {
+		t.Fatalf("%v %v %v %v", rng(0, 0), rng(1, 1), rng(2, 0), rng(3, 1))
 	}
+	back := FromKP(f)
+	if back.Objects[0].Value.Min != nil || back.Objects[3].Value.Min != nil {
+		t.Fatal("default raw span should omit model limits")
+	}
+	if back.Objects[1].Value.Min == nil || *back.Objects[1].Value.Min != 250 || *back.Objects[1].Value.Max != 1500 {
+		t.Fatalf("16-bit limits: %#v", back.Objects[1].Value)
+	}
+}
+
+// TestKPEditableValues round-trips free-editable axis values (8-bit and 16-bit).
+func TestKPEditableValues(t *testing.T) {
+	vals8 := []float64{1, 2, 3, 4, 5, 6, 7, 8}
+	vals16 := []float64{1, 2, 4, 5, 7, 8, 10, 11, 13, 14, 16}
+	d8 := Data{Bits: 8}
+	d16 := Data{Bits: 16, Endian: "little"}
+	m := &Model{Schema: SchemaID, Objects: []*Object{
+		{
+			Key: "T8", ID: "T8", Shape: "1d", Address: 0x100, Rows: 1, Cols: 8,
+			Data: d8, Value: Value{Conversion: Conversion{Factor: 1}},
+			X: &Axis{Source: "editable", Data: &d8, Value: Value{Conversion: Conversion{Factor: 1}, Precision: 1}, Values: vals8},
+		},
+		{
+			Key: "T16", ID: "T16", Shape: "2d", Inverse: true, Address: 0x200, Rows: 16, Cols: 11,
+			Data: d16, Value: Value{Conversion: Conversion{Factor: 1}},
+			X: &Axis{Source: "editable", Data: &d16, Value: Value{Conversion: Conversion{Factor: 1}, Precision: 4}, Values: vals16},
+			Y: &Axis{Source: "ordinal", Value: Value{Conversion: Conversion{Factor: 1}}},
+		},
+	}}
+	f, err := m.KP(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	x0 := f.Project.Maps[0].X
+	if x0.DataSource != kp.DSFreeEditable || len(x0.Values) != 32 || string(x0.Values[:8]) != "\x01\x02\x03\x04\x05\x06\x07\x08" {
+		t.Fatalf("8-bit pack: ds=%v len=%d %x", x0.DataSource, len(x0.Values), x0.Values)
+	}
+	x1 := f.Project.Maps[1].X
+	if x1.DataSource != kp.DSFreeEditable || len(x1.Values) != 64 {
+		t.Fatalf("16-bit pack: ds=%v len=%d", x1.DataSource, len(x1.Values))
+	}
+	back := FromKP(f)
+	if !equalFloats(back.Objects[0].X.Values, vals8) || !equalFloats(back.Objects[1].X.Values, vals16) {
+		t.Fatalf("round trip values: %#v %#v", back.Objects[0].X.Values, back.Objects[1].X.Values)
+	}
+}
+
+func equalFloats(a, b []float64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

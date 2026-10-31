@@ -50,7 +50,7 @@
         },
         "data": {
           "$ref": "#/$defs/Data",
-          "description": "Axis-point storage, for image axes."
+          "description": "Axis-point storage, for image and editable axes."
         },
         "header": {
           "description": "Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count.",
@@ -65,7 +65,7 @@
           "type": "integer"
         },
         "source": {
-          "description": "image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\"; the values are not in the model yet); unknown: an unnamed KP datasource (written back as ordinal).",
+          "description": "image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\"); unknown: an unnamed KP datasource (written back as ordinal).",
           "enum": [
             "image",
             "ordinal",
@@ -87,6 +87,13 @@
         "value": {
           "$ref": "#/$defs/Value",
           "description": "Axis-point meaning and conversion."
+        },
+        "values": {
+          "description": "Fixed axis points in display units, for editable axes. KP packs them as consecutive elements in the axis type, zero-padded to 4 bytes per point.",
+          "items": {
+            "type": "number"
+          },
+          "type": "array"
         },
         "view": {
           "$ref": "#/$defs/View",
@@ -421,11 +428,11 @@
           "type": "string"
         },
         "max": {
-          "description": "Highest value shown. Omitted when the source has none.",
+          "description": "Highest value shown (display units). Omitted when the source has none or only the default raw span. KP stores the raw pair; read and write convert with the conversion.",
           "type": "number"
         },
         "min": {
-          "description": "Lowest value shown. Omitted when the source has none.",
+          "description": "Lowest value shown (display units). Omitted when the source has none or only the default raw span. KP stores the raw pair; read and write convert with the conversion.",
           "type": "number"
         },
         "precision": {

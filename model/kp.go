@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	_ "embed"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -223,8 +224,8 @@ func objectFromKP(km *kp.Map, inFolder bool) *Object {
 		Data:        dataFromKP(km.Type, km.Signed),
 		Value:       valueFromKP(km.Value, int(km.Precision), km.Reciprocal),
 		View:        View{Base: int(km.Base), Difference: km.Difference, Percent: km.Percent},
-		X:           axisFromKP(km.X),
-		Y:           axisFromKP(km.Y),
+		X:           axisFromKP(km.X, axisCount(km, true)),
+		Y:           axisFromKP(km.Y, axisCount(km, false)),
 	}
 	if km.Marked != 0 {
 		o.VisLevel = 1
@@ -241,7 +242,34 @@ func objectFromKP(km *kp.Map, inFolder bool) *Object {
 	default:
 		o.Shape = "value"
 	}
+	valueRangeFromKP(km, o)
 	return o
+}
+
+// axisCount is the free-editable Values length: StoredCols/StoredRows when set
+// (swapped on 2d-inverse), else Cols/Rows.
+func axisCount(km *kp.Map, x bool) int {
+	if x {
+		if km.StoredCols > 0 {
+			return int(km.StoredCols)
+		}
+		return int(km.Cols)
+	}
+	if km.StoredRows > 0 {
+		return int(km.StoredRows)
+	}
+	return int(km.Rows)
+}
+
+func (o *Object) modelAxisCount(x bool) int {
+	c, r := o.Cols, o.Rows
+	if o.Inverse {
+		c, r = r, c
+	}
+	if x {
+		return c
+	}
+	return r
 }
 
 func (o *Object) kpMap(i int) *kp.Map {
@@ -271,8 +299,8 @@ func (o *Object) kpMap(i int) *kp.Map {
 		Start:        uint32(o.Address),
 		End:          uint32(o.Address) + uint32(o.Rows*o.Cols*t.Width()),
 		Addr2:        uint32(o.Address),
-		X:            o.X.kpAxis(),
-		Y:            o.Y.kpAxis(),
+		X:            o.X.kpAxis(o.modelAxisCount(true)),
+		Y:            o.Y.kpAxis(o.modelAxisCount(false)),
 		StoredCols:   int32(o.Cols),
 		StoredRows:   int32(o.Rows),
 		Term2:        kp.Hex{1, 1, 1},
@@ -324,31 +352,75 @@ func kpValue(v Value) kp.Value {
 	return kp.Value{Description: v.Description, Units: v.Units, Factor: v.Conversion.Factor, Offset: v.Conversion.Offset}
 }
 
-// kpValueRange sets the value-range pair for the map's width when the map
-// did not come from a template. Both model limits, ordered low to high, win.
-// Otherwise the pair is the conversion of the raw endpoints. The field
-// cannot be omitted.
-func kpValueRange(km *kp.Map, o *Object) {
-	lo, hi, ok := Limits(o.Value.Conversion, o.Data)
-	if o.Value.Min != nil && o.Value.Max != nil {
-		lo, hi, ok = *o.Value.Min, *o.Value.Max, true
+// rawRangeDefaults is the WinOLS default Value range pair for the map width.
+func rawRangeDefaults(bits int) (lo, hi int64, ok bool) {
+	switch bits {
+	case 8:
+		return 0, 255, true
+	case 16:
+		return 0, 65535, true
+	case 32:
+		return 0, 4294967295, true
 	}
-	if !ok || math.IsNaN(lo+hi) || math.IsInf(lo, 0) || math.IsInf(hi, 0) {
+	return 0, 0, false
+}
+
+// valueRangeFromKP sets model min/max from the KP raw range pair for the map
+// width, converted to display units. The default raw pair is omitted.
+func valueRangeFromKP(km *kp.Map, o *Object) {
+	if o.Data.Float {
 		return
 	}
+	defLo, defHi, ok := rawRangeDefaults(o.Data.Bits)
+	if !ok {
+		return
+	}
+	s := min(o.Data.Bits/16, 2)
+	lo, hi := km.Range[s][0], km.Range[s][1]
+	if lo == defLo && hi == defHi {
+		return
+	}
+	dlo, dhi := o.Value.Conversion.Apply(float64(lo)), o.Value.Conversion.Apply(float64(hi))
+	if math.IsNaN(dlo+dhi) || math.IsInf(dlo, 0) || math.IsInf(dhi, 0) {
+		return
+	}
+	if dlo > dhi {
+		dlo, dhi = dhi, dlo
+	}
+	o.Value.Min, o.Value.Max = &dlo, &dhi
+}
+
+// kpValueRange sets the KP raw value-range pair for the map's width when the
+// map did not come from a template. Model min/max (display) are converted to
+// raw. Otherwise the default raw pair for the width is written. The field
+// cannot be omitted.
+func kpValueRange(km *kp.Map, o *Object) {
+	defLo, defHi, ok := rawRangeDefaults(o.Data.Bits)
+	if !ok || o.Data.Float {
+		return
+	}
+	s := min(o.Data.Bits/16, 2)
+	km.Range[s][0], km.Range[s][1] = defLo, defHi
+	if o.Value.Min == nil || o.Value.Max == nil {
+		return
+	}
+	a := o.Value.Conversion.Unapply(*o.Value.Min)
+	b := o.Value.Conversion.Unapply(*o.Value.Max)
+	if math.IsNaN(a+b) || math.IsInf(a, 0) || math.IsInf(b, 0) {
+		return
+	}
+	lo, hi := math.Round(a), math.Round(b)
 	if lo > hi {
 		lo, hi = hi, lo
 	}
-	s := min(o.Data.Bits/16, 2)
-	km.Range[s][0], km.Range[s][1] = int64(math.Round(lo)), int64(math.Round(hi))
+	km.Range[s][0], km.Range[s][1] = int64(lo), int64(hi)
 }
 
 // Limits is the conversion of the raw endpoints, ordered. Identity uses the
 // unsigned span. A reciprocal conversion maps the low raw value to the high
-// physical value. Float and a width of 0 have none. The KP writer uses this
-// span when the model has no min and max, because that field cannot be
-// omitted. The XDF writer does not. The XDF reader leaves out a min and max
-// that are only this span.
+// physical value. Float and a width of 0 have none. The XDF reader leaves out
+// a min and max that are only this span. The KP writer uses the default raw
+// pair when the model has no min and max.
 func Limits(c Conversion, d Data) (lo, hi float64, ok bool) {
 	if d.Float || d.Bits <= 0 || d.Bits > 32 {
 		return 0, 0, false
@@ -374,6 +446,21 @@ func (c Conversion) Apply(raw float64) float64 {
 	return float64(raw*c.Factor) + c.Offset
 }
 
+// Unapply is the inverse of Apply: raw from a physical value.
+func (c Conversion) Unapply(phys float64) float64 {
+	if c.Reciprocal {
+		d := phys - c.Offset
+		if d == 0 {
+			return math.NaN()
+		}
+		return c.Factor / d
+	}
+	if c.Factor == 0 {
+		return math.NaN()
+	}
+	return (phys - c.Offset) / c.Factor
+}
+
 // Axis sources and storage by KP datasource (docs/kp-format.md).
 var axisSources = []struct{ source, stored string }{
 	kp.DSOrdinal:         {"ordinal", ""},
@@ -386,7 +473,7 @@ var axisSources = []struct{ source, stored string }{
 
 const noSignature = -1
 
-func axisFromKP(a *kp.Axis) *Axis {
+func axisFromKP(a *kp.Axis, n int) *Axis {
 	if a == nil || !a.Defined {
 		return nil
 	}
@@ -404,16 +491,22 @@ func axisFromKP(a *kp.Axis) *Axis {
 	if ds := int(a.DataSource); ds >= 0 && ds < len(axisSources) {
 		x.Source, x.Stored = axisSources[ds].source, axisSources[ds].stored
 	}
-	if x.Source == "image" {
-		addr, d := Addr(a.Addr), dataFromKP(a.Type, a.Signed)
+	d := dataFromKP(a.Type, a.Signed)
+	switch x.Source {
+	case "image":
+		addr := Addr(a.Addr)
 		x.Address, x.Data = &addr, &d
+	case "editable":
+		x.Data = &d
+		x.Values = unpackAxisValues(a.Values, d, x.Value.Conversion, n)
 	}
 	return x
 }
 
 // kpAxis rebuilds the axis record from the model. Width is derived from the
-// type, as WinOLS stores it (docs/kp-format.md).
-func (x *Axis) kpAxis() *kp.Axis {
+// type, as WinOLS stores it (docs/kp-format.md). n is the axis point count
+// for packing editable Values.
+func (x *Axis) kpAxis(n int) *kp.Axis {
 	a := &kp.Axis{Values: kp.Hex{}}
 	if x == nil {
 		a.Value = kp.Value{Description: "-", Units: "-"} // as WinOLS fills unused slots
@@ -445,7 +538,96 @@ func (x *Axis) kpAxis() *kp.Axis {
 		a.Type = 1
 	}
 	a.Width = int32(a.Type.Width())
+	if x.Source == "editable" && n > 0 && x.Data != nil && !x.Data.Float {
+		a.Values = packAxisValues(x.Values, *x.Data, x.Value.Conversion, n)
+	}
 	return a
+}
+
+// unpackAxisValues reads consecutive axis-type elements from h (padded to
+// 4*n), converts them to display units, and drops a trailing all-zero list.
+func unpackAxisValues(h kp.Hex, d Data, c Conversion, n int) []float64 {
+	w := d.Bits / 8
+	if n < 1 || w < 1 || d.Float || len(h) < n*w {
+		return nil
+	}
+	var order binary.ByteOrder = binary.LittleEndian
+	if d.Endian == "big" {
+		order = binary.BigEndian
+	}
+	out := make([]float64, n)
+	nonzero := false
+	for i := range n {
+		raw := axisRaw(h[i*w:], order, w, d.Signed)
+		if raw != 0 {
+			nonzero = true
+		}
+		out[i] = c.Apply(float64(raw))
+	}
+	if !nonzero {
+		return nil
+	}
+	for len(out) > 0 && out[len(out)-1] == 0 {
+		out = out[:len(out)-1]
+	}
+	return out
+}
+
+// packAxisValues writes display values as consecutive axis-type elements,
+// zero-padded to 4*n bytes.
+func packAxisValues(vals []float64, d Data, c Conversion, n int) kp.Hex {
+	w := d.Bits / 8
+	if n < 1 || w < 1 || d.Float {
+		return kp.Hex{}
+	}
+	var order binary.ByteOrder = binary.LittleEndian
+	if d.Endian == "big" {
+		order = binary.BigEndian
+	}
+	out := make(kp.Hex, 4*n)
+	for i := 0; i < n && i < len(vals); i++ {
+		raw := int64(math.Round(c.Unapply(vals[i])))
+		putAxisRaw(out[i*w:], order, w, d.Signed, raw)
+	}
+	return out
+}
+
+func axisRaw(b []byte, order binary.ByteOrder, w int, signed bool) int64 {
+	var u uint64
+	switch w {
+	case 1:
+		u = uint64(b[0])
+	case 2:
+		u = uint64(order.Uint16(b))
+	case 4:
+		u = uint64(order.Uint32(b))
+	default:
+		return 0
+	}
+	if signed {
+		shift := 64 - 8*w
+		return int64(u) << shift >> shift
+	}
+	return int64(u)
+}
+
+func putAxisRaw(b []byte, order binary.ByteOrder, w int, signed bool, raw int64) {
+	var u uint64
+	if signed {
+		u = uint64(raw)
+	} else if raw < 0 {
+		u = 0
+	} else {
+		u = uint64(raw)
+	}
+	switch w {
+	case 1:
+		b[0] = byte(u)
+	case 2:
+		order.PutUint16(b, uint16(u))
+	case 4:
+		order.PutUint32(b, uint32(u))
+	}
 }
 
 // kpBase is the KP display base. 0 is omitted in the model; WinOLS crashes

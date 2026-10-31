@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/pflag"
 	"go.nyet.org/xdfkit/api"
 	"go.nyet.org/xdfkit/canon"
+	"go.nyet.org/xdfkit/kp"
 	"go.nyet.org/xdfkit/lint"
 )
 
@@ -32,6 +33,7 @@ const usage = `usage:
              [--description keep|fill|replace] [--comment keep|append|replace]
              [-f json|yaml|kp|xdf] [-i image] [--meta file] [--force]
              base [incoming] [output]
+  xdfkit kpdiff [--all] [--bytes] [--byte-limit N] a.kp [b.kp]
   xdfkit version
   xdfkit xdf2kp|kp2json|xdf2json|json2kp FILE...
   xdfkit kp2xdf [-i image] [-m] FILE...
@@ -101,6 +103,13 @@ categories, and another unit becomes an alternate. One file with --smart
 only folds that file. -n prints the report and writes nothing. --force only
 replaces an existing output file. XDF input reads NAME.meta.json beside each
 file; --meta overrides the base file's.
+
+kpdiff flattens decoded KP fields for sweep comparison. One file prints
+path = value lines. Two files print each field that changed (a -> b) and
+exit 1 when any remain after the noise filter. Container noise (filename,
+headerLen, endOffset, fixedHeader, headerBody, trailing) is skipped unless
+--all. --bytes also lists raw byte offsets that differ, capped by
+--byte-limit (default 64; 0 means all).
 `
 
 func main() {
@@ -127,7 +136,9 @@ func main() {
 		fmt.Println(api.Version)
 		return
 	}
-	cmds := map[string]func([]string) error{"verify": verify, "lint": lintCmd, "fix": fix, "merge": mergeCmd}
+	cmds := map[string]func([]string) error{
+		"verify": verify, "lint": lintCmd, "fix": fix, "merge": mergeCmd, "kpdiff": kpdiff,
+	}
 	run := convert
 	if len(args) > 0 && cmds[args[0]] != nil {
 		run, args = cmds[args[0]], args[1:]
@@ -535,6 +546,62 @@ func writeConverted(out string, b, meta []byte, force bool) error {
 		return err
 	}
 	return writeOutput(metaName(out), meta, force)
+}
+
+func kpdiff(args []string) error {
+	fs := newFlags("kpdiff")
+	all := fs.Bool("all", false, "include container noise fields")
+	bytesFlag := fs.Bool("bytes", false, "also list raw byte offsets that differ")
+	byteLimit := fs.Int("byte-limit", 64, "max byte diffs to print; 0 means all")
+	files, err := parse(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(files) < 1 || len(files) > 2 {
+		return errors.New("kpdiff: need one or two KP files")
+	}
+	raw := make([][]byte, len(files))
+	flat := make([]map[string]string, len(files))
+	for i, name := range files {
+		raw[i], err = readInput(name)
+		if err != nil {
+			return err
+		}
+		f, err := kp.Parse(raw[i])
+		if err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+		flat[i], err = kp.Flat(f)
+		if err != nil {
+			return fmt.Errorf("%s: %w", name, err)
+		}
+	}
+	if len(files) == 1 {
+		for _, k := range slices.Sorted(maps.Keys(flat[0])) {
+			fmt.Printf("%s = %s\n", k, flat[0][k])
+		}
+		return nil
+	}
+	diffs := kp.Diff(flat[0], flat[1], *all)
+	for _, d := range diffs {
+		a, b := d.A, d.B
+		if a == "" {
+			a = "<missing>"
+		}
+		if b == "" {
+			b = "<missing>"
+		}
+		fmt.Printf("%s: %s -> %s\n", d.Path, a, b)
+	}
+	if *bytesFlag {
+		for _, line := range kp.ByteDiff(raw[0], raw[1], *byteLimit) {
+			fmt.Println(line)
+		}
+	}
+	if len(diffs) > 0 {
+		os.Exit(1)
+	}
+	return nil
 }
 
 func verify(args []string) error {

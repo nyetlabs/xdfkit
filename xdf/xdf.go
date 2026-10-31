@@ -542,11 +542,14 @@ func axisPoints(id string, x *model.Axis, size int, image []byte, static bool) (
 	a.Data = embedded{ElementSizeBits: 16, MajorStrideBits: -32}
 	vals := make([]float64, size)
 	for i := range size {
-		v := float64(i)
-		if raw != nil {
-			v = raw[i]
+		switch {
+		case raw != nil:
+			vals[i] = c.Apply(raw[i])
+		case x != nil && i < len(x.Values):
+			vals[i] = x.Values[i] // already display units
+		default:
+			vals[i] = c.Apply(float64(i))
 		}
-		vals[i] = c.Apply(v)
 		a.Labels = append(a.Labels, label{Index: i, Value: javaFixed(vals[i], prec)})
 	}
 	a.OutputType = outputType(prec, base, vals)

@@ -252,7 +252,7 @@ func value(o *model.Value, c model.Value, d model.Data) {
 	if limitPrecision(p, d.Bits, d.Signed) == o.Precision {
 		o.Precision = c.Precision
 	}
-	if o.Min == nil && o.Max == nil || limitsMatch(o, o.Conversion, d) || limitsMatch(o, c.Conversion, d) {
+	if o.Min == nil && o.Max == nil || limitsMatch(o, o.Conversion, d) || limitsMatch(o, c.Conversion, d) || limitsClose(*o, c) {
 		o.Min, o.Max = c.Min, c.Max
 	}
 }
@@ -269,6 +269,16 @@ func limitsMatch(v *model.Value, c model.Conversion, d model.Data) bool {
 		return false
 	}
 	return *v.Min == lo && *v.Max == hi || javaFixed(*v.Min, 6) == javaFixed(lo, 6) && javaFixed(*v.Max, 6) == javaFixed(hi, 6)
+}
+
+// limitsClose reports that the XDF spelling of the limits (6 decimals) matches
+// the metadata. The XDF wire form is lossy; keep the metadata (KP-derived)
+// values when only that spelling differs.
+func limitsClose(o, c model.Value) bool {
+	if o.Min == nil || o.Max == nil || c.Min == nil || c.Max == nil {
+		return false
+	}
+	return javaFixed(*o.Min, 6) == javaFixed(*c.Min, 6) && javaFixed(*o.Max, 6) == javaFixed(*c.Max, 6)
 }
 
 // remap translates category ids from one category list to another by name,

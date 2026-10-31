@@ -76,12 +76,12 @@ Names and limits for the rows above:
 - Units. A2L `COMPU_METHOD` unit / `PHYS_UNIT`.
 - Display precision. A2L `FORMAT`. XDF `decimalpl`.
 - Display base. KP base field; v2 uses binary on codewords such as CWMSRCAN. XDF decimal and hex only. Model view base.
-- Min / max. KP `range`: one low/high pair per element width, stored as typed (`kp-format.md`). Raw versus displayed units is unconfirmed. A2L limits plus `EXTENDED_LIMITS`. DAMOS `/SPW`, `/SPX` and `/SPY` limits. Model `min` and `max` on `value`, omitted when the source has none (`model.md`).
+- Min / max. KP `range`: one low/high pair per element width, stored as typed raw / eprom units (`kp-format.md`; the Value range dialog does not follow the map's raw/scaled display toggle). A2L limits plus `EXTENDED_LIMITS`. DAMOS `/SPW`, `/SPX` and `/SPY` limits. Model `min` and `max` on `value`, omitted when the source has none (`model.md`).
 - Difference / percent. KP flags. Model view flags.
 - Per-map doubles. KP `viewScale`, `viewOffset`, `view2DScale`, and `view3DRotation` (often 300.0, 1.0) are view state, not a conversion. Not in the model. KP output takes them from a template or from defaults.
 - Read from image. KP datasource EEPROM. A2L `STD_AXIS` / `COM_AXIS`. XDF `EMBEDDEDDATA`. Model source `image`.
 - Per-axis type, sign, units, conversion.
-- Fixed values. KP ordinal `1, 2, 3`, or free editable with 4 bytes per point. v2 stores those values in the axis list, in the axis type. A2L `FIX_AXIS_PAR`, `FIX_AXIS_DIST`, `FIX_AXIS_LIST`. XDF static `LABEL`s. Model source `editable`; the values are not stored.
+- Fixed values. KP ordinal `1, 2, 3`, or free editable: consecutive elements in the axis type, zero-padded to 4 bytes per point (`kp-format.md`). A2L `FIX_AXIS_PAR`, `FIX_AXIS_DIST`, `FIX_AXIS_LIST`. XDF static `LABEL`s. Model source `editable` with `values` (display units).
 - Shared axis object. KP repeats the address on each map. A2L `COM_AXIS` points at `AXIS_PTS`. DAMOS type 7 (curve) and 8 (map) name an axis-point table by its `/SPZ` index on `/SPX` and `/SPY`; the reader copies that table's axis-point address, width, conversion and length. XDF links an axis to another table (`embedinfo type="3"`, `linkobjid` the uniqueid; TunerPro 5). The model repeats the address. The XDF writer links an axis to a matching curve at that address.
 - Point count from image. A2L `NO_AXIS_PTS` in the record layout. Model `header` is a byte count; the point count is not read.
 - Stored as differences. KP `EEPROM, subtract` counts gaps down from 256 (`kp-format.md`). `add` and `backwards` are still unknown. ME7 packs include absolute axes labelled subtract. A2L `DEPOSIT DIFFERENCE`. XDF writes a live helper table of `CELL()` equations (`kp-format.md`), confirmed in TunerPro 6.00.0149.00. `--static-axes` writes static labels from the image. The model stores `absolute`, `add`, `subtract`, and `backwards`.
