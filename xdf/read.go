@@ -115,7 +115,7 @@ func view(b []byte) (m *model.Model, uids, warnings []string, folds map[string]s
 		prec = *h.Defaults.SigDigits
 	}
 	// Wider cells with no mmedtypeflags follow DEFAULTS lsbfirst; when that
-	// is also missing, little-endian (C167 / ME7). mapdump omits the flag
+	// is also missing, little-endian (C167 / ME7). Some writers omit the flag
 	// for unsigned big-endian KP types, which is wrong on those bins.
 	defaultLE := true
 	if h.Defaults.LSBFirst != nil {
@@ -218,7 +218,12 @@ func (r *robject) object(prec int, cats map[int]bool, defaultLE bool) (*model.Ob
 			o.Shape = "2d"
 		}
 	}
-	addr, err := parseHex(z.Data.Address)
+	// TunerPro omits mmedaddress when it is 0.
+	var addr uint64
+	var err error
+	if s := strings.TrimSpace(z.Data.Address); s != "" {
+		addr, err = parseHex(s)
+	}
 	if err != nil || addr > 0xFFFFFFFF {
 		return nil, nil, fmt.Errorf("cell address %q", z.Data.Address)
 	}

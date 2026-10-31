@@ -94,6 +94,50 @@ func TestReadAbsentTypeFlagsNoDefaults(t *testing.T) {
 	}
 }
 
+// TunerPro omits mmedaddress when it is 0 (confirmed on float-flag save).
+func TestReadAbsentAddressIsZero(t *testing.T) {
+	const xdf = `<?xml version="1.0" encoding="UTF-8"?>
+<XDFFORMAT version="1.50">
+  <XDFHEADER>
+    <deftitle>t</deftitle>
+  </XDFHEADER>
+  <XDFCONSTANT uniqueid="0x1">
+    <title>F1</title>
+    <EMBEDDEDDATA mmedtypeflags="0x10002" mmedelementsizebits="32" />
+    <MATH equation="X"><VAR id="X" /></MATH>
+  </XDFCONSTANT>
+  <XDFTABLE uniqueid="0x2">
+    <title>F4</title>
+    <XDFAXIS id="x">
+      <EMBEDDEDDATA mmedelementsizebits="16" mmedmajorstridebits="-32" />
+      <indexcount>4</indexcount>
+      <MATH equation="X"><VAR id="X" /></MATH>
+    </XDFAXIS>
+    <XDFAXIS id="y">
+      <indexcount>1</indexcount>
+      <MATH equation="X"><VAR id="X" /></MATH>
+    </XDFAXIS>
+    <XDFAXIS id="z">
+      <EMBEDDEDDATA mmedtypeflags="0x10002" mmedelementsizebits="32" mmedrowcount="1" mmedcolcount="4" />
+      <MATH equation="X"><VAR id="X" /></MATH>
+    </XDFAXIS>
+  </XDFTABLE>
+</XDFFORMAT>
+`
+	m, _, _, _, err := view([]byte(xdf))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(m.Objects) != 2 {
+		t.Fatalf("objects: %d", len(m.Objects))
+	}
+	for _, o := range m.Objects {
+		if o.Address != 0 || !o.Data.Float {
+			t.Fatalf("%s: addr=%#x data=%+v", o.ID, o.Address, o.Data)
+		}
+	}
+}
+
 func TestWriteWiderCellsAlwaysTypeFlags(t *testing.T) {
 	o := &model.Object{
 		ID: "V", Shape: "value", Rows: 1, Cols: 1, Address: 0x10,

@@ -6,11 +6,9 @@ import (
 	"fmt"
 	"io"
 	"maps"
-	"math"
 	"os"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -67,80 +65,6 @@ func parse(t *testing.T, b []byte) *node {
 	}
 	return root
 }
-
-// diff reports where got and want differ, up to max lines.
-func diff(path string, got, want *node, out *[]string, limit int) {
-	if len(*out) >= limit {
-		return
-	}
-	if got.Name == "embedinfo" && got.Attrs["type"] == "3" {
-		// mapdump didn't link axes
-		got = &node{Name: got.Name, Attrs: map[string]string{"type": "1"}}
-	}
-	if _, ok := got.Attrs["vislevel"]; ok {
-		// mapdump didn't write vislevel (marked → 1, unmarked → 2)
-		got = &node{Name: got.Name, Attrs: maps.Clone(got.Attrs), Text: got.Text, Kids: got.Kids}
-		delete(got.Attrs, "vislevel")
-	}
-	if e, ok := want.Attrs["equation"]; ok && got.Name == "MATH" {
-		// mapdump wrote offsets too small to show
-		if i := strings.LastIndex(e, "+ "); i >= 0 {
-			if f, err := strconv.ParseFloat(e[i+2:], 64); err == nil && math.Abs(f) < minOffset {
-				want = &node{Name: want.Name, Attrs: maps.Clone(want.Attrs), Text: want.Text, Kids: want.Kids}
-				want.Attrs["equation"] = e[:i]
-				if e[:i] == "1 * X" {
-					want.Attrs["equation"] = "X"
-				}
-			}
-		}
-	}
-	if got.Name == "LABEL" && want.Attrs["value"] == "" && got.Attrs["value"] == "0" {
-		// mapdump left index 0 blank when the precision was 0; the value is an attribute
-		want = &node{Name: want.Name, Attrs: maps.Clone(want.Attrs), Text: want.Text, Kids: want.Kids}
-		want.Attrs["value"] = "0"
-	}
-	if got.String() != want.String() {
-		*out = append(*out, fmt.Sprintf("%s: got %s, want %s", path, got, want))
-		return
-	}
-	// mapdump wrote text that was only whitespace as empty elements
-	want.Kids = slices.DeleteFunc(slices.Clone(want.Kids), func(n *node) bool {
-		return (n.Name == "description" || n.Name == "units" || n.Name == "title") && n.Text == ""
-	})
-	if want.Name == "XDFAXIS" && !slices.ContainsFunc(got.Kids, isUnits) {
-		// mapdump wrote the KP's units on axes the model doesn't have
-		want.Kids = slices.DeleteFunc(slices.Clone(want.Kids), func(n *node) bool { return isUnits(n) && n.Text == "-" })
-	}
-	if !slices.ContainsFunc(got.Kids, func(n *node) bool { return n.Name == "outputtype" && n.Text == "2" }) {
-		// integer output type blanks a 0 in TunerPro; mapdump wrote it for every precision of 0
-		want.Kids = slices.DeleteFunc(slices.Clone(want.Kids), func(n *node) bool { return n.Name == "outputtype" && n.Text == "2" })
-	}
-	hasMin := func(n *node) bool { return n.Name == "min" }
-	switch {
-	case !slices.ContainsFunc(got.Kids, hasMin):
-		// mapdump writes the raw span; a missing model range is not that claim
-		want.Kids = slices.DeleteFunc(slices.Clone(want.Kids), func(n *node) bool { return n.Name == "min" || n.Name == "max" })
-	case !slices.ContainsFunc(want.Kids, hasMin):
-		got.Kids = slices.DeleteFunc(slices.Clone(got.Kids), func(n *node) bool { return n.Name == "min" || n.Name == "max" })
-	}
-	for i := range max(len(got.Kids), len(want.Kids)) {
-		p := fmt.Sprintf("%s/%d", path, i)
-		switch {
-		case i >= len(got.Kids):
-			*out = append(*out, fmt.Sprintf("%s: missing %s", p, want.Kids[i]))
-		case i >= len(want.Kids):
-			*out = append(*out, fmt.Sprintf("%s: extra %s", p, got.Kids[i]))
-		default:
-			diff(p+"("+want.Kids[i].Name+")", got.Kids[i], want.Kids[i], out, limit)
-			continue
-		}
-		if len(*out) >= limit {
-			return
-		}
-	}
-}
-
-func isUnits(n *node) bool { return n.Name == "units" }
 
 func liveNode(n *node) bool {
 	for _, c := range n.Kids {
@@ -399,36 +323,6 @@ func TestLimitPrecision(t *testing.T) {
 	}
 }
 
-// TestMapdump compares the XDF of each archived pack with mapdump's XDF of
-// the KP that xdfkit writes from the model, in the directory
-// XDFKIT_MAPDUMP_DIR.
-func TestMapdump(t *testing.T) {
-	ref := os.Getenv("XDFKIT_MAPDUMP_DIR")
-	if ref == "" {
-		t.Skip("XDFKIT_MAPDUMP_DIR not set")
-	}
-	dir := testenv.Archive(t)
-	xdfs, _ := filepath.Glob(filepath.Join(ref, "*.xdf"))
-	for _, path := range xdfs {
-		stem := strings.TrimSuffix(filepath.Base(path), ".xdf")
-		t.Run(stem, func(t *testing.T) {
-			got, err := WriteLabels(readModel(t, dir, stem), corpus.ArchiveImage(t, stem), stem)
-			if err != nil {
-				t.Fatal(err)
-			}
-			want, err := os.ReadFile(path)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var out []string
-			diff("", parse(t, got), parse(t, want), &out, 20)
-			for _, s := range out {
-				t.Error(s)
-			}
-		})
-	}
-}
-
 // TestShownFormat checks the TunerPro display of a zero and of an identity
 // conversion. Integer output type is used only when every value is a positive
 // whole number. Min and max are written only when the model has both.
@@ -511,6 +405,69 @@ func TestSwappedLimits(t *testing.T) {
 	b := mustWrite(t, m, make([]byte, 16))
 	if !bytes.Contains(b, []byte("<min>10.000000</min>")) || !bytes.Contains(b, []byte("<max>90.000000</max>")) {
 		t.Fatalf("range not ordered")
+	}
+}
+
+// TestFloatTypeFlags: float cells get mmedtypeflags bit 0x10000 (and LE for
+// wider cells). Confirmed in TunerPro 6.00.0149.00 (load and save).
+func TestFloatTypeFlags(t *testing.T) {
+	m := &model.Model{Schema: model.SchemaID, Objects: []*model.Object{{
+		Key: "F", ID: "F", Shape: "value", Address: 0, Rows: 1, Cols: 1,
+		Data:  model.Data{Bits: 32, Endian: "little", Float: true},
+		Value: model.Value{Conversion: model.Conversion{Factor: 1}},
+	}}}
+	b := mustWrite(t, m, make([]byte, 4))
+	if !bytes.Contains(b, []byte(`mmedtypeflags="0x10002"`)) {
+		t.Fatalf("float LE flags missing: %s", b)
+	}
+	if !bytes.Contains(b, []byte(`version="1.80"`)) {
+		t.Fatalf("want XDF 1.80: %s", b)
+	}
+	got, _, err := Read(b, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.Objects[0].Data.Float || got.Objects[0].Data.Endian != "little" {
+		t.Fatalf("read back %+v", got.Objects[0].Data)
+	}
+}
+
+// TestFloatTableNonIdentityFails: TunerPro warns on non-X equations for float
+// tables; the writer rejects that source conversion. Constants may use 2*X.
+func TestFloatTableNonIdentityFails(t *testing.T) {
+	img := make([]byte, 16)
+	table := &model.Object{
+		Key: "F4", ID: "F4", Shape: "1d", Address: 0, Rows: 1, Cols: 4,
+		Data:  model.Data{Bits: 32, Endian: "little", Float: true},
+		Value: model.Value{Conversion: model.Conversion{Factor: 2}},
+		X:     &model.Axis{Source: "ordinal", Value: model.Value{Conversion: model.Conversion{Factor: 1}}},
+	}
+	_, err := Write(&model.Model{Schema: model.SchemaID, Objects: []*model.Object{table}}, img, "t")
+	if err == nil || !strings.Contains(err.Error(), "equation X") {
+		t.Fatalf("want float equation error, got %v", err)
+	}
+	c := &model.Object{
+		Key: "F1", ID: "F1", Shape: "value", Address: 0, Rows: 1, Cols: 1,
+		Data:  model.Data{Bits: 32, Endian: "little", Float: true},
+		Value: model.Value{Conversion: model.Conversion{Factor: 2}},
+	}
+	b, err := Write(&model.Model{Schema: model.SchemaID, Objects: []*model.Object{c}}, img, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(b, []byte(`equation="2 * X"`)) {
+		t.Fatalf("constant should keep 2*X: %s", b)
+	}
+}
+
+func TestFloatBitsMustBe32(t *testing.T) {
+	_, err := Write(&model.Model{Schema: model.SchemaID, Objects: []*model.Object{{
+		Key: "D1", ID: "D1", Shape: "value", Address: 0, Rows: 1, Cols: 1,
+		Data:  model.Data{Bits: 64, Endian: "little", Float: true},
+		Value: model.Value{Conversion: model.Conversion{Factor: 1}},
+	}}}, make([]byte, 8), "t")
+	if err == nil || !strings.Contains(err.Error(), "32 bits") {
+		t.Fatalf("want 32-bit float error, got %v", err)
 	}
 }
 

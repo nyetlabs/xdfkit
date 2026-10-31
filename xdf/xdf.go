@@ -1,16 +1,12 @@
-// Package xdf writes a model as a TunerPro XDF file (XML, format 1.50), as
-// ecuxplot's mapdump did (docs/design.md): categories sorted by name with
-// "My maps" first, objects in address order, precision limited to the six
-// digits TunerPro shows, and "EEPROM, subtract" axes written as a live helper
-// table (docs/kp-format.md). Non-ASCII text is written as
-// character references: TunerPro reads XDF as Windows-1252.
-//
-// Deliberate differences from mapdump: no "Written <date>" comment, so the
-// output is reproducible; no units on axes the model doesn't have; float cells
-// get TunerPro's float type flag; and a category repeated by name keeps its
-// objects instead of moving them to the first category; an image axis whose
-// breakpoints are another curve links to it. The axis mirror flag is ignored
-// (docs/design.md).
+// Package xdf writes a model as a TunerPro XDF file (XML, format 1.80;
+// docs/design.md): categories sorted by name with "My maps" first, objects in
+// address order, precision limited to the six digits TunerPro shows, and
+// "EEPROM, subtract" axes written as a live helper table (docs/kp-format.md).
+// Non-ASCII text is written as character references: TunerPro reads XDF as
+// Windows-1252. Float cells get TunerPro's float type flag; float table/axis
+// cells with a non-identity conversion fail the write. A category repeated by
+// name keeps its objects. An image axis whose breakpoints are another curve
+// links to it. The axis mirror flag is ignored.
 package xdf
 
 import (
@@ -36,7 +32,8 @@ const maxDigits = 6
 // bytes TunerPro reads from an attribute, which crashes it on load.
 const minOffset = 0.5e-6
 
-// EMBEDDEDDATA mmedtypeflags bits. flagFloat is unconfirmed.
+// EMBEDDEDDATA mmedtypeflags bits. flagFloat is IEEE float32 (TunerPro
+// 6.00.0149.00 load and save; 64-bit size is not double).
 const (
 	flagSigned = 0x01
 	flagLE     = 0x02
@@ -195,7 +192,7 @@ func write(m *model.Model, image []byte, title string, labels bool) ([]byte, err
 	if p := m.Provenance; p != nil && p.Subset != nil {
 		desc = strings.TrimPrefix(desc+"\n"+subsetPrefix+" "+p.Subset.Kind+" sha256:"+p.Subset.Table, "\n")
 	}
-	d := document{Version: "1.50", Header: header{
+	d := document{Version: "1.80", Header: header{
 		FileVersion: trim(m.Project.Version),
 		DefTitle:    trim(title),
 		Description: desc,
@@ -281,8 +278,7 @@ func write(m *model.Model, image []byte, title string, labels bool) ([]byte, err
 }
 
 // categories returns the category names, unique, sorted with "My maps" first,
-// and each category id's index among them. Ids outside 0 to n-1 are left out,
-// as mapdump did.
+// and each category id's index among them. Ids outside 0 to n-1 are left out.
 func categories(m *model.Model) ([]string, map[int]int) {
 	valid := func(c *model.Category) bool { return c.ID >= 0 && c.ID < len(m.Categories) }
 	var names []string
@@ -403,6 +399,9 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 	uid := hex(index + 1)
 	vl := xdfVisLevel(o)
 	prec := limitPrecision(o.Value, o.Data.Bits, o.Data.Signed)
+	if err := floatDataOK(o.Data); err != nil {
+		return nil, err
+	}
 	if o.Shape == "value" {
 		return &constant{
 			UniqueID: uid, VisLevel: vl, Title: title, Description: desc, CategoryMem: mem,
@@ -412,6 +411,13 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 			DecimalPl:  decimalPl(prec),
 			Math:       formula(o.Value.Conversion),
 		}, nil
+	}
+	// Float table cells only accept equation X in TunerPro; a factor/offset
+	// draws its round-trip warning. Constants may use a non-identity equation.
+	if o.Data.Float {
+		if err := floatEqOK(o.Value.Conversion); err != nil {
+			return nil, err
+		}
 	}
 	t := &table{UniqueID: uid, VisLevel: vl, Flags: "0x0", Title: title, Description: desc, CategoryMem: mem}
 	for _, a := range []struct {
@@ -517,6 +523,14 @@ func breakpoints(id string, x *model.Axis, size int, image []byte, static bool) 
 	}
 	if !ordinal && raw == nil {
 		d := *x.Data
+		if err := floatDataOK(d); err != nil {
+			return a, fmt.Errorf("axis %s: %w", id, err)
+		}
+		if d.Float {
+			if err := floatEqOK(c); err != nil {
+				return a, fmt.Errorf("axis %s: %w", id, err)
+			}
+		}
 		a.OutputType = outputType(prec, base, shown(c, d, *x.Address, size, image))
 		a.Data = cells(d, *x.Address)
 		a.Data.MajorStrideBits = d.Bits
@@ -721,10 +735,34 @@ func formula(c model.Conversion) equation {
 	return e
 }
 
+// identityEq reports a conversion that writes as equation X.
+func identityEq(c model.Conversion) bool {
+	return !c.Reciprocal && c.Factor == 1 && math.Abs(c.Offset) < minOffset
+}
+
+// floatDataOK rejects float cells that are not 32-bit. TunerPro's float flag
+// is single precision; size 64 still reads float32 from the low four bytes.
+func floatDataOK(d model.Data) error {
+	if !d.Float || d.Bits == 32 {
+		return nil
+	}
+	return fmt.Errorf("float cells must be 32 bits (source data bits=%d)", d.Bits)
+}
+
+// floatEqOK rejects a non-identity conversion on float table/axis cells.
+// TunerPro warns that such equations may not reverse floating-point data.
+func floatEqOK(c model.Conversion) error {
+	if identityEq(c) {
+		return nil
+	}
+	return fmt.Errorf("float table/axis cells require equation X (source conversion factor=%g offset=%g reciprocal=%v)",
+		c.Factor, c.Offset, c.Reciprocal)
+}
+
 // limitPrecision cuts the decimal places so that the largest value of the
-// type has at most maxDigits digits. It reproduces mapdump's arithmetic,
-// including Java's 32-bit int shift, so that 32-bit unsigned cells (and axes
-// without storage, width 0) are measured at raw 0.
+// type has at most maxDigits digits. It uses a Java-style 32-bit int shift, so
+// 32-bit unsigned cells (and axes without storage, width 0) are measured at
+// raw 0.
 func limitPrecision(v model.Value, bits int, signed bool) int {
 	width := bits
 	if signed {

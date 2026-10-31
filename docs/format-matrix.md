@@ -1,6 +1,6 @@
 # Map definition formats: field support
 
-KP v1/v2 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, v1, 4170 maps, and `8D0907551M.kp`, v2, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro XML (mapdump writes 1.50, TunerPro 5.00 and 6.00.0149.00 save 1.80), checked against TunerPro's version history up to 5.00.10305 (2026-01); the model is xdfkit's canonical model in JSON or YAML (`model.md`): "schema 1" is what `model/schema.json` holds today, "target" is the design, not implemented beyond schema 1.
+KP v1/v2 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, v1, 4170 maps, and `8D0907551M.kp`, v2, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro XML 1.80 (xdfkit and TunerPro 5.00 / 6.00.0149.00), checked against TunerPro's version history up to 5.00.10305 (2026-01); the model is xdfkit's canonical model in JSON or YAML (`model.md`): "schema 1" is what `model/schema.json` holds today, "target" is the design, not implemented beyond schema 1.
 
 Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed (samples needed), `-` not applicable. Model is schema 1. Target is the design.
 
@@ -63,7 +63,7 @@ Names and limits for the rows above:
 - Value block. KP and the model: a 2D map with ordinal axes. A2L `VAL_BLK`. DAMOS type 13 (`/FKX` above 1 is the column count). XDF: a table with label axes.
 - Strings. A2L `ASCII`. XDF `outputtype` 4.
 - Integer. A2L also has 64-bit. Model `bits` 8/16/32 and `signed`.
-- Float. KP and the model are 32-bit (`eFloatLoHi` / `eFloatHiLo`). A2L is 16/32/64-bit. XDF has a 32-bit float flag, added in 5.00.8008 (2012). 64-bit is unconfirmed. That build allowed no equation on float data except `X`; whether the limit remains is unconfirmed.
+- Float. KP and the model are 32-bit (`eFloatLoHi` / `eFloatHiLo`). A2L is 16/32/64-bit. XDF `mmedtypeflags` bit 0x10000 is 32-bit IEEE float (confirmed on load and save in TunerPro 6.00.0149.00 on little-endian `0x10002`). Added in 5.00.8008 (2012) as single precision only. 64-bit float is not supported: the same flag with `mmedelementsizebits="64"` still reads float32 from the low four bytes (TunerPro 6.00.0149.00 showed all zeros on a LE double probe whose low halves were zero; `testdata/local/outgoing/float64-flag.xdf`). The writer rejects float cells that are not 32 bits. On a float table or image-axis cell, a non-identity equation draws TunerPro's "equation round trip warning"; the writer fails that source conversion. A float constant accepts and saves `2*X` (confirmed on the float-flag probe).
 - Endianness. KP HiLo/LoHi is the type enum. A2L `BYTE_ORDER`, with a module default. DAMOS may be global. XDF `mmedtypeflags` (absent wider-cell flags follow `DEFAULTS lsbfirst`, else little). Model `endian`.
 - Row vs column major. KP `2d Inverse`: 252 of 4170 maps in 8D0907551G, 99 of 471 in 8D0907551M. A2L `RECORD_LAYOUT`. XDF major stride and flags. Model `inverse` from KP.
 - Gaps / alignment. A2L `RECORD_LAYOUT` positions and `ALIGNMENT_*`. DAMOS pads a 16-bit field to an even address, and an inline map whose axes are both 16-bit stores each count as a 16-bit word (`model.md`). XDF stride only. The model does not store the gap.
