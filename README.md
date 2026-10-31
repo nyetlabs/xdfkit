@@ -83,7 +83,7 @@ flowchart LR
 
 It finds:
 
-- Axes that show the wrong breakpoints in WinOLS. These are fixed.
+- Axes that show the wrong axis points in WinOLS. These are fixed.
 - Axes whose values make no sense, usually a wrong address or size. These are only listed.
 - Out-of-date map end addresses. These are fixed.
 

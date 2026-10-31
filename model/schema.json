@@ -44,13 +44,13 @@
       "additionalProperties": false,
       "properties": {
         "address": {
-          "description": "File offset of the first breakpoint, for image axes.",
+          "description": "File offset of the first axis point, for image axes.",
           "pattern": "^0x[0-9A-Fa-f]{1,8}$",
           "type": "string"
         },
         "data": {
           "$ref": "#/$defs/Data",
-          "description": "Breakpoint storage, for image axes."
+          "description": "Axis-point storage, for image axes."
         },
         "header": {
           "description": "Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count.",
@@ -86,7 +86,7 @@
         },
         "value": {
           "$ref": "#/$defs/Value",
-          "description": "Breakpoint meaning and conversion."
+          "description": "Axis-point meaning and conversion."
         },
         "view": {
           "$ref": "#/$defs/View",

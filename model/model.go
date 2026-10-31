@@ -137,13 +137,13 @@ type View struct {
 	Percent    bool `json:"percent,omitzero" doc:"Show the difference in percent."`
 }
 
-// Axis gives the breakpoints of a curve or map.
+// Axis gives the axis points of a curve or map.
 type Axis struct {
 	Source    string `json:"source" doc:"image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\"; the values are not in the model yet); unknown: an unnamed KP datasource (written back as ordinal)." enum:"image|ordinal|editable|unknown"`
 	Stored    string `json:"stored,omitempty" doc:"How image values are stored: absolute; subtract: 2^bits minus the sum of the remaining raw values (docs/kp-format.md); add and backwards: semantics unknown." enum:"absolute|add|subtract|backwards"`
-	Address   *Addr  `json:"address,omitempty" doc:"File offset of the first breakpoint, for image axes."`
-	Data      *Data  `json:"data,omitempty" doc:"Breakpoint storage, for image axes."`
-	Value     Value  `json:"value" doc:"Breakpoint meaning and conversion."`
+	Address   *Addr  `json:"address,omitempty" doc:"File offset of the first axis point, for image axes."`
+	Data      *Data  `json:"data,omitempty" doc:"Axis-point storage, for image axes."`
+	Value     Value  `json:"value" doc:"Axis-point meaning and conversion."`
 	View      View   `json:"view,omitzero" doc:"Display settings."`
 	Mirror    bool   `json:"mirror,omitzero" doc:"KP \"mirror map\" axis setting: WinOLS shows the axis in descending order; storage is unchanged."`
 	Header    int    `json:"header,omitzero" doc:"Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count."`

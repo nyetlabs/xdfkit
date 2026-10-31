@@ -235,7 +235,7 @@ func TestVisLevelFromArchive(t *testing.T) {
 }
 
 // TestLinkedAxis: an image axis links to the curve at its address that holds
-// its breakpoints (same count, storage and conversion up to KP rounding) and
+// its axis points (same count, storage and conversion up to KP rounding) and
 // keeps its own location; any other axis stays embedded.
 func TestLinkedAxis(t *testing.T) {
 	addr := func(a model.Addr) *model.Addr { return &a }

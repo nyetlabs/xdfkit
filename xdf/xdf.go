@@ -5,7 +5,7 @@
 // Non-ASCII text is written as character references: TunerPro reads XDF as
 // Windows-1252. Float cells get TunerPro's float type flag; float table/axis
 // cells with a non-identity conversion fail the write. A category repeated by
-// name keeps its objects. An image axis whose breakpoints are another curve
+// name keeps its objects. An image axis whose axis points are another curve
 // links to it. The axis mirror flag is ignored.
 package xdf
 
@@ -113,7 +113,7 @@ type constant struct {
 }
 
 // axis holds the elements of the three kinds of XDFAXIS (labels, image
-// breakpoints, cells) in the order TunerPro writes them; each kind leaves out
+// axis points, cells) in the order TunerPro writes them; each kind leaves out
 // what it doesn't use.
 type axis struct {
 	ID         string     `xml:"id,attr"`
@@ -140,7 +140,7 @@ type embedded struct {
 	MajorStrideBits int    `xml:"mmedmajorstridebits,attr,omitempty"`
 }
 
-// embedInfo is type 1 for breakpoints read from the image, or type 3 with the
+// embedInfo is type 1 for axis points read from the image, or type 3 with the
 // uniqueid of the object holding them (a linked axis).
 type embedInfo struct {
 	Type   int    `xml:"type,attr"`
@@ -425,7 +425,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 		x    *model.Axis
 		size int
 	}{{"x", o.X, o.Cols}, {"y", o.Y, o.Rows}} {
-		x, err := breakpoints(a.id, a.x, a.size, image, labels)
+		x, err := axisPoints(a.id, a.x, a.size, image, labels)
 		if err != nil {
 			return nil, err
 		}
@@ -457,7 +457,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 }
 
 // linkable says whether t, an object at the address of image axis x, holds
-// exactly x's n breakpoints: a curve of n cells stored and converted as x is.
+// exactly x's n axis points: a curve of n cells stored and converted as x is.
 // Factors match to 1e-4 relative, the rounding KP factors carry; offsets to
 // minOffset, below which they aren't written.
 func linkable(t *model.Object, x *model.Axis, n int) bool {
@@ -483,15 +483,15 @@ func text(o *model.Object) (title, desc string) {
 }
 
 // labels reports whether the writer gives axis x labels instead of an image
-// location (see breakpoints; "subtract" axes get labels only with an image).
+// location (see axisPoints; "subtract" axes get labels only with an image).
 func labels(x *model.Axis) bool {
 	return x == nil || x.Source != "image" || x.Stored == "backwards"
 }
 
-// breakpoints is the XDFAXIS of a table's x or y axis: labels for axes not
+// axisPoints is the XDFAXIS of a table's x or y axis: labels for axes not
 // read from the image (ordinal, editable, unknown, missing, "backwards") and
-// for "subtract" axes, else the breakpoints' image location.
-func breakpoints(id string, x *model.Axis, size int, image []byte, static bool) (axis, error) {
+// for "subtract" axes, else the axis points' image location.
+func axisPoints(id string, x *model.Axis, size int, image []byte, static bool) (axis, error) {
 	a := axis{ID: id, UniqueID: "0x0", IndexCount: &size, link: &link{}}
 	ordinal := labels(x)
 	if !ordinal && (x.Address == nil || x.Data == nil) {
@@ -617,7 +617,7 @@ func liveEquations(x *model.Axis, n int) []equation {
 	return out
 }
 
-// cells is the EMBEDDEDDATA locating cells or breakpoints of type d.
+// cells is the EMBEDDEDDATA locating cells or axis points of type d.
 func cells(d model.Data, addr model.Addr) embedded {
 	f := 0
 	if d.Signed {

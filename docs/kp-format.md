@@ -168,7 +168,7 @@ WinOLS "&Mirror map". The image stays in stored order. WinOLS shows the axis, an
 
 ### Free editable
 
-Datasource 4. `Values` is 4 bytes per point, with the breakpoint in the element type at the start of each group. Setting an 8-bit axis to 1..8 writes 32 bytes (`01` through `08`, then zeros), clears the address, and sets the factor to 1. Datasource 5 (EEPROM backwards) clears the list.
+Datasource 4. `Values` is 4 bytes per point, with the axis point in the element type at the start of each group. Setting an 8-bit axis to 1..8 writes 32 bytes (`01` through `08`, then zeros), clears the address, and sets the factor to 1. Datasource 5 (EEPROM backwards) clears the list.
 
 In v2 the list is empty except on free-editable axes. In v1 both axis records hold zeros, 4 bytes per stored row, on almost every map.
 
@@ -185,7 +185,7 @@ Datasource 4 and 5 are free editable then EEPROM backwards. The WinOLS UI lists 
 
 ## EEPROM, subtract
 
-Datasource 3 stores the gaps between breakpoints, counted down from the top of the range. For an 8-bit axis, displayed point i is
+Datasource 3 stores the gaps between axis points, counted down from the top of the range. For an 8-bit axis, displayed point i is
 
 ```text
 conversion(256 - (raw[i] + raw[i+1] + ... + raw[n-1]))

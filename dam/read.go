@@ -336,13 +336,13 @@ func emit(rec record, regs map[int]*reg, tables map[int]record) (*model.Object, 
 	return o, "", warnings
 }
 
-// axisRef is a type 6 breakpoint series copied onto a shared-axis map.
+// axisRef is a type 6 axis-point series copied onto a shared-axis map.
 type axisRef struct {
 	n    int
 	axis *model.Axis
 }
 
-// sharedAxis is the breakpoint series of a type 6 table. On a type 7 curve
+// sharedAxis is the axis-point series of a type 6 table. On a type 7 curve
 // the last /SPX number is that table's /SPZ index; on a type 8 map /SPX is
 // the row axis and /SPY the column axis.
 func sharedAxis(tables map[int]record, index int, regs map[int]*reg) (axisRef, bool) {

@@ -15,7 +15,7 @@ import (
 	"go.nyet.org/xdfkit/kp"
 )
 
-// Families: how an ECU stores axis breakpoints.
+// Families: how an ECU stores axis points.
 const (
 	ME7 = "me7" // absolute values, preceded by a count byte (ME7.x)
 	M3  = "m3"  // "EEPROM, subtract" offsets, preceded by [variable id][count] (Motronic M3.x, M5.x)
