@@ -56,13 +56,9 @@ func (m *Map) codeOLS5(c *codec) {
 	c.strOLS5Name(&m.Name)
 	c.i32(&ex.NameExtra[0])
 	c.i32(&ex.NameExtra[1])
-	var org int32
-	c.i32(&org)
-	m.Organization = Org(org)
+	c.i32((*int32)(&m.Organization))
 	c.i32(&m.RightPane)
-	var typ int32
-	c.i32(&typ)
-	m.Type = Type(typ)
+	c.i32((*int32)(&m.Type))
 	c.i32(&m.Width)
 	c.i32(&m.Base)
 	c.i32(&m.FolderID)
@@ -132,35 +128,20 @@ func (a *Axis) codeOLS5(c *codec) {
 	for i := range ex.ValueMid {
 		c.i32(&ex.ValueMid[i])
 	}
-	c.strOLS5Units(&a.Value.Units)
+	c.strRaw(&a.Value.Units)
 	c.f64(&a.Value.Factor)
 	c.f64(&a.Value.Offset)
-	var ds int32
-	c.i32(&ds)
-	a.DataSource = DataSource(ds)
+	c.i32((*int32)(&a.DataSource))
 	c.u32(&a.Addr)
-	var typ int32
-	c.i32(&typ)
-	a.Type = Type(typ)
+	c.i32((*int32)(&a.Type))
 	c.i32(&a.Width)
 	c.i32(&a.Base)
-	var mir int32
-	c.i32(&mir)
-	if mir != 0 && mir != 1 {
-		c.pos -= 4
-		c.fail("mirror int32 %d", mir)
-	}
-	a.Mirror = mir == 1
+	c.mirrorI32(&a.Mirror)
 	c.raw(&a.MirrorPad, 9)
 	c.bool(&a.Reciprocal)
 	c.i32(&a.Precision)
 	c.bool(&a.Signed)
-	n := c.count(0)
-	if n%4 != 0 {
-		c.pos -= 4
-		c.fail("list length %d is not a multiple of 4", n)
-	}
-	a.Values = append(Hex(nil), c.take(n)...)
+	c.hexBytes(&a.Values, 4)
 	c.i32(&a.DataHeader)
 	c.i32(&a.SignatureByte)
 	c.strRaw(&ex.ID)
@@ -170,23 +151,9 @@ func (a *Axis) codeOLS5(c *codec) {
 
 func (c *codec) valueOLS5Map(v *Value) {
 	c.strRaw(&v.Description)
-	c.strOLS5Units(&v.Units)
+	c.strRaw(&v.Units)
 	c.f64(&v.Factor)
 	c.f64(&v.Offset)
-}
-
-func (c *codec) strOLS5Units(p *string) {
-	var n int32
-	c.i32(&n)
-	if n <= 0 {
-		*p = ""
-		return
-	}
-	if int(n) > len(c.b)-c.pos {
-		c.pos -= 4
-		c.fail("bad units length %d", n)
-	}
-	*p = latin9(c.take(int(n)))
 }
 
 func (c *codec) strOLS5Name(p *string) {

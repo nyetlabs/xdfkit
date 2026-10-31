@@ -157,6 +157,8 @@ func (c *codec) record(p any) { c.structFields(reflect.ValueOf(p).Elem()) }
 func (c *codec) list(p any) { c.value(reflect.ValueOf(p).Elem(), field{count: true}) }
 
 func (c *codec) structFields(v reflect.Value) {
+	// OLS5 Map/Axis bypass reflection: kp tags on those types are unused here;
+	// codeOLS5 is the layout source of truth (float Range, name padding, pads).
 	if c.layout == OLS5 {
 		switch s := v.Addr().Interface().(type) {
 		case *Map:
@@ -254,6 +256,10 @@ func (c *codec) slice(v reflect.Value, f field) {
 			v.Set(reflect.MakeSlice(v.Type(), n, n))
 		}
 	case f.bytes:
+		if h, ok := v.Addr().Interface().(*Hex); ok {
+			c.hexBytes(h, 1)
+			return
+		}
 		size := int(v.Type().Elem().Size())
 		n := c.count(v.Len() * size)
 		if n%size != 0 {
@@ -399,6 +405,35 @@ func (c *codec) i32(p *int32) {
 	v := uint32(*p)
 	c.u32(&v)
 	*p = int32(v)
+}
+
+// mirrorI32 codes Mirror as an int32 that must be 0 or 1 (v2 and OLS5).
+func (c *codec) mirrorI32(p *bool) {
+	var v int32
+	if *p {
+		v = 1
+	}
+	c.i32(&v)
+	if v != 0 && v != 1 {
+		c.pos -= 4
+		c.fail("mirror int32 %d", v)
+	}
+	*p = v == 1
+}
+
+// hexBytes codes a length-prefixed byte blob. When elemSize > 1, n must be a
+// multiple of elemSize (axis Values are 4 bytes per point).
+func (c *codec) hexBytes(p *Hex, elemSize int) {
+	n := c.count(len(*p))
+	if elemSize > 1 && n%elemSize != 0 {
+		c.pos -= 4
+		c.fail("list length %d is not a multiple of %d", n, elemSize)
+	}
+	if c.enc {
+		c.put(*p...)
+		return
+	}
+	*p = append(Hex(nil), c.take(n)...)
 }
 
 func (c *codec) u64(p *uint64) {

@@ -2,7 +2,7 @@
 
 WinOLS map pack (`*.kp`), read and written by `kp/`. Integers are little-endian. A string is an int32 byte count, that many ISO-8859-15 bytes, and a NUL. A zero count has no NUL.
 
-The Go structs are the record layouts. `kp/codec.go` walks fields in declaration order; the tag grammar is at the top of that file. JSON names are those fields with a lower-case first letter. `kp-defaults.json` uses the JSON names (`model.md`).
+The Go structs are the record layouts. `kp/codec.go` walks fields in declaration order; the tag grammar is at the top of that file. JSON names are those fields with a lower-case first letter. `kp-defaults.json` uses the JSON names (`model.md`). File, Project and Folder always use that walk. On OLS5, Map and Axis leave it for a hand walk in `kp/ols5.go` (`codeOLS5`): float ranges, name padding, ID/Range pads, string modes and a two-byte `Term2` differ from the v1/v2 tags, so Map/Axis `kp` tags are not the OLS5 source of truth. Shared primitives (`strRaw`, `mirrorI32`, `hexBytes`) serve both paths.
 
 ## Versions
 
@@ -14,7 +14,7 @@ The Go structs are the record layouts. `kp/codec.go` walks fields in declaration
 
 0x149 is accepted. The archived packs use 0x124. WinOLS 2.24 writes v2 with header id 0x124 and version string `OLS 5.0 (Windows)`. The filename string is the name the file was exported under, usually upper case.
 
-OLS5 is the WinOLS 5 pack layout (header `0x255`). It is read-only: `Encode` returns an error until a WinOLS 5 save oracle exists. Outer filename and version strings have no trailing NUL. Map value ranges are six `float64`s in the file and are stored in the existing `[3][2]int64` slots (values seen so far are whole). Empty map-block strings may use length `-1` (no NUL). Folder `Pad` is 36 bytes. `EndTag` is 8 bytes (`99 78 00 42 02 00 00 00`). Per-layout defaults for KP-only residue use the `"ols5"` key in `kp-defaults.json` (from a local sample when regenerating).
+OLS5 is the WinOLS 5 pack layout (header `0x255`). It is read-only: `Encode` returns an error until a WinOLS 5 save oracle exists. Outer filename and version strings have no trailing NUL. Map and value/axis unit strings use the raw (no trailing NUL) form; the map name is length-prefixed with a NUL and three pad bytes when non-empty, or four pad bytes when empty. Map value ranges are six `float64`s in the file and are stored in the existing `[3][2]int64` slots (values seen so far are whole). Empty map-block strings may use length `-1` (no NUL). Folder `Pad` is 36 bytes. `EndTag` is 8 bytes (`99 78 00 42 02 00 00 00`). Axis `Values` are a byte length that is a multiple of 4. Per-layout defaults for KP-only residue use the `"ols5"` key in `kp-defaults.json` (from a local sample when regenerating).
 
 Every archived pack ends with `33 88 72 98`. `EndOffset` is the offset of that marker (file length minus 4). WinOLS imports a file whose length changed without updating `EndOffset`, and raises its crash-report dialog.
 

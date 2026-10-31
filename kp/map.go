@@ -95,20 +95,11 @@ type Axis struct {
 	SignatureByte int32      `json:"signatureByte"`     // the script's SignaturByte (marker byte before the axis), -1 for none (unconfirmed)
 }
 
-// hook codes Mirror: an int32 in v2, a byte in v1, 0 or 1 in both.
+// hook codes Mirror: an int32 in v2/OLS5, a byte in v1, 0 or 1 in both.
 func (a *Axis) hook(c *codec, _ string) {
 	if c.layout == V1 {
 		c.bool(&a.Mirror)
 		return
 	}
-	var v int32
-	if a.Mirror {
-		v = 1
-	}
-	c.i32(&v)
-	if v != 0 && v != 1 {
-		c.pos -= 4
-		c.fail("mirror int32 %d", v)
-	}
-	a.Mirror = v == 1
+	c.mirrorI32(&a.Mirror)
 }
