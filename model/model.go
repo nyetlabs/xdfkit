@@ -140,7 +140,7 @@ type View struct {
 // Axis gives the axis points of a curve or map.
 type Axis struct {
 	Source    string    `json:"source" doc:"image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\"); unknown: an unnamed KP datasource (written back as ordinal)." enum:"image|ordinal|editable|unknown"`
-	Stored    string    `json:"stored,omitempty" doc:"How image values are stored: absolute; subtract: 2^bits minus the sum of the remaining raw values (docs/kp-format.md); add and backwards: semantics unknown." enum:"absolute|add|subtract|backwards"`
+	Stored    string    `json:"stored,omitempty" doc:"How image values are stored: absolute; add: prefix sum of raw values; subtract: 2^bits minus the sum of the remaining raw values; backwards: absolute values in reverse image order (docs/kp-format.md)." enum:"absolute|add|subtract|backwards"`
 	Address   *Addr     `json:"address,omitempty" doc:"File offset of the first axis point, for image axes."`
 	Data      *Data     `json:"data,omitempty" doc:"Axis-point storage, for image and editable axes."`
 	Value     Value     `json:"value" doc:"Axis-point meaning and conversion."`

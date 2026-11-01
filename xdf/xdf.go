@@ -1,7 +1,7 @@
 // Package xdf writes a model as a TunerPro XDF file (XML, format 1.80;
 // docs/design.md): categories sorted by name with "My maps" first, objects in
 // address order, precision limited to the six digits TunerPro shows, and
-// "EEPROM, subtract" axes written as a live helper table (docs/kp-format.md).
+// "EEPROM, add" / "EEPROM, subtract" axes written as live helpers (docs/kp-format.md).
 // Non-ASCII text is written as character references: TunerPro reads XDF as
 // Windows-1252. Float cells get TunerPro's float type flag; float table/axis
 // cells with a non-identity conversion fail the write. A category repeated by
@@ -174,15 +174,15 @@ type equation struct {
 const livePrefix = "xdfkit-live:"
 
 // Write returns m as XDF. title is the definition title (the file stem).
-// "EEPROM, subtract" axes are live helper tables. Without an image there is
-// no file region.
+// "EEPROM, add" and "EEPROM, subtract" axes are live helper tables. Without
+// an image there is no file region.
 func Write(m *model.Model, image []byte, title string) ([]byte, error) {
 	return write(m, image, title, false)
 }
 
-// WriteLabels is Write with "subtract" axes as static labels read from the
-// image (TunerPro before 5.00.8414). Without an image those axes are plain
-// image axes.
+// WriteLabels is Write with "add" / "subtract" axes as static labels read
+// from the image (TunerPro before 5.00.8414). Without an image those axes
+// are plain image axes.
 func WriteLabels(m *model.Model, image []byte, title string) ([]byte, error) {
 	return write(m, image, title, true)
 }
@@ -222,7 +222,7 @@ func write(m *model.Model, image []byte, title string, labels bool) ([]byte, err
 	link := func(self *model.Object, x *model.Axis, n int) string {
 		if !labels && liveOK(x, n) {
 			c := x.Value.Conversion
-			k := fmt.Sprintf("%d/%d/%s/%d/%s/%s", *x.Address, x.Data.Bits, x.Data.Endian, n, plain(c.Factor), plain(c.Offset))
+			k := fmt.Sprintf("%s/%d/%d/%s/%d/%s/%s", x.Stored, *x.Address, x.Data.Bits, x.Data.Endian, n, plain(c.Factor), plain(c.Offset))
 			if t, ok := helpers[k]; ok {
 				return t.UniqueID
 			}
@@ -483,14 +483,15 @@ func text(o *model.Object) (title, desc string) {
 }
 
 // labels reports whether the writer gives axis x labels instead of an image
-// location (see axisPoints; "subtract" axes get labels only with an image).
+// location (see axisPoints; "add"/"subtract"/"backwards" get labels only
+// with an image).
 func labels(x *model.Axis) bool {
-	return x == nil || x.Source != "image" || x.Stored == "backwards"
+	return x == nil || x.Source != "image"
 }
 
 // axisPoints is the XDFAXIS of a table's x or y axis: labels for axes not
-// read from the image (ordinal, editable, unknown, missing, "backwards") and
-// for "subtract" axes, else the axis points' image location.
+// read from the image (ordinal, editable, unknown, missing) and for
+// "add"/"subtract"/"backwards" axes, else the axis points' image location.
 func axisPoints(id string, x *model.Axis, size int, image []byte, static bool) (axis, error) {
 	a := axis{ID: id, UniqueID: "0x0", IndexCount: &size, link: &link{}}
 	ordinal := labels(x)
@@ -518,8 +519,15 @@ func axisPoints(id string, x *model.Axis, size int, image []byte, static bool) (
 		return a, nil
 	}
 	var raw []float64
-	if !ordinal && x.Stored == "subtract" {
-		raw = subtracted(x, size, image)
+	if !ordinal {
+		switch x.Stored {
+		case "subtract":
+			raw = subtracted(x, size, image)
+		case "add":
+			raw = added(x, size, image)
+		case "backwards":
+			raw = backwards(x, size, image)
+		}
 	}
 	if !ordinal && raw == nil {
 		d := *x.Data
@@ -559,9 +567,13 @@ func axisPoints(id string, x *model.Axis, size int, image []byte, static bool) (
 
 func eqs(c model.Conversion) []equation { return []equation{formula(c)} }
 
-// liveOK reports an unsigned integer "subtract" axis the live helper can show.
+// liveOK reports an unsigned integer "add" or "subtract" axis the live
+// helper can show.
 func liveOK(x *model.Axis, n int) bool {
-	if x == nil || x.Stored != "subtract" || x.Address == nil || x.Data == nil || n < 1 {
+	if x == nil || x.Address == nil || x.Data == nil || n < 1 {
+		return false
+	}
+	if x.Stored != "subtract" && x.Stored != "add" {
 		return false
 	}
 	d := x.Data
@@ -569,7 +581,8 @@ func liveOK(x *model.Axis, n int) bool {
 }
 
 // liveTable is the helper at the axis address: one column, n rows, each row
-// an equation. TunerPro 6.00.0149.00 shows that pattern (docs/kp-format.md).
+// an equation. TunerPro 6.00.0149.00 shows the subtract pattern
+// (docs/kp-format.md); add is the prefix-sum dual.
 func liveTable(id string, x *model.Axis, n int, cat categoryMem) *table {
 	one := 1
 	stub := embedded{ElementSizeBits: 16, MajorStrideBits: -32}
@@ -593,22 +606,28 @@ func liveTable(id string, x *model.Axis, n int, cat categoryMem) *table {
 }
 
 func liveEquations(x *model.Axis, n int) []equation {
-	span := int64(1) << x.Data.Bits
 	f, off := x.Value.Conversion.Factor, x.Value.Conversion.Offset
 	term := plain(f) + " * X"
 	if f == 1 {
 		term = "X"
 	}
-	cell := "CELL(ROW()+1;0;FALSE) - " + term
-	last := fmt.Sprintf("(%d - X) * %s", span, plain(f))
-	switch {
-	case math.Abs(off) < minOffset:
-	case off < 0:
-		last += " - " + plain(-off)
-	default:
-		last += "+ " + plain(off)
-	}
 	out := make([]equation, n)
+	if x.Stored == "add" {
+		first := offsetEq(term, off)
+		cell := "CELL(ROW()-1;0;FALSE) + " + term
+		for i := range n {
+			eq := cell
+			if i == 0 {
+				eq = first
+			}
+			out[i] = equation{Equation: eq, Row: strconv.Itoa(i + 1)}
+			out[i].Var.ID = "X"
+		}
+		return out
+	}
+	span := int64(1) << x.Data.Bits
+	cell := "CELL(ROW()+1;0;FALSE) - " + term
+	last := offsetEq(fmt.Sprintf("(%d - X) * %s", span, plain(f)), off)
 	for i := range n {
 		eq := cell
 		if i == n-1 {
@@ -618,6 +637,18 @@ func liveEquations(x *model.Axis, n int) []equation {
 		out[i].Var.ID = "X"
 	}
 	return out
+}
+
+// offsetEq appends conversion offset to a live-helper equation body.
+func offsetEq(eq string, off float64) string {
+	switch {
+	case math.Abs(off) < minOffset:
+		return eq
+	case off < 0:
+		return eq + " - " + plain(-off)
+	default:
+		return eq + "+ " + plain(off)
+	}
 }
 
 // cells is the EMBEDDEDDATA locating cells or axis points of type d.
@@ -814,6 +845,41 @@ func subtracted(x *model.Axis, size int, image []byte) []float64 {
 	for i := size - 1; i >= 0; i-- {
 		t -= rawInt(image[start+i*w:], order, w, x.Data.Signed)
 		out[i] = float64(t)
+	}
+	return out
+}
+
+// added returns the points of an "add" axis as WinOLS shows them: point i is
+// the sum of raw values 0 to i. Nil if the axis is float or doesn't fit.
+func added(x *model.Axis, size int, image []byte) []float64 {
+	w := x.Data.Bits / 8
+	start := int(*x.Address)
+	if w == 0 || x.Data.Float || start+size*w > len(image) {
+		return nil
+	}
+	order := byteOrder(*x.Data)
+	out := make([]float64, size)
+	var t int64
+	for i := range size {
+		t += rawInt(image[start+i*w:], order, w, x.Data.Signed)
+		out[i] = float64(t)
+	}
+	return out
+}
+
+// backwards returns the points of a "backwards" axis as WinOLS shows them:
+// point i is raw[n-1-i] (absolute values in reverse image order). Nil if the
+// axis is float or doesn't fit. XDF has no live helper for this; labels only.
+func backwards(x *model.Axis, size int, image []byte) []float64 {
+	w := x.Data.Bits / 8
+	start := int(*x.Address)
+	if w == 0 || x.Data.Float || start+size*w > len(image) {
+		return nil
+	}
+	order := byteOrder(*x.Data)
+	out := make([]float64, size)
+	for i := range size {
+		out[i] = float64(rawInt(image[start+(size-1-i)*w:], order, w, x.Data.Signed))
 	}
 	return out
 }

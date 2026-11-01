@@ -60,7 +60,9 @@ func (t Type) LE() bool { return t > 1 && t&1 == 1 }
 func (t Type) Float() bool { return t == 6 || t == 7 }
 
 // FromImage reports whether axis values are read from the image.
-func (d DataSource) FromImage() bool { return d >= DSEeprom && d <= DSEepromSubtract }
+func (d DataSource) FromImage() bool {
+	return d == DSEeprom || d == DSEepromAdd || d == DSEepromSubtract || d == DSEepromBackwards
+}
 
 func name[K ~int32](names map[K]string, k K) string {
 	if s, ok := names[k]; ok {

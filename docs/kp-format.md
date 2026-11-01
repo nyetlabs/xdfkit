@@ -78,7 +78,7 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 | `CommentFlag` | byte, v2 | |
 | `Name` | string | long description |
 | `Organization` | int32 | [Enums](#enums) |
-| `RightPane` | int32 | script `RWin` candidate (0 none, 1 hex, 2 bars, 3 both); unconfirmed in the map window |
+| `RightPane` | int32 | HelpEn `RWin` candidate (0 none, 1 hex, 2 bars, 3 both); unconfirmed in the map window |
 | `Type` | int32 | element type; [Enums](#enums) |
 | `Width` | int32 | element size in bytes; matches `Type` |
 | `Base` | int32 | 10, 16, or 2 |
@@ -104,7 +104,7 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 
 ### Range
 
-Three low/high pairs, in order: 8-bit, 16-bit, 32-bit. WinOLS writes the pair for the map's width, as typed in Value range (raw / eprom units, not factor-scaled). Toggling the map display between raw and scaled does not change the dialog numbers. An 8-bit map uses the first pair (TLDOBAN, 10 to 90). A 16-bit map uses the second (NMAX, 1000 to 6000; KFMIOP, 10 to 90). Defaults are 0 and 255, 0 and 65535, 0 and 4294967295. A negative low is sign-extended. The 32-bit pair is unconfirmed by a WinOLS save.
+Three low/high pairs, in order: 8-bit, 16-bit, 32-bit. WinOLS writes the pair for the map's width, as typed in Value range (raw / eprom units, not factor-scaled). Toggling the map display between raw and scaled does not change the dialog numbers. An 8-bit map uses the first pair (TLDOBAN, 10 to 90). A 16-bit map uses the second (NMAX, 1000 to 6000; KFMIOP, 10 to 90). A 32-bit map uses the third (NMAX-30-range32, 1000 to 9000). Defaults are 0 and 255, 0 and 65535, 0 and 4294967295. A negative low is sign-extended.
 
 The field cannot be omitted. Without a template, the pair for the map's width is the model's min and max converted from display units to raw (ordered low to high). Otherwise it is the default raw pair for the width. The other two pairs stay at the defaults. The model omits min and max when the KP pair is that default.
 
@@ -164,9 +164,9 @@ Both records are stored on every map. WinOLS uses X for a 1D map, X and Y for a 
 
 ### Data header and signature
 
-`DataHeader` is the script's `DataHeader`: how many bytes before the axis data WinOLS treats as a header (0, 1, 2, or 4). Non-zero headers commonly hold the point count (one byte, or two for a word count). A 4-byte header on a word axis of a 2D map is often two little-endian uint16 counts, this axis then the other. Many image axes keep the field at 0 even when those bytes exist in the image, so it is a setting, not a discovery from the flash. Model `header`.
+`DataHeader` is HelpEn's `DataHeader`: how many bytes before the axis data WinOLS treats as a header (0, 1, 2, or 4). Non-zero headers commonly hold the point count (one byte, or two for a word count). A 4-byte header on a word axis of a 2D map is often two little-endian uint16 counts, this axis then the other. Many image axes keep the field at 0 even when those bytes exist in the image, so it is a setting, not a discovery from the flash. Model `header`.
 
-`SignatureByte` is the script's `SignaturByte`. `-1` means none (the usual value). Otherwise it often matches the byte two before the axis (a variable id on M3 packs). Model `signature`, omitted for `-1`.
+`SignatureByte` is HelpEn's `SignaturByte`. `-1` means none (the usual value). Otherwise it often matches the byte two before the axis (a variable id on M3 packs). Model `signature`, omitted for `-1`.
 
 ### Mirror
 
@@ -174,7 +174,7 @@ WinOLS "&Mirror map". The image stays in stored order. WinOLS shows the axis, an
 
 ### Free editable
 
-Datasource 4. `Values` is length-prefixed; the length is always 4 bytes times the axis point count. The points are packed consecutively in the axis element type (little-endian for multi-byte), then zero-padded to that length. An 8-bit axis with values 1..8 is 32 bytes (`01`..`08`, then zeros). A 16-bit axis (KFMIOP-06 X) packs `u16` LE values the same way and pads to 4×points. Free editable also clears the axis address and sets its factor to 1. Datasource 5 (EEPROM backwards) clears the list.
+Datasource 4. `Values` is length-prefixed; the length is always 4 bytes times the axis point count. The points are packed consecutively in the axis element type (little-endian for multi-byte), then zero-padded to that length. An 8-bit axis with values 1..8 is 32 bytes (`01`..`08`, then zeros). A 16-bit axis (KFMIOP-06 X) packs `u16` LE values the same way and pads to 4×points. Free editable also clears the axis address and sets its factor to 1. Switching away from free editable (including to EEPROM backwards) leaves `Values` empty.
 
 In v2 the list is empty except on free-editable axes. In v1 both axis records hold zeros, 4 bytes per stored row, on almost every map.
 
@@ -188,6 +188,16 @@ In v2 the list is empty except on free-editable axes. In v1 both axis records ho
 | Display base | 10, 16, 2. An omitted base is written as 10. WinOLS crashes when a map whose base is 0 is opened. |
 
 Datasource 4 and 5 are free editable then EEPROM backwards. The WinOLS UI lists those two in the other order.
+
+## EEPROM, add
+
+Datasource 2 stores successive gaps from the start. Displayed point i is
+
+```text
+conversion(raw[0] + raw[1] + ... + raw[i])
+```
+
+with no wrap. TLDOBAN X (save `TLDOBAN-23-add.kp`), raw 25, 38, 50, 63, 75, 100, 125, 150, factor 40, displays 1000, 2520, 4520, 7040, 10040, 14040, 19040, 25040.
 
 ## EEPROM, subtract
 
@@ -205,9 +215,19 @@ The label in a pack can be wrong either way. KFFA X in 8D0907558E is a subtract 
 
 On M3 images the two bytes before one of these axes are the variable id and the point count.
 
+## EEPROM, backwards
+
+Datasource 5 shows the absolute image values in reverse order. Displayed point i is
+
+```text
+conversion(raw[n - 1 - i])
+```
+
+Address and factor stay as for EEPROM. Mirror is a separate flag and stays off. TLDOBAN X (save `TLDOBAN-24-backwards-display.kp`), raw 25…150, factor 40, displays 6000, 5000, 4000, 3000, 2520, 2000, 1520, 1000.
+
 The model keeps `axis.stored` as written (`absolute`, `add`, `subtract`, or `backwards`).
 
-The XDF writer emits a live helper table for an unsigned 8, 16 or 32-bit subtract axis that is not reciprocal. The helper is a 1-column table at the axis address, linked from the map axis with `embedinfo type="3"`. Its last row is `(2^bits - X) * factor + offset`; each earlier row is `CELL(ROW()+1;0;FALSE) - factor * X`, with the factor written before `X` (`0.75 * X`). Rows are numbered from 1. TunerPro 6.00.0149.00 shows FHSA.0 X that way: raw 27, 13, 12, 60 reads as 60, 80.25, 90, 99. Builds before 5.00.8414 (2014) miscompute the pattern. `--static-axes` writes static labels from the image instead; without an image those axes are plain image axes. A signed, float or reciprocal subtract axis uses the labels when an image is present, otherwise a plain image axis. The reader leaves the helper out of the model. The metadata file keeps the axis.
+The XDF writer emits a live helper table for an unsigned 8, 16 or 32-bit add or subtract axis that is not reciprocal. The helper is a 1-column table at the axis address, linked from the map axis with `embedinfo type="3"`. For subtract, the last row is `(2^bits - X) * factor + offset` and each earlier row is `CELL(ROW()+1;0;FALSE) - factor * X` (factor before `X`, as in `0.75 * X`). For add, the first row is `factor * X + offset` and each later row is `CELL(ROW()-1;0;FALSE) + factor * X`. Rows are numbered from 1. TunerPro 6.00.0149.00 shows FHSA.0 X (subtract) that way: raw 27, 13, 12, 60 reads as 60, 80.25, 90, 99. Builds before 5.00.8414 (2014) miscompute the subtract pattern. `--static-axes` writes static labels from the image instead; without an image those axes are plain image axes. A signed, float or reciprocal add/subtract axis uses the labels when an image is present, otherwise a plain image axis. Backwards has no live helper (XDF cannot reverse the embedded order): with an image the writer emits static labels; without one, a plain image axis (forward order). The reader leaves helpers out of the model. The metadata file keeps the axis.
 
 ## WinOLS 2.24 exports
 

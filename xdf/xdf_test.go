@@ -542,6 +542,115 @@ func TestLiveSubtract(t *testing.T) {
 	}
 }
 
+// TestLiveAdd writes an 8-bit add axis as the prefix-sum dual of subtract
+// (TLDOBAN-23-add: raw 25..150, factor 40 → 1000..25040).
+func TestLiveAdd(t *testing.T) {
+	addr := model.Addr(0x197b6)
+	ax := &model.Axis{
+		Source: "image", Stored: "add", Address: &addr,
+		Data: &model.Data{Bits: 8},
+		Value: model.Value{
+			Units: "Upm", Precision: 0,
+			Conversion: model.Conversion{Factor: 40},
+		},
+	}
+	o := &model.Object{
+		Key: "TLDOBAN", ID: "TLDOBAN", Shape: "1d", Address: 0x197be,
+		Rows: 1, Cols: 8, Data: model.Data{Bits: 8},
+		Value: model.Value{Precision: 0, Conversion: model.Conversion{Factor: 1}},
+		X:     ax,
+	}
+	m := &model.Model{Schema: model.SchemaID, Objects: []*model.Object{o}}
+	b := mustWrite(t, m, nil)
+	s := string(b)
+	if strings.Count(s, `equation="40 * X"`) != 1 {
+		t.Errorf("first row: %s", s)
+	}
+	if strings.Count(s, `equation="CELL(ROW()-1;0;FALSE) + 40 * X"`) != 7 {
+		t.Errorf("cell rows: %s", s)
+	}
+	if strings.Count(s, livePrefix) != 1 {
+		t.Errorf("helpers: %s", s)
+	}
+	meta, err := Meta(m, b, "xdfkit test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ws, err := Read(b, meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ws) != 0 {
+		t.Errorf("warnings %q", ws)
+	}
+	if g, w := marshal(t, got), marshal(t, m); !bytes.Equal(g, w) {
+		t.Errorf("round trip: %s", firstDiff(g, w))
+	}
+	img := make([]byte, 0x197be)
+	copy(img[0x197b6:], []byte{25, 38, 50, 63, 75, 100, 125, 150})
+	lb, err := WriteLabels(m, img, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(lb, []byte("CELL(ROW()")) {
+		t.Errorf("static labels wrote a helper: %s", lb)
+	}
+	for _, v := range []string{`"1000"`, `"2520"`, `"10040"`, `"25040"`} {
+		if !bytes.Contains(lb, []byte(`value=`+v)) {
+			t.Errorf("missing %s in %s", v, lb)
+		}
+	}
+}
+
+// TestBackwardsLabels writes an 8-bit backwards axis as absolute values in
+// reverse image order (TLDOBAN-24: 6000..1000). No live helper.
+func TestBackwardsLabels(t *testing.T) {
+	addr := model.Addr(0x197b6)
+	ax := &model.Axis{
+		Source: "image", Stored: "backwards", Address: &addr,
+		Data: &model.Data{Bits: 8},
+		Value: model.Value{
+			Units: "Upm", Precision: 0,
+			Conversion: model.Conversion{Factor: 40},
+		},
+	}
+	o := &model.Object{
+		Key: "TLDOBAN", ID: "TLDOBAN", Shape: "1d", Address: 0x197be,
+		Rows: 1, Cols: 8, Data: model.Data{Bits: 8},
+		Value: model.Value{Precision: 0, Conversion: model.Conversion{Factor: 1}},
+		X:     ax,
+	}
+	m := &model.Model{Schema: model.SchemaID, Objects: []*model.Object{o}}
+	img := make([]byte, 0x197be)
+	copy(img[0x197b6:], []byte{25, 38, 50, 63, 75, 100, 125, 150})
+	b, err := Write(m, img, "t")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(b, []byte("CELL(ROW()")) || bytes.Contains(b, []byte(livePrefix)) {
+		t.Errorf("backwards wrote a helper: %s", b)
+	}
+	for _, v := range []string{`"6000"`, `"5000"`, `"2520"`, `"1000"`} {
+		if !bytes.Contains(b, []byte(`value=`+v)) {
+			t.Errorf("missing %s in %s", v, b)
+		}
+	}
+	meta, err := Meta(m, b, "xdfkit test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, ws, err := Read(b, meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ws) != 0 {
+		t.Errorf("warnings %q", ws)
+	}
+	if g, w := marshal(t, got), marshal(t, m); !bytes.Equal(g, w) {
+		t.Errorf("round trip: %s", firstDiff(g, w))
+	}
+}
+
 func mustWrite(t *testing.T, m *model.Model, img []byte) []byte {
 	t.Helper()
 	b, err := Write(m, img, "t")

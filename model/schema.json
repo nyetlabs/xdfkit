@@ -75,7 +75,7 @@
           "type": "string"
         },
         "stored": {
-          "description": "How image values are stored: absolute; subtract: 2^bits minus the sum of the remaining raw values (docs/kp-format.md); add and backwards: semantics unknown.",
+          "description": "How image values are stored: absolute; add: prefix sum of raw values; subtract: 2^bits minus the sum of the remaining raw values; backwards: absolute values in reverse image order (docs/kp-format.md).",
           "enum": [
             "absolute",
             "add",
