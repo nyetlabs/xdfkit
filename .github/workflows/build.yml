@@ -20,8 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       XDFKIT_REQUIRE_DATA: 1
-      # Fork PRs get no secrets, so they can't fetch the private corpus; their corpus tests skip.
-      HAS_CORPUS: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      # Fork PRs and Dependabot get no Actions secrets, so they can't fetch the private corpus; their corpus tests skip.
+      HAS_CORPUS: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
     steps:
       - uses: actions/checkout@v7
         with:

@@ -21,4 +21,4 @@ make corpus-bump   # submodule at the ecu-corpus head
 
 ## CI
 
-`.github/workflows/build.yml` checks out `ecu-corpus/` with a short-lived token from the `nyetlabs-corpus-reader` GitHub App (organization variable `CORPUS_APP_CLIENT_ID`, secret `CORPUS_APP_KEY`), for the `ecu-corpus` URL only. Fork PRs have no secrets and skip. `.github/workflows/corpus-bump.yml` moves the submodule to the corpus head and opens a pull request. `release.yml` reuses the build and must pass `secrets: inherit`.
+`.github/workflows/build.yml` checks out `ecu-corpus/` with a short-lived token from the `nyetlabs-corpus-reader` GitHub App (organization variable `CORPUS_APP_CLIENT_ID`, secret `CORPUS_APP_KEY`), for the `ecu-corpus` URL only. Fork and Dependabot pull requests have no Actions secrets and skip. `.github/workflows/corpus-bump.yml` moves the submodule to the corpus head and opens a pull request. `release.yml` reuses the build and must pass `secrets: inherit`.
