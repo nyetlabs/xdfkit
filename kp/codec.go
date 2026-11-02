@@ -23,13 +23,16 @@ import (
 // `kp:"opt,opt..."` options:
 //
 //   - not stored (derived or bookkeeping); unexported fields are skipped too
-//     v1, v2, ols5, v2only   walk filter, not a version: v1 is 113 and 116;
-//     v2 is 292, 329, 503, and 597; v2only is 292 and 329; ols5 is 503 and 597
-//     len=N    Hex: N raw bytes
-//     count    slice: int32 element count, then the elements
-//     bytes    slice: int32 byte length, then the elements
-//     rest     Hex: everything up to the end of the buffer
-//     hook     coded by the struct's hook method
+//     v1         walk for headers 113 and 116
+//     v2         walk for headers 292, 329, 503, and 597 (and 245's project/zip)
+//     v2only     walk for headers 292 and 329 (and 245's project/zip) only
+//     ols5       walk for headers 503 and 597 only
+//     245        header 245's intern only (layout forced to V1 there); ORs with v1/v2/…
+//     len=N      Hex: N raw bytes
+//     count      slice: int32 element count, then the elements
+//     bytes      slice: int32 byte length, then the elements
+//     rest       Hex: everything up to the end of the buffer
+//     hook       coded by the struct's hook method
 //
 // A struct implementing checker has check called after its fields are coded.
 type codec struct {
@@ -65,20 +68,36 @@ func (c *codec) sub(b []byte) *codec {
 	return &codec{b: b, enc: c.enc, layout: c.layout, headerID: c.headerID, want: c.want, path: c.path, found: c.found, block: true}
 }
 
+// Layout bits for field.layouts. Tag "v2" sets maskV2|maskOLS5; "v2only" is maskV2.
+const (
+	maskV1   = 1 << V1
+	maskV2   = 1 << V2
+	maskOLS5 = 1 << OLS5
+)
+
 type field struct {
 	index      int
 	goName     string
 	name       string // JSON name
-	layouts    uint8  // bit mask of Layout values; 0 means every layout
+	layouts    uint8  // bit mask of Layout values; 0 means every layout (unless on245)
 	n          int
 	skip, hook bool
 	count      bool
 	bytes      bool
 	rest       bool
+	on245      bool // tag "245": header 245 map block
 }
 
-func (f field) in(l Layout) bool {
-	return f.layouts == 0 || f.layouts&(1<<l) != 0
+// include reports whether f is coded on c. Layout tags and "245" combine with OR.
+// A field with no layout or "245" tags is coded on every walk.
+func (f field) include(c *codec) bool {
+	if f.layouts == 0 && !f.on245 {
+		return true
+	}
+	if f.layouts != 0 && f.layouts&(1<<c.layout) != 0 {
+		return true
+	}
+	return f.on245 && c.headerID == header245 && c.block
 }
 
 var fieldCache sync.Map // reflect.Type -> []field
@@ -96,34 +115,37 @@ func fieldsOf(t reflect.Type) []field {
 		}
 		f.skip = !sf.IsExported()
 		for _, o := range strings.Split(sf.Tag.Get("kp"), ",") {
-			switch {
-			case o == "":
-			case o == "-":
+			switch o {
+			case "":
+			case "-":
 				f.skip = true
-			case o == "v1":
-				f.layouts |= 1 << V1
-			case o == "v2":
-				f.layouts |= 1<<V2 | 1<<OLS5 // walks for 292/329 and 503/597
-			case o == "v2only":
-				f.layouts |= 1 << V2
-			case o == "ols5":
-				f.layouts |= 1 << OLS5
-			case o == "count":
+			case "v1":
+				f.layouts |= maskV1
+			case "v2":
+				f.layouts |= maskV2 | maskOLS5
+			case "v2only":
+				f.layouts |= maskV2
+			case "ols5":
+				f.layouts |= maskOLS5
+			case "245":
+				f.on245 = true
+			case "count":
 				f.count = true
-			case o == "bytes":
+			case "bytes":
 				f.bytes = true
-			case o == "rest":
+			case "rest":
 				f.rest = true
-			case o == "hook":
+			case "hook":
 				f.hook = true
-			case strings.HasPrefix(o, "len="):
+			default:
+				if !strings.HasPrefix(o, "len=") {
+					panic(fmt.Sprintf("kp: %s.%s: unknown tag option %q", t, sf.Name, o))
+				}
 				n, err := strconv.Atoi(o[4:])
 				if err != nil {
 					panic(fmt.Sprintf("kp: %s.%s: bad tag %q", t, sf.Name, o))
 				}
 				f.n = n
-			default:
-				panic(fmt.Sprintf("kp: %s.%s: unknown tag option %q", t, sf.Name, o))
 			}
 		}
 		fs = append(fs, f)
@@ -175,7 +197,7 @@ func (c *codec) structFields(v reflect.Value) {
 		}
 	}
 	for _, f := range fieldsOf(v.Type()) {
-		if f.skip || !f.in(c.layout) {
+		if f.skip || !f.include(c) {
 			continue
 		}
 		old := c.enter(f.name)

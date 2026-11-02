@@ -1,8 +1,7 @@
 // Package kp reads and writes WinOLS map packs ("OLS Map Pack", *.kp).
-// The int32 at offset 0x10 is a decimal header id. 113 and 116 keep maps
-// inline. 292 and 329, and 503 and 597, store maps in a deflated zip entry
-// named "intern". 503 and 597 are read only: Encode returns an error until a
-// save oracle exists.
+// The int32 at offset 0x10 is a decimal header id: 113/116 inline maps;
+// 245/292/329/503/597 zip "intern". 245, 503, and 597 are read-only until a
+// save oracle exists. Header hybrids: docs/kp-format.md.
 //
 // Fields whose meaning isn't known get the most likely name, marked
 // "(unconfirmed)" in a comment; constants with no known meaning are named Pad
@@ -20,9 +19,7 @@ import (
 	"io"
 )
 
-// Layout is a shared record walk, not a WinOLS version. Header ids are the
-// decimal int32 at offset 0x10: 113 and 116 use V1, 292 and 329 use V2
-// (329 is in the 300s), and 503 and 597 use OLS5.
+// Layout is a shared record walk, not a WinOLS version (see headerGroup).
 type Layout int
 
 const (
@@ -34,6 +31,7 @@ const (
 const (
 	header113 = 113
 	header116 = 116
+	header245 = 245
 	header292 = 292
 	header329 = 329
 	header503 = 503
@@ -43,9 +41,9 @@ const (
 // File is a parsed map pack. Fields are in file order (see codec for the tags).
 type File struct {
 	Signature   string  `json:"signature"`
-	HeaderID    int32   `json:"headerId"`              // decimal: 113/116, 292/329, or 503/597
-	HeaderLen   int32   `json:"headerLen"`             // file length except 113 and 116, where it is 0; recomputed by Encode on 292 and 329
-	FixedHeader Hex     `json:"fixedHeader" kp:"hook"` // from 0x18 through 0x5c (113, 116) or 0x60 (the other headers); zeros
+	HeaderID    int32   `json:"headerId"`              // decimal: 113/116, 245, 292/329, or 503/597
+	HeaderLen   int32   `json:"headerLen"`             // file length except 113, 116, and 245, where it is 0; recomputed by Encode on 292 and 329
+	FixedHeader Hex     `json:"fixedHeader" kp:"hook"` // from 0x18 through 0x5c (113, 116, 245) or 0x60 (the other headers); zeros
 	Filename    string  `json:"filename" kp:"hook"`    // 503 and 597: no trailing NUL
 	Version     string  `json:"version" kp:"hook"`     // 503 and 597: no trailing NUL
 	HeaderBody  Hex     `json:"headerBody" kp:"hook"`  // between Version and EndOffset; partly uninitialized memory
@@ -81,7 +79,7 @@ type Folder struct {
 	Name    string `json:"name"`
 	Flags   Hex    `json:"flags" kp:"len=2"`       // 1, 1: expanded and visible (unconfirmed)
 	Style   int32  `json:"style"`                  // 0x1000000 (unconfirmed)
-	Pad     Hex    `json:"pad,omitzero" kp:"hook"` // v2: 15 bytes; OLS5: 36 bytes (unconfirmed)
+	Pad     Hex    `json:"pad,omitzero" kp:"hook"` // v2: 15 bytes; header 245: 14; OLS5: 36 (unconfirmed)
 }
 
 const headerLenOff = 0x14
@@ -98,9 +96,9 @@ func Parse(data []byte) (f *File, err error) {
 // WinOLS used zlib, so a fresh archive is equivalent but not byte-identical.
 // The length-derived fields (HeaderLen in v2, EndOffset) are recomputed and
 // stored back into f, so f matches what parsing the output gives.
-// Headers 503 and 597 are read-only until a save oracle exists.
+// Headers 245, 503, and 597 are read-only until a save oracle exists.
 func (f *File) Encode() (out []byte, err error) {
-	if f.Layout() == OLS5 {
+	if f.Layout() == OLS5 || f.HeaderID == header245 {
 		return nil, fmt.Errorf("kp: Encode of header %d is not supported yet", f.HeaderID)
 	}
 	defer catch(&err)
@@ -143,8 +141,8 @@ func headerGroup(id int32) (Layout, string) {
 	switch id {
 	case header113, header116:
 		return V1, "100"
-	case header292, header329:
-		return V2, "200+300"
+	case header245, header292, header329:
+		return V2, "200+300" // 245 special-cases FixedHeader, walkHeader, intern
 	case header503, header597:
 		return OLS5, "500"
 	}
@@ -171,7 +169,7 @@ func (f *File) hook(c *codec, field string) {
 		c.layout = f.Layout()
 		c.headerID = f.HeaderID
 		end := 0x60
-		if c.layout == V1 {
+		if c.layout == V1 || c.headerID == header245 {
 			end = 0x5c
 		} else if c.layout == 0 {
 			c.fail("unknown kp header %d", f.HeaderID)
@@ -215,8 +213,8 @@ func (f *File) codeOLS5HeaderBody(c *codec) {
 	c.raw(&f.HeaderBody, i-4) // leave EndOffset (4) before the tag
 }
 
-// walkHeader steps over the header after the filename and version strings,
-// checking its terminators. The layout follows mapdump's Parser.parseHeader.
+// walkHeader steps over the header after the filename and version strings
+// (mapdump Parser.parseHeader; 245 skips term2a/"Binary data", unconfirmed).
 func walkHeader(c *codec, l Layout) {
 	var s string
 	skip := func(n int) { c.take(n) }
@@ -231,10 +229,14 @@ func walkHeader(c *codec, l Layout) {
 		c.str(&s)
 		c.str(&s)
 		skip(10 * 4)
-		c.term("2a")
-		skip(1 + 12*4)
-		c.str(&s)
-		skip(10*4 + 1)
+		if c.headerID == header245 {
+			skip(38)
+		} else {
+			c.term("2a")
+			skip(1 + 12*4)
+			c.str(&s)
+			skip(10*4 + 1)
+		}
 	}
 	skip(0x14*2 + 0x10*2 + 18*4)
 	c.term("3")
@@ -253,9 +255,8 @@ func ols5Trailer(headerID int32) int {
 	return 93
 }
 
-// hook codes the maps: inline in v1; in v2/OLS5 an int length, then a zip holding
-// "intern" (InternFlag, then the maps; OLS5 may leave a short trailing block).
-// NameTrailer and VersionTrailer are the OLS5 blocks whose size follows the header.
+// hook codes the maps: inline in v1; in v2/OLS5 a zip "intern" (OLS5 may leave
+// a short trailing block). NameTrailer/VersionTrailer are OLS5-only.
 func (p *Project) hook(c *codec, field string) {
 	switch field {
 	case "NameTrailer":
@@ -285,6 +286,9 @@ func (p *Project) hook(c *codec, field string) {
 		}
 		p.intern = intern
 		ic := c.sub(intern)
+		if c.headerID == header245 {
+			ic.layout = V1 // records match 113/116; container stays V2
+		}
 		ic.u8(&p.InternFlag)
 		maps(ic)
 		if left := len(intern) - ic.pos; left != 0 {
@@ -321,7 +325,11 @@ func (fd *Folder) hook(c *codec, field string) {
 	}
 	switch c.layout {
 	case V2:
-		c.raw(&fd.Pad, 15)
+		n := 15
+		if c.headerID == header245 {
+			n = 14
+		}
+		c.raw(&fd.Pad, n)
 	case OLS5:
 		c.raw(&fd.Pad, 36)
 	}

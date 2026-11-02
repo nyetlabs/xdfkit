@@ -6,15 +6,16 @@ The Go structs are the record layouts. `kp/codec.go` walks fields in declaration
 
 ## Versions
 
-The int32 at offset 0x10 is a decimal header id. Headers that share a row share a record walk, named by hundred: 100 (113 and 116), 200+300 (292 and 329), and 500 (503 and 597).
+The int32 at offset 0x10 is a decimal header id. Headers that share a row share a record walk, named by hundred: 100 (113 and 116), 200+300 (292 and 329; 245 uses this walk for project/maps), and 500 (503 and 597).
 
 | Header | Walk | Value at 0x14 | Fixed header ends | Maps |
 | --- | --- | --- | --- | --- |
 | 113, 116 | 100 | 0 | 0x5c | inline |
+| 245 | 200+300 | 0 | 0x5c | zip entry `intern` |
 | 292, 329 | 200+300 | file length | 0x60 | zip entry `intern` |
 | 503, 597 | 500 | file length | 0x60 | zip entry `intern` |
 
-329 is accepted; archived packs use 292. WinOLS 2.24 writes header 292 and version `OLS 5.0 (Windows)`. 503 and 597 are read-only (`Encode` errors until a save oracle exists). Size differences and OLS5 string modes live in `kp/ols5.go`.
+329 is accepted; archived packs use 292. WinOLS 2.24 writes header 292 and version `OLS 5.0 (Windows)`. 245 is a hybrid (unconfirmed mid skip): V1-sized fixed header (`HeaderLen` 0), V2 project/zip, V1 map walk plus `IDState`, axis `Mirror` as int32 plus a 1-byte pad (no LinkID/Comment/ImageSizePad), folder pad 14, header-body mid without term2a/`"Binary data"`. 245, 503, and 597 are read-only. OLS5 size and string modes: `kp/ols5.go`.
 
 Every archived pack ends with `33 88 72 98`. `EndOffset` is that marker's offset (file length minus 4). KP-only residue defaults in `kp-defaults.json` are pooled by hundred (`"100"`, `"200+300"`, `"500"`); `"default"` holds values shared by at least two pools.
 
@@ -31,7 +32,7 @@ flowchart TD
   E --> F[Maps]
   F --> G["MapsTag, folders, trailing bytes"]
   F --> H["113 and 116: count, then records"]
-  F --> I["292, 329, 503, 597: zip length, then the zip"]
+  F --> I["245, 292, 329, 503, 597: zip length, then the zip"]
   I --> J["intern: flag 0, count, records"]
 ```
 
@@ -40,13 +41,13 @@ flowchart TD
 Maps, then `MapsTag`, then folders:
 
 - 113/116: int32 count, then map records
-- 292/329/503/597: int32 zip length, then the zip; folders follow. Inflated `intern` is flag 0, count, records
+- 245/292/329/503/597: int32 zip length, then the zip; folders follow. Inflated `intern` is flag 0, count, records
 
 Each folder: id, `BuiltIn` (9000 My maps, 9001 Hexdump, else 0), name, flags, style, pad. This reader keeps the table as stored.
 
 ## Round trip
 
-`Parse` and `Encode` share one walk. Encode writes the length at 0x14 and `EndOffset` for 292/329. Encode of 503/597 is not supported.
+`Parse` and `Encode` share one walk. Encode writes the length at 0x14 and `EndOffset` for 292/329. Encode of 245/503/597 is not supported.
 
 - 113/116: parse then encode is byte-identical (including JSON in between)
 - 292/329: original zip reused while the map block is unchanged; a changed block is re-deflated with Go `compress/flate` level 9. Inflated block and bytes outside the zip match aside from the two lengths

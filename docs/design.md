@@ -15,7 +15,7 @@ Converts map definitions between WinOLS KP, A2L, DAMOS, TunerPro XDF and a canon
     - Add/subtract axes are live helpers by default; backwards is static labels; `--static-axes` forces labels (`stamp-and-metadata.md`, Live helpers; formulas in `kp-format.md`).
   - CSV map list (output only): ecuxplot mapdump format via `mapcsv/` (`xdfkit -f csv -i image -r ref`). Differences: axis columns follow organisation (`kp-format.md`); no-cell objects get `-`; 32-bit raw range masked; floats read as floats.
   - Edit stamp on every JSON output (model and metadata file): `stamp-and-metadata.md`.
-- Inputs: KP headers 113, 116, 292, 329 (as ecuxplot mapdump); 503 and 597 read-only (`kp-format.md`); A2L; DAMOS `.dam`; JSON/YAML; XDF with metadata file if present.
+- Inputs: KP headers 113, 116, 292, 329 (as ecuxplot mapdump); 245, 503, and 597 read-only (`kp-format.md`); A2L; DAMOS `.dam`; JSON/YAML; XDF with metadata file if present.
 - No licensed WinOLS options assumed. Route into WinOLS is KP. No A2L or DAMOS writers (WinOLS import is one-way through the licensed Damos plugin).
 - Readers: A2L (`a2l/`) then DAMOS (`dam/`). Both emit schema 1 with axes and conversions inlined and addresses as file offsets (`model.md`). A2L text is ISO-8859-1; DAMOS display text is CP850 except `0xB0` as degree (`°KW`).
 
