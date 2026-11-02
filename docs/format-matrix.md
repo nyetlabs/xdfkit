@@ -77,7 +77,7 @@ Names and limits for the rows above:
 - Display precision. A2L `FORMAT`. XDF `decimalpl`.
 - Display base. KP base field; v2 uses binary on codewords such as CWMSRCAN. XDF decimal and hex only. Model view base.
 - Min / max. KP `range`: one low/high pair per element width, stored as typed raw / eprom units (`kp-format.md`; the Value range dialog does not follow the map's raw/scaled display toggle). A2L limits plus `EXTENDED_LIMITS`. DAMOS `/SPW`, `/SPX` and `/SPY` limits. Model `min` and `max` on `value`, omitted when the source has none (`model.md`).
-- Difference / percent. KP flags. Model view flags.
+- Difference / percent. KP flags, the map-window toggles. Model view flags.
 - Per-map doubles. KP `viewScale`, `viewOffset`, `view2DScale`, and `view3DRotation` (often 300.0, 1.0) are view state, not a conversion. Not in the model. KP output takes them from a template or from defaults.
 - Read from image. KP datasource EEPROM. A2L `STD_AXIS` / `COM_AXIS`. XDF `EMBEDDEDDATA`. Model source `image`.
 - Per-axis type, sign, units, conversion.

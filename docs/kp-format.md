@@ -78,7 +78,7 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 | `CommentFlag` | byte, v2 | |
 | `Name` | string | long description |
 | `Organization` | int32 | [Enums](#enums) |
-| `RightPane` | int32 | HelpEn `RWin` candidate (0 none, 1 hex, 2 bars, 3 both); unconfirmed in the map window |
+| `RightPane` | int32 | HelpEn `RWin` candidate (0 none, 1 hex, 2 bars, 3 both). The hexdump's right pane does not write this field. Unconfirmed in the map window |
 | `Type` | int32 | element type; [Enums](#enums) |
 | `Width` | int32 | element size in bytes; matches `Type` |
 | `Base` | int32 | 10, 16, or 2 |
@@ -88,7 +88,7 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 | `IDFlag` | byte | 0 |
 | `IDState` | int32, v2 | 0 or 1. Meaning unconfirmed; often constant per pack. Residue only (not in the model). Was wrongly named Marked before the map-list marker was confirmed |
 | `Range` | int64[3][2] | [below](#range) |
-| `Reciprocal`, `Signed`, `Difference`, `Percent` | byte | 0 or 1, in that order |
+| `Reciprocal`, `Signed`, `Difference`, `Percent` | byte | 0 or 1, in that order. `Difference` and `Percent` are the map-window toggles (model `view`) |
 | `Cols`, `Rows` | int32 | |
 | `Cursor` | int32[2] | changes when the map is opened |
 | `Precision` | int32 | |
@@ -101,6 +101,8 @@ Order is the `kp.Map` struct. v2-only fields are marked.
 | `Addr2ImageSize` | int32 | image length, or 0 |
 | `Addr2Pad` | int32 | 0 |
 | `X`, `Y` | axis | [Axis](#axis) |
+
+The hexdump's original-value toggle does not change a decoded field.
 
 ### Range
 
