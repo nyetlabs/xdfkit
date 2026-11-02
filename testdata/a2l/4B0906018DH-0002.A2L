@@ -85954,7 +85954,7 @@
     TZTOL_UM
     "Toleranz zwischen Zeit- und Zahnzählererfassung in Timerinkrementen"
     VALUE
-    0x81421B
+    0x81421A
     KwUw
     65535.00
     dez
@@ -85963,8 +85963,8 @@
 
     FUNCTION_LIST UFNC
     
-    IF_DATA DIM_X      DIRECT      0x81421B
-     /begin IF_DATA ETK  DP_BLOB 0x81421B  0x2  /end IF_DATA 
+    IF_DATA DIM_X      DIRECT      0x81421A
+     /begin IF_DATA ETK  DP_BLOB 0x81421A  0x2  /end IF_DATA 
 /end CHARACTERISTIC
 
 /begin CHARACTERISTIC
@@ -89278,7 +89278,7 @@
     VMIN_UM
     "Minimalgeschwindigkeit für FGR-Betrieb in der Funktionsüberwachung"
     VALUE
-    0x81421F
+    0x81421E
     KwUw
     511.9922
     vfzg_uw_q0p00781
@@ -89287,8 +89287,8 @@
 
     FUNCTION_LIST UFFGRC
     
-    IF_DATA DIM_X      DIRECT      0x81421F
-     /begin IF_DATA ETK  DP_BLOB 0x81421F  0x2  /end IF_DATA 
+    IF_DATA DIM_X      DIRECT      0x81421E
+     /begin IF_DATA ETK  DP_BLOB 0x81421E  0x2  /end IF_DATA 
 /end CHARACTERISTIC
 
 
@@ -89680,7 +89680,7 @@
     WAIT_T_UM
     "Wartezeit für Reset-Tastverhältnis aus der Funktionsüberwachung"
     VALUE
-    0x814219
+    0x814218
     KwUw
     8332.629
     t_wdt_high
@@ -89689,8 +89689,8 @@
 
     FUNCTION_LIST UFURAM URDELAY
     
-    IF_DATA DIM_X      DIRECT      0x814219
-     /begin IF_DATA ETK  DP_BLOB 0x814219  0x2  /end IF_DATA 
+    IF_DATA DIM_X      DIRECT      0x814218
+     /begin IF_DATA ETK  DP_BLOB 0x814218  0x2  /end IF_DATA 
 /end CHARACTERISTIC
 
 /begin CHARACTERISTIC
