@@ -1,0 +1,22 @@
+*** Created by ASAP2DAM Version 6.05 02.09.1998 ***
+/EPR, {PROJ}, {1.0}, X
+1, /REG, linear, {scale}, 0, 0, {raw}, 0
+/REP, 1, 0, 0, 1, 0, 0;
+2, /REG, recip, {time}, 0, 0, {s}, 0
+/REP, 0, 2560, 10, 0, 0, 0;
+
+1, /SPZ, VAL, {a value}, 1, $800010, $800010
+/SPW, 1, -2, -1, 1
+/SPX, 0, 0, 0, 0, 0
+
+2, /SPZ, CUR, {a curve}, 2, $800100, $800100
+/SPW, 2, 2, 0, 10
+/SPX, 1, 1, 0, 4, 99
+/FKX, 4, 0, 0
+
+6, /SPZ, MAP, {a map}, 3, $81C05C, $81C05C
+/SPW, 1, 2, 0, 2
+/SPX, 1, 1, 0, 10, 99
+/SPY, 1, 2, 0, 20, 99
+/FKX, 4, 0, 0
+/FKY, 1, 0, 0

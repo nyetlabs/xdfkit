@@ -1,0 +1,13 @@
+*** Created by ASAP2DAM Version 6.05 02.09.1998 ***
+/EPR, {PROJ}, {1.0}, X
+1, /REG, linear, {scale}, 0, 0, {raw}, 0
+/REP, 1, 0, 0, 1, 0, 0;
+
+9, /SPZ, SST, {shared}, 6, $800500, $800500
+/SPW, 0, 0, 0, 0
+/SPX, 2, 1, 0, 10, 0
+/FKX, 8, 0, 0
+
+10, /SPZ, ONSST, {on the shared axis}, 7, $800600, $800600
+/SPW, 1, 1, 0, 1
+/SPX, 2, 1, 0, 10, 9

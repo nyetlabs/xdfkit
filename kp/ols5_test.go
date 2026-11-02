@@ -17,6 +17,52 @@ const (
 	ols5A2L  = "../testdata/local/8N0906018BB_0002.a2l"
 )
 
+func TestOLS5Fixture597(t *testing.T) {
+	b, err := os.ReadFile("../testdata/kp/597-fewmaps.kp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := Parse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Layout() != OLS5 || f.HeaderID != header597 {
+		t.Fatalf("layout %v header %d", f.Layout(), f.HeaderID)
+	}
+	if len(f.Project.NameTrailer) != 93 || len(f.Project.VersionTrailer) != 93 {
+		t.Fatalf("597 trailers %d %d", len(f.Project.NameTrailer), len(f.Project.VersionTrailer))
+	}
+	if len(f.Project.Maps) != 4 {
+		t.Fatalf("maps %d", len(f.Project.Maps))
+	}
+	if _, err := f.Encode(); err == nil {
+		t.Fatal("Encode of OLS5 should fail")
+	}
+}
+
+func TestOLS5Fixture503(t *testing.T) {
+	b, err := os.ReadFile("../testdata/kp/503-fewmaps.kp")
+	if err != nil {
+		t.Fatal(err)
+	}
+	f, err := Parse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Layout() != OLS5 || f.HeaderID != header503 {
+		t.Fatalf("layout %v header %d", f.Layout(), f.HeaderID)
+	}
+	if len(f.Project.NameTrailer) != 84 || len(f.Project.VersionTrailer) != 84 {
+		t.Fatalf("503 trailers %d %d", len(f.Project.NameTrailer), len(f.Project.VersionTrailer))
+	}
+	if len(f.Project.Maps) != 4 {
+		t.Fatalf("maps %d", len(f.Project.Maps))
+	}
+	if _, err := f.Encode(); err == nil {
+		t.Fatal("Encode of header 503 should fail")
+	}
+}
+
 func TestOLS5Parse(t *testing.T) {
 	b, err := os.ReadFile(ols5KP)
 	if err != nil {
@@ -43,7 +89,7 @@ func TestOLS5Parse(t *testing.T) {
 	}
 }
 
-// Header 503 is the other OLS5 header beside 597.
+// Header 503 is the other OLS5 header beside 597 (full local pack).
 func TestOLS5Header503(t *testing.T) {
 	b, err := os.ReadFile("../testdata/local/4B0906018DH_0002.kp")
 	if err != nil {

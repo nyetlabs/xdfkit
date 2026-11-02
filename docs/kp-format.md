@@ -17,6 +17,8 @@ The int32 at offset 0x10 is a decimal header id. Headers that share a row share 
 
 329 is accepted; archived packs use 292. WinOLS 2.24 writes header 292 and version `OLS 5.0 (Windows)`. 245 is a hybrid (unconfirmed mid skip): V1-sized fixed header (`HeaderLen` 0), V2 project/zip, V1 map walk plus `IDState`, axis `Mirror` as int32 plus a 1-byte pad (no LinkID/Comment/ImageSizePad), folder pad 14, header-body mid without term2a/`"Binary data"`. 245, 503, and 597 are read-only. OLS5 size and string modes: `kp/ols5.go`.
 
+CI parse smoke uses minimal complete packs under `testdata/kp/` (one few-map fixture per header family: 116, 292, 245, 503, 597). Full private saves stay in `testdata/local/`; the frozen ecuxplot archive is separate and not for new fixtures.
+
 Every archived pack ends with `33 88 72 98`. `EndOffset` is that marker's offset (file length minus 4). KP-only residue defaults in `kp-defaults.json` are pooled by hundred (`"100"`, `"200+300"`, `"500"`); `"default"` holds values shared by at least two pools.
 
 ## Layout

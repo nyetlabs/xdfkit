@@ -1,0 +1,29 @@
+/begin PROJECT DEMO ""
+  /begin HEADER ""
+    VERSION "1.2"
+  /end HEADER
+  /begin MODULE MOD ""
+    /begin MOD_COMMON ""
+      BYTE_ORDER MSB_LAST
+      ALIGNMENT_BYTE 1
+      ALIGNMENT_WORD 2
+      ALIGNMENT_LONG 2
+    /end MOD_COMMON
+    /begin COMPU_METHOD ident ""
+      RAT_FUNC "%3.0" ""
+      COEFFS 0 1 0 0 0 1
+    /end COMPU_METHOD
+    /begin RECORD_LAYOUT Scalar
+      FNC_VALUES 1 UBYTE
+    /end RECORD_LAYOUT
+    /begin CHARACTERISTIC Val "a value"
+      VALUE
+      0x800500
+      Scalar
+      0
+      ident
+      0
+      1
+    /end CHARACTERISTIC
+  /end MODULE
+/end PROJECT

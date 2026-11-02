@@ -11,7 +11,7 @@ make help       # all targets
 
 - `make install` copies `build/xdfkit` without building, so it can run under sudo. It takes `DESTDIR` for staging a package; `BINDIR` links are absolute paths into `LIBDIR`.
 - `make lint` needs only Go and must pass before sending changes. `go.mod` has no toolchain directive; keep it that way.
-- Tests use the archived ecuxplot packs and mapdump CSVs in `testdata/archive/ecuxplot/`, images from the private corpus (`docs/corpus.md`), and jq 1.8. Without the corpus or jq those tests skip; `XDFKIT_REQUIRE_DATA=1` and `XDFKIT_REQUIRE_CORPUS=1` (as in CI) make them fail instead. Lint also has synthetic fixtures (`testdata/lint/cases.json`) that need no corpus.
+- Tests use the archived ecuxplot packs and mapdump CSVs in `testdata/archive/ecuxplot/`, minimal KP packs in `testdata/kp/`, A2L/DAMOS fixtures in `testdata/a2l/` and `testdata/damos/`, images from the private corpus (`docs/corpus.md`), and jq 1.8. Without the corpus or jq those tests skip; `XDFKIT_REQUIRE_DATA=1` and `XDFKIT_REQUIRE_CORPUS=1` (as in CI) make them fail instead. Lint also has synthetic fixtures (`testdata/lint/cases.json`) that need no corpus.
 
 ## Formats
 
@@ -55,7 +55,8 @@ me7-logger imports `model`, `xdf` and `canon` (`docs/integrations.md`): after ch
 
 - Commit messages start with a prefix that `cliff.toml` groups: `feat`/`add`, `fix`, `docs`, `refactor`, `chore`, `ci`, `build`, `test`, `style`, `chore(deps)`.
 - Never edit or regenerate `testdata/archive/ecuxplot/` (see its README). `images.tsv` names each archived pack's corpus image for tests.
-- Reader fixtures live in `testdata/a2l/` and `testdata/damos/`. Other private files (images, OLS, WinOLS sweeps) stay in the gitignored `testdata/local/`. Tests do not read that directory.
+- Committed reader fixtures: small A2L/DAMOS fragments and (for now) the large A2L/DAMOS samples in `testdata/a2l/` and `testdata/damos/`; minimal complete KP packs for every parsed header family in `testdata/kp/` (see its README; regenerate with `go run ./internal/cmd/gen-kp-fixtures`). Do not add packs to the frozen archive.
+- Private full saves (images, OLS, WinOLS/OLS5 sweeps, large header 245/503/597 sources) stay in the gitignored `testdata/local/`. CI must not require that directory; optional deep tests may read it and skip when absent.
 - `docs/` describes how things are, including spec not implemented yet; plans are kept outside the repo.
 
 ## Releases
