@@ -48,14 +48,14 @@ type Fix struct {
 	DataSource *kp.DataSource `json:"dataSource,omitempty"`
 	Signed     *bool          `json:"signed,omitempty"`
 	End        *uint32        `json:"end,omitempty"`
-	Points     *int           `json:"points,omitempty"` // new axis point count (R4); map cols/rows and end follow
-	Addr       *uint32        `json:"addr,omitempty"`   // new axis address (R5, R9)
-	Start      *uint32        `json:"start,omitempty"`  // new map start (R9, R10); end follows
-	Type       *kp.Type       `json:"type,omitempty"`   // new axis element type (R9 axis-width)
+	Points     *int           `json:"points,omitempty"` // new axis point count (AX01); map cols/rows and end follow
+	Addr       *uint32        `json:"addr,omitempty"`   // new axis address (AX02, RC01)
+	Start      *uint32        `json:"start,omitempty"`  // new map start (RC01, RC02); end follows
+	Type       *kp.Type       `json:"type,omitempty"`   // new axis element type (RC01 axis-width)
 }
 
 // Finding is one problem with one axis (address and point count) or one map
-// (start address and byte length, rules R8 to R10), with the evidence and the
+// (start address and byte length, rules MP01 to RC02), with the evidence and the
 // proposed fix.
 type Finding struct {
 	ID         string         `json:"id"` // RULE@0xADDR:POINTS
@@ -70,12 +70,12 @@ type Finding struct {
 	Values     []int64        `json:"values,omitempty"`     // raw, as stored
 	Subtracted []int64        `json:"subtracted,omitempty"` // Values as WinOLS shows a "subtract" axis
 	Opposite   []int64        `json:"opposite,omitempty"`   // raw, with the other signedness
-	Later      []int64        `json:"later,omitempty"`      // R9: raw, read one byte later
-	Earlier    []int64        `json:"earlier,omitempty"`    // R9: raw, read one byte earlier
-	Narrow     []int64        `json:"narrow,omitempty"`     // R9: axis read as 8-bit one byte earlier
+	Later      []int64        `json:"later,omitempty"`      // RC01: raw, read one byte later
+	Earlier    []int64        `json:"earlier,omitempty"`    // RC01: raw, read one byte earlier
+	Narrow     []int64        `json:"narrow,omitempty"`     // RC01: axis read as 8-bit one byte earlier
 	CountByte  *int           `json:"countByte,omitempty"`  // before an 8-bit axis, or before Narrow
-	Record     *Record        `json:"record,omitempty"`     // R9, R10: the record the image holds there
-	Cause      string         `json:"cause,omitempty"`      // R9, R10: how the def differs from Record
+	Record     *Record        `json:"record,omitempty"`     // RC01, RC02: the record the image holds there
+	Cause      string         `json:"cause,omitempty"`      // RC01, RC02: how the def differs from Record
 	End        *uint32        `json:"end,omitempty"`        // stored map end address
 	Fix        *Fix           `json:"fix,omitempty"`
 	Maps       []AxisRef      `json:"maps"`
@@ -207,49 +207,49 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 		if fix != nil {
 			conf = Low
 		}
-		return set("R9", conf, fmt.Sprintf("%d-bit axis at an odd address (ME7 stores 16-bit data at even addresses); monotonic: %s; %s", 8*w, strings.Join(mono, ", "), describe(fd.Cause, fd.Record)), fix)
+		return set("RC01", conf, fmt.Sprintf("%d-bit axis at an odd address (ME7 stores 16-bit data at even addresses); monotonic: %s; %s", 8*w, strings.Join(mono, ", "), describe(fd.Cause, fd.Record)), fix)
 	}
 	if allEqual(v) {
-		return set("R6", None, "all values identical: wrong address or size", nil)
+		return set("XR01", None, "all values identical: wrong address or size", nil)
 	}
 	if family == ME7 {
 		switch {
 		case delta && monotonic(v):
-			return set("R1", High, fmt.Sprintf("%s axis, but ME7 axes are absolute and the plain values are monotonic", a.DataSource), &Fix{DataSource: ptr(kp.DSEeprom)})
+			return set("DS01", High, fmt.Sprintf("%s axis, but ME7 axes are absolute and the plain values are monotonic", a.DataSource), &Fix{DataSource: ptr(kp.DSEeprom)})
 		case delta && monotonic(opp):
 			fd.Opposite = opp
-			return set("R1", Medium, fmt.Sprintf("%s axis, but ME7 axes are absolute; monotonic only with the opposite signedness", a.DataSource), &Fix{DataSource: ptr(kp.DSEeprom), Signed: ptr(!a.Signed)})
+			return set("DS01", Medium, fmt.Sprintf("%s axis, but ME7 axes are absolute; monotonic only with the opposite signedness", a.DataSource), &Fix{DataSource: ptr(kp.DSEeprom), Signed: ptr(!a.Signed)})
 		case delta:
-			return set("R6", None, fmt.Sprintf("%s axis that is not monotonic plain either: check address, size or type", a.DataSource), nil)
+			return set("XR01", None, fmt.Sprintf("%s axis that is not monotonic plain either: check address, size or type", a.DataSource), nil)
 		case !monotonic(v) && monotonic(opp):
 			fd.Opposite = opp
-			return set("R3", Medium, "monotonic only with the opposite signedness", &Fix{Signed: ptr(!a.Signed)})
+			return set("DS03", Medium, "monotonic only with the opposite signedness", &Fix{Signed: ptr(!a.Signed)})
 		case !monotonic(v):
 			if fd := r5(a, n, img, set); fd != nil {
 				return fd
 			}
-			return set("R6", None, "not monotonic: check address, size or type", nil)
+			return set("XR01", None, "not monotonic: check address, size or type", nil)
 		}
 		return nil
 	}
 	sub := increasing(fd.Subtracted) && fd.Subtracted[0] >= 0
 	switch {
 	case !delta && !monotonic(v) && sub:
-		return set("R2", High, "plain axis in an M3.x image that is increasing only read as \"EEPROM, subtract\"", &Fix{DataSource: ptr(kp.DSEepromSubtract)})
+		return set("DS02", High, "plain axis in an M3.x image that is increasing only read as \"EEPROM, subtract\"", &Fix{DataSource: ptr(kp.DSEepromSubtract)})
 	case a.DataSource == kp.DSEepromSubtract && sub:
 		return nil
 	case countDisagrees(a, fd.CountByte, n):
 		c := *fd.CountByte
 		msg := fmt.Sprintf("count byte before the axis is %d, axis size is %d: check address or size", c, n)
 		if v2 := read(img, a.Addr, c, a.Type, a.Signed); monotonic(v2) {
-			return set("R4", Medium, msg+"; size "+fmt.Sprint(c)+" is monotonic", &Fix{Points: &c})
+			return set("AX01", Medium, msg+"; size "+fmt.Sprint(c)+" is monotonic", &Fix{Points: &c})
 		}
-		return set("R4", None, msg, nil)
+		return set("AX01", None, msg, nil)
 	case delta && !sub:
 		if fd := r5(a, n, img, set); fd != nil {
 			return fd
 		}
-		return set("R6", None, fmt.Sprintf("%s axis that is not increasing from 0 or more when read as \"EEPROM, subtract\": check address, size or type", a.DataSource), nil)
+		return set("XR01", None, fmt.Sprintf("%s axis that is not increasing from 0 or more when read as \"EEPROM, subtract\": check address, size or type", a.DataSource), nil)
 	case !delta && !monotonic(v):
 		if fd := r5(a, n, img, set); fd != nil {
 			return fd
@@ -276,7 +276,7 @@ func r5(a *kp.Axis, n int, img []byte, set func(rule, conf, msg string, fix *Fix
 		if !monotonic(read(img, caddr, n, a.Type, a.Signed)) {
 			continue
 		}
-		return set("R5", Low, fmt.Sprintf("count %d and monotonic axis at 0x%x (%+d from stored)", n, caddr, d), &Fix{Addr: &caddr})
+		return set("AX02", Low, fmt.Sprintf("count %d and monotonic axis at 0x%x (%+d from stored)", n, caddr, d), &Fix{Addr: &caddr})
 	}
 	return nil
 }
@@ -309,7 +309,7 @@ func subtracted(v []int64, w int) []int64 {
 // mapBytes is the byte length of a map's data, or 0 if unknown.
 func mapBytes(m *kp.Map) int { return int(m.Cols) * int(m.Rows) * m.Type.Width() }
 
-// checkEnd applies rule R8: WinOLS writes a map's end address as start +
+// checkEnd applies rule MP01: WinOLS writes a map's end address as start +
 // byte length and recomputes it on export, so a different value is stale.
 func checkEnd(m *kp.Map) *Finding {
 	n := mapBytes(m)
@@ -318,17 +318,17 @@ func checkEnd(m *kp.Map) *Finding {
 		return nil
 	}
 	return &Finding{
-		ID: fmt.Sprintf("R8@0x%x:%d", m.Start, n), Rule: "R8", Confidence: High,
+		ID: fmt.Sprintf("MP01@0x%x:%d", m.Start, n), Rule: "MP01", Confidence: High,
 		Message: fmt.Sprintf("end address 0x%x, but start + %d bytes is 0x%x", m.End, n, end),
 		Addr:    m.Start, Points: n, Type: m.Type, Signed: m.Signed, End: ptr(m.End),
 		Fix: &Fix{End: &end},
 	}
 }
 
-// alignCells caps the cells an R9 map finding shows from each reading.
+// alignCells caps the cells an RC01 map finding shows from each reading.
 const alignCells = 16
 
-// checkAlign applies rule R9 to a map: ME7 stores 16-bit data at even addresses
+// checkAlign applies rule RC01 to a map: ME7 stores 16-bit data at even addresses
 // only, so integer cells of 16 bits or more at an odd address are
 // mislocated. Report only; the readings one byte either side are evidence.
 func checkAlign(m *kp.Map, img []byte, family string) *Finding {
@@ -343,7 +343,7 @@ func checkAlign(m *kp.Map, img []byte, family string) *Finding {
 		conf = Low
 	}
 	return &Finding{
-		ID: fmt.Sprintf("R9@0x%x:%d", m.Start, n*w), Rule: "R9", Confidence: conf,
+		ID: fmt.Sprintf("RC01@0x%x:%d", m.Start, n*w), Rule: "RC01", Confidence: conf,
 		Message: fmt.Sprintf("%d-bit map at an odd address (ME7 stores 16-bit data at even addresses); %s", 8*w, describe(cause, rec)),
 		Addr:    m.Start, Points: n * w, Type: m.Type, Signed: m.Signed,
 		Values:  read(img, m.Start, k, m.Type, m.Signed),
@@ -353,7 +353,7 @@ func checkAlign(m *kp.Map, img []byte, family string) *Finding {
 	}
 }
 
-// checkHeader applies rule R10 to a map: an ME7 curve, map or axis-point
+// checkHeader applies rule RC02 to a map: an ME7 curve, map or axis-point
 // table record starts with its point counts, one byte per axis, then the
 // axes, then the values, each 16-bit field at an even address
 // (docs/model.md). A map without image axes whose data reads as such a
@@ -378,7 +378,7 @@ func checkHeader(m *kp.Map, img []byte, family string) *Finding {
 		}
 		fix := recordFix(RecordStart, &r)
 		return &Finding{
-			ID: fmt.Sprintf("R10@0x%x:%d", m.Start, mapBytes(m)), Rule: "R10", Confidence: Low,
+			ID: fmt.Sprintf("RC02@0x%x:%d", m.Start, mapBytes(m)), Rule: "RC02", Confidence: Low,
 			Message: fmt.Sprintf("map without image axes starts on its own point counts and monotonic axes; %s", describe(RecordStart, &r)),
 			Addr:    m.Start, Points: mapBytes(m), Type: m.Type, Signed: m.Signed,
 			Values: read(img, r.Axes[0].Addr, r.Counts[0], intType(r.Axes[0].Bits/8), false),
@@ -533,7 +533,7 @@ func Apply(f *kp.File, fs []Finding) error {
 	return nil
 }
 
-// recordFix proposes an R9/R10 change from the cause and record. Low
+// recordFix proposes an RC01/RC02 change from the cause and record. Low
 // confidence; apply with --only or --min-confidence low.
 func recordFix(cause string, r *Record) *Fix {
 	if r == nil {

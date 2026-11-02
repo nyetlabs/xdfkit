@@ -69,7 +69,7 @@ func TestAliasRejectsMainOptions(t *testing.T) {
 	opts := [][]string{
 		{"-f", "json"}, {"--format", "json"}, {"--template", "t"}, {"-r", "r"}, {"--ref", "r"},
 		{"--meta", "m"}, {"--origin", "manual"}, {"--tuner", "t"}, {"--quiet"}, {"--force"},
-		{"-o", "o"}, {"--output", "o"}, {"-n"}, {"--dry-run"}, {"--rules", "R1"}, {"--only", "x"},
+		{"-o", "o"}, {"--output", "o"}, {"-n"}, {"--dry-run"}, {"--rules", "DS01"}, {"--only", "x"},
 		{"--min-confidence", "low"}, {"--findings", "f"}, {"--family", "me7"}, {"--json", "j"},
 		{"--status"}, {"--smart"}, {"--update"}, {"--overwrite"}, {"--description", "keep"},
 		{"--comment", "keep"}, {"-version"},

@@ -15,29 +15,29 @@ import (
 
 // want counts map axes per rule, from the prototype run on ecuxplot's data
 // (the archived packs, with OEM images from the corpus)
-// (keyed by map ID and axis, as the prototype did). R8, which the prototype
-// lacked, counts map IDs with a stale end address. R9, which it lacked too,
-// counts maps and axes at odd addresses, and takes over the prototype's R3
-// and R6 on KFFRMIN X and LAMFA X (8D0907551G, 4Z7907551R), R6 on LAMFA X
-// (06A906032HS, 8N0906018CB) and on KFMLDMN Y (4D1907558). R10 finds
-// nothing in these packs. 8D0907558M's R2 and R4 differ: the prototype read
+// (keyed by map ID and axis, as the prototype did). MP01, which the prototype
+// lacked, counts map IDs with a stale end address. RC01, which it lacked too,
+// counts maps and axes at odd addresses, and takes over the prototype's DS03
+// and XR01 on KFFRMIN X and LAMFA X (8D0907551G, 4Z7907551R), XR01 on LAMFA X
+// (06A906032HS, 8N0906018CB) and on KFMLDMN Y (4D1907558). RC02 finds
+// nothing in these packs. 8D0907558M's DS02 and AX01 differ: the prototype read
 // "subtract" axes as forward sums, and six axes that are increasing that way
-// but negative as WinOLS reads them are R4 here. R4 counts a previous
+// but negative as WinOLS reads them are AX01 here. AX01 counts a previous
 // byte only when it is a plausible count or the axis declares a header.
 var want = map[string]map[string]int{
-	"06A906032HS": {"R3": 7, "R9": 26},
-	"06A906032LP": {"R1": 16, "R3": 6, "R6": 1, "R9": 30},
-	"4D1907558":   {"R3": 1, "R5": 3, "R6": 5, "R9": 6},
-	"4Z7907551AA": {"R6": 1, "R8": 26, "R9": 4},
-	"4Z7907551R":  {"R1": 24, "R9": 44},
-	"8D0907551F":  {"R1": 20, "R6": 2, "R9": 45},
-	"8D0907551G":  {"R1": 23, "R9": 18},
-	"8D0907551H":  {"R6": 3},
-	"8D0907551K":  {"R6": 2, "R8": 64},
-	"8D0907551M":  {"R1": 1, "R6": 3, "R8": 13},
-	"8D0907558E":  {"R2": 216},
-	"8D0907558M":  {"R2": 68, "R4": 10, "R6": 9, "R8": 333},
-	"8N0906018CB": {"R1": 13, "R9": 25},
+	"06A906032HS": {"DS03": 7, "RC01": 26},
+	"06A906032LP": {"DS01": 16, "DS03": 6, "XR01": 1, "RC01": 30},
+	"4D1907558":   {"DS03": 1, "AX02": 3, "XR01": 5, "RC01": 6},
+	"4Z7907551AA": {"XR01": 1, "MP01": 26, "RC01": 4},
+	"4Z7907551R":  {"DS01": 24, "RC01": 44},
+	"8D0907551F":  {"DS01": 20, "XR01": 2, "RC01": 45},
+	"8D0907551G":  {"DS01": 23, "RC01": 18},
+	"8D0907551H":  {"XR01": 3},
+	"8D0907551K":  {"XR01": 2, "MP01": 64},
+	"8D0907551M":  {"DS01": 1, "XR01": 3, "MP01": 13},
+	"8D0907558E":  {"DS02": 216},
+	"8D0907558M":  {"DS02": 68, "AX01": 10, "XR01": 9, "MP01": 333},
+	"8N0906018CB": {"DS01": 13, "RC01": 25},
 }
 
 func load(t *testing.T, stem string) (*kp.File, []byte) {

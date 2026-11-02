@@ -27,14 +27,14 @@ type RecordAxis struct {
 	Bits int    `json:"bits"`
 }
 
-// Causes: how a def differs from the record the image holds (R9, R10).
+// Causes: how a def differs from the record the image holds (RC01, RC02).
 const (
 	ValuesPad   = "values-pad"   // values right after the axes: the pad before them was missed
 	TableLate   = "table-late"   // axis-point table one byte after its first point
 	AxisPad     = "axis-pad"     // 16-bit axis one byte off: a pad missed, or read as the axis
 	AxisWidth   = "axis-width"   // 8-bit axis read as 16-bit
 	Shape       = "shape"        // map next to a record of another shape
-	RecordStart = "record-start" // R10: map starts on the record's first count
+	RecordStart = "record-start" // RC02: map starts on the record's first count
 )
 
 var causeText = map[string]string{

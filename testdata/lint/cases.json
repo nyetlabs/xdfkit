@@ -1,5 +1,5 @@
 {
-  "about": "Synthetic lint fixtures (lint/fixture_test.go, docs/autocorrect.md): no OEM data. Each case builds an image holding its Bosch ident and the raw axis values (8-bit axes get a count byte before them unless count is given; points with values sets the declared size when it differs from the written length; at and atBits write the values at another address or width than the axis defines, bits sets a map's cell width; an axis with points instead of values writes nothing; a map without x has cols ordinal points, without y rows, and data bytes written at at, else at its address), and a KP file from the maps. want lists every finding: rule ID, confidence, the map axes it names (MAP/x, or MAP/ for map findings), and for R9 and R10 the cause and the record's first axis and values addresses.",
+  "about": "Synthetic lint fixtures (lint/fixture_test.go, docs/autocorrect.md): no OEM data. Each case builds an image holding its Bosch ident and the raw axis values (8-bit axes get a count byte before them unless count is given; points with values sets the declared size when it differs from the written length; at and atBits write the values at another address or width than the axis defines, bits sets a map's cell width; an axis with points instead of values writes nothing; a map without x has cols ordinal points, without y rows, and data bytes written at at, else at its address), and a KP file from the maps. want lists every finding: rule ID, confidence, the map axes it names (MAP/x, or MAP/ for map findings), and for RC01 and RC02 the cause and the record's first axis and values addresses.",
   "cases": [
     {
       "name": "me7",
@@ -28,22 +28,22 @@
         {"id": "SHAPE", "addr": "0x2507", "bits": 16, "cols": 8, "at": "0x2500", "data": [2, 3, 1, 2, 5, 6, 7, 0, 1, 0, 2, 0, 3, 0]}
       ],
       "want": [
-        {"id": "R1@0x1010:4", "confidence": "high", "maps": ["SHARED_A/x", "SHARED_B/x"]},
-        {"id": "R1@0x1020:4", "confidence": "medium", "maps": ["SIGNED_SUB/x"]},
-        {"id": "R3@0x1030:4", "confidence": "medium", "maps": ["SIGNED/x"]},
-        {"id": "R6@0x1040:4", "confidence": "n/a", "maps": ["CONST/x"]},
-        {"id": "R6@0x1050:4", "confidence": "n/a", "maps": ["ZIGZAG/x"]},
-        {"id": "R8@0x8080:8", "confidence": "high", "maps": ["STALE/"]},
-        {"id": "R10@0x8100:8", "confidence": "low", "maps": ["HEADER8/"], "cause": "record-start", "axis": "0x8101", "values": "0x8106"},
-        {"id": "R10@0x8120:6", "confidence": "low", "maps": ["HEADER16/"], "cause": "record-start", "axis": "0x8122", "values": "0x8128"},
-        {"id": "R10@0x8180:6", "confidence": "low", "maps": ["HEADER2D/"], "cause": "record-start", "axis": "0x8182", "values": "0x8187"},
-        {"id": "R9@0x1201:4", "confidence": "n/a", "maps": ["EARLY/x"]},
-        {"id": "R9@0x1301:4", "confidence": "low", "maps": ["NARROW/x"], "cause": "axis-width", "axis": "0x1300"},
-        {"id": "R9@0x2005:8", "confidence": "low", "maps": ["VALUES_PAD/"], "cause": "values-pad", "axis": "0x2001", "values": "0x2006"},
-        {"id": "R9@0x2103:8", "confidence": "low", "maps": ["TABLE_LATE/"], "cause": "table-late", "values": "0x2102"},
-        {"id": "R9@0x2205:4", "confidence": "low", "maps": ["AXIS_PAD/x"], "cause": "axis-pad", "axis": "0x2206"},
-        {"id": "R9@0x2507:16", "confidence": "n/a", "maps": ["SHAPE/"], "cause": "shape", "axis": "0x2502", "values": "0x2508"},
-        {"id": "R9@0x8091:8", "confidence": "n/a", "maps": ["ODD_MAP/"]}
+        {"id": "DS01@0x1010:4", "confidence": "high", "maps": ["SHARED_A/x", "SHARED_B/x"]},
+        {"id": "DS01@0x1020:4", "confidence": "medium", "maps": ["SIGNED_SUB/x"]},
+        {"id": "DS03@0x1030:4", "confidence": "medium", "maps": ["SIGNED/x"]},
+        {"id": "XR01@0x1040:4", "confidence": "n/a", "maps": ["CONST/x"]},
+        {"id": "XR01@0x1050:4", "confidence": "n/a", "maps": ["ZIGZAG/x"]},
+        {"id": "MP01@0x8080:8", "confidence": "high", "maps": ["STALE/"]},
+        {"id": "RC02@0x8100:8", "confidence": "low", "maps": ["HEADER8/"], "cause": "record-start", "axis": "0x8101", "values": "0x8106"},
+        {"id": "RC02@0x8120:6", "confidence": "low", "maps": ["HEADER16/"], "cause": "record-start", "axis": "0x8122", "values": "0x8128"},
+        {"id": "RC02@0x8180:6", "confidence": "low", "maps": ["HEADER2D/"], "cause": "record-start", "axis": "0x8182", "values": "0x8187"},
+        {"id": "RC01@0x1201:4", "confidence": "n/a", "maps": ["EARLY/x"]},
+        {"id": "RC01@0x1301:4", "confidence": "low", "maps": ["NARROW/x"], "cause": "axis-width", "axis": "0x1300"},
+        {"id": "RC01@0x2005:8", "confidence": "low", "maps": ["VALUES_PAD/"], "cause": "values-pad", "axis": "0x2001", "values": "0x2006"},
+        {"id": "RC01@0x2103:8", "confidence": "low", "maps": ["TABLE_LATE/"], "cause": "table-late", "values": "0x2102"},
+        {"id": "RC01@0x2205:4", "confidence": "low", "maps": ["AXIS_PAD/x"], "cause": "axis-pad", "axis": "0x2206"},
+        {"id": "RC01@0x2507:16", "confidence": "n/a", "maps": ["SHAPE/"], "cause": "shape", "axis": "0x2502", "values": "0x2508"},
+        {"id": "RC01@0x8091:8", "confidence": "n/a", "maps": ["ODD_MAP/"]}
       ]
     },
     {
@@ -59,11 +59,11 @@
         {"id": "OVERFLOW", "addr": "0x8030", "x": {"addr": "0x1030", "stored": "subtract", "values": [100, 100, 100, 10]}}
       ],
       "want": [
-        {"id": "R2@0x1010:4", "confidence": "high", "maps": ["PLAIN_SUB/x"]},
-        {"id": "R4@0x1020:4", "confidence": "medium", "maps": ["COUNT/x"]},
-        {"id": "R4@0x1040:4", "confidence": "n/a", "maps": ["COUNT_BAD/x"]},
-        {"id": "R5@0x1050:4", "confidence": "low", "maps": ["NEAR/x"]},
-        {"id": "R6@0x1030:4", "confidence": "n/a", "maps": ["OVERFLOW/x"]}
+        {"id": "DS02@0x1010:4", "confidence": "high", "maps": ["PLAIN_SUB/x"]},
+        {"id": "AX01@0x1020:4", "confidence": "medium", "maps": ["COUNT/x"]},
+        {"id": "AX01@0x1040:4", "confidence": "n/a", "maps": ["COUNT_BAD/x"]},
+        {"id": "AX02@0x1050:4", "confidence": "low", "maps": ["NEAR/x"]},
+        {"id": "XR01@0x1030:4", "confidence": "n/a", "maps": ["OVERFLOW/x"]}
       ]
     }
   ]

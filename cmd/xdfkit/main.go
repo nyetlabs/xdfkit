@@ -26,8 +26,8 @@ const usage = `usage:
          [--meta file.meta.json] [--origin damos|a2l|manual|auto]
          [--tuner categories.json] [--quiet] [--force] input [output]
   xdfkit verify [--status] file.json|file.yaml...
-  xdfkit lint -i image [--family me7|m3] [--rules R9,R10] [--json findings.json] input
-  xdfkit fix -i image (-o output | -n) [--rules R1,R2] [--only ID,...]
+  xdfkit lint -i image [--family me7|m3] [--rules RC01,RC02] [--json findings.json] input
+  xdfkit fix -i image (-o output | -n) [--rules DS01,DS02] [--only ID,...]
              [--min-confidence high|medium|low] [--findings findings.json] input
   xdfkit merge [--smart] [--update] [--overwrite] [-n]
              [--description keep|fill|replace] [--comment keep|append|replace]

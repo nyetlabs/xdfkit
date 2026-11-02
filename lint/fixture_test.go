@@ -92,7 +92,7 @@ func (c *fixtureCase) build(t *testing.T) (*kp.File, []byte) {
 		}
 		n := len(a.Values)
 		if a.Points > 0 {
-			n = a.Points // declared size may disagree with written values (R4)
+			n = a.Points // declared size may disagree with written values (AX01)
 		}
 		if w == 1 {
 			c := n

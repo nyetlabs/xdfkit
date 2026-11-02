@@ -67,7 +67,7 @@ Order is the `kp.Map` struct. Writers need:
 - `Range`: three low/high pairs for 8/16/32-bit raw spans. Without a template, the pair for the map's width is the model's min/max converted to raw; the other pairs stay at defaults. The model omits min/max when the KP pair is that default.
 - Flags: `Reciprocal`, `Signed`, `Difference`, `Percent` (model `view`)
 - `Cols`, `Rows`, `Precision`, `Value` (description, units, factor, offset)
-- `Start`, `End` (`End` = start + byte length; R8 in `autocorrect.md`), `ImageSize`, `Addr2`
+- `Start`, `End` (`End` = start + byte length; MP01 in `autocorrect.md`), `ImageSize`, `Addr2`
 - Axes `X`, `Y`: [Axis](#axis)
 - `StoredCols` / `StoredRows` follow `Cols`/`Rows`, swapped on organisation 5 (2D inverse)
 - Tail after Y (view mode, cursor, etc.) is residue; see `kp.Map`
@@ -106,7 +106,7 @@ Displayed point i, after conversion:
 - **subtract** (datasource 3): `2^bits - (raw[i] + … + raw[n-1])` (no wrap); last raw is the gap to the top of the range
 - **backwards** (datasource 5): `raw[n - 1 - i]`
 
-The model keeps `axis.stored` as `absolute`, `add`, `subtract`, or `backwards`. Mislabelled packs are fixed by R1/R2 (`autocorrect.md`). XDF live helpers for add/subtract: `stamp-and-metadata.md`.
+The model keeps `axis.stored` as `absolute`, `add`, `subtract`, or `backwards`. Mislabelled packs are fixed by DS01/DS02 (`autocorrect.md`). XDF live helpers for add/subtract: `stamp-and-metadata.md`.
 
 ## WinOLS 2.24 exports
 

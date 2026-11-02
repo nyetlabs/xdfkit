@@ -71,6 +71,6 @@ me7-logger imports `model`, `xdf` and `canon` (`docs/integrations.md`): after ch
 | `docs/format-matrix.md` | Which format supports which field |
 | `docs/kp-format.md` | KP header layout |
 | `docs/autocorrect.md` | `lint` and `fix` |
-| `docs/stamp-and-metadata.md` | Edit stamp, XDF metadata file, default output names |
-| `docs/corpus.md` | Test images from ecu-corpus; image stem shape |
-| `docs/integrations.md` | ecuxplot, ME7Sum, me7-logger |
+| `docs/stamp-and-metadata.md` | Edit stamp, XDF metadata file, live helpers, embed (planned) |
+| `docs/corpus.md` | Test images from ecu-corpus |
+| `docs/integrations.md` | ecuxplot, ME7Sum, me7-logger (lint hold codes) |
