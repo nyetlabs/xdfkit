@@ -71,7 +71,7 @@ me7-logger imports `model`, `xdf` and `canon` (`docs/integrations.md`): after ch
 | `docs/design.md` | Formats, implementation, architecture, CLI, verification |
 | `docs/model.md` | The model and its JSON |
 | `docs/format-matrix.md` | Which format supports which field |
-| `docs/kp-format.md` | KP v1/v2 layout |
+| `docs/kp-format.md` | KP header layout |
 | `docs/autocorrect.md` | `lint` and `fix` |
 | `docs/stamp-and-metadata.md` | Edit stamp and XDF metadata file |
 | `docs/corpus.md` | Test images from ecu-corpus |

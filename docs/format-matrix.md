@@ -1,10 +1,10 @@
 # Map definition formats: field support
 
-KP v1/v2 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, v1, 4170 maps, and `8D0907551M.kp`, v2, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro XML 1.80 (xdfkit and TunerPro 5.00 / 6.00.0149.00), checked against TunerPro's version history up to 5.00.10305 (2026-01); the model is xdfkit's canonical model in JSON or YAML (`model.md`): "schema 1" is what `model/schema.json` holds today, "target" is the design, not implemented beyond schema 1.
+KP headers 113, 116, 292, and 329 as parsed by ecuxplot's mapdump (evidence from raw dumps of ecuxplot's `8D0907551G.kp`, header 116, 4170 maps, and `8D0907551M.kp`, header 292, 471 maps); A2L per ASAM MCD-2MC; DAMOS `.dam` (undocumented, mostly unconfirmed); XDF as TunerPro XML 1.80 (xdfkit and TunerPro 5.00 / 6.00.0149.00), checked against TunerPro's version history up to 5.00.10305 (2026-01); the model is xdfkit's canonical model in JSON or YAML (`model.md`): "schema 1" is what `model/schema.json` holds today, "target" is the design, not implemented beyond schema 1.
 
 Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed (samples needed), `-` not applicable. Model is schema 1. Target is the design.
 
-| Group | Field | KP v1 | KP v2 | A2L | DAMOS | XDF | Model | Target |
+| Group | Field | KP 113/116 | KP 292/329 | A2L | DAMOS | XDF | Model | Target |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Identity | Short identifier | Y | Y | Y | Y | Y | Y | Y |
 | Identity | Long description | Y | Y | Y | Y | Y | Y | Y |
@@ -51,7 +51,7 @@ Names and limits for the rows above:
 
 - Short identifier. KP `id`. A2L object name. XDF `title`. Model `id`.
 - Long description. KP `name`. A2L `LongIdentifier`. XDF `description`. Model `description`.
-- Comment. KP v2 `comment`. In 8D0907551M that string holds hex signature bytes. A2L `ANNOTATION`. XDF only by appending to `description`.
+- Comment. Header 292 and 329 `comment`. In 8D0907551M that string holds hex signature bytes. A2L `ANNOTATION`. XDF only by appending to `description`.
 - Categories. KP: one folder per map (321 in 8D0907551G). A2L: `FUNCTION` / `GROUP`, nested, many-to-many. DAMOS: a function assignment. XDF: one path of up to 3 levels (`CATEGORYMEM` 0 to 2), not many-to-many; up to 2048 categories; builds before 5.00.9813 (2023) misload numbers above 255 (323 load in 5.00.10305). Model: flat, several per object, no nesting.
 - Project / ECU metadata. KP: name and version; most header fields are unknown. A2L: `PROJECT`, `HEADER`, `MODULE`, `MOD_PAR` (EPK, CPU). XDF: title, description, author. Model: name and version.
 - File offset. A2L and DAMOS store an ECU address and need a segment map. XDF adds the header `baseoffset`. Model is a file offset only. Target adds the original CPU address and segment.
@@ -75,7 +75,7 @@ Names and limits for the rows above:
 - Enum / lookup table. A2L `COMPU_TAB`, `COMPU_VTAB`, `VTAB_RANGE`.
 - Units. A2L `COMPU_METHOD` unit / `PHYS_UNIT`.
 - Display precision. A2L `FORMAT`. XDF `decimalpl`.
-- Display base. KP base field; v2 uses binary on codewords such as CWMSRCAN. XDF decimal and hex only. Model view base.
+- Display base. KP base field; 292 and 329 use binary on codewords such as CWMSRCAN. XDF decimal and hex only. Model view base.
 - Min / max. KP `range`: one low/high pair per element width, stored as typed raw / eprom units (`kp-format.md`; the Value range dialog does not follow the map's raw/scaled display toggle). A2L limits plus `EXTENDED_LIMITS`. DAMOS `/SPW`, `/SPX` and `/SPY` limits. Model `min` and `max` on `value`, omitted when the source has none (`model.md`).
 - Difference / percent. KP flags, the map-window toggles. Model view flags.
 - Per-map doubles. KP `viewScale`, `viewOffset`, `view2DScale`, and `view3DRotation` (often 300.0, 1.0) are view state, not a conversion. Not in the model. KP output takes them from a template or from defaults.
@@ -86,7 +86,7 @@ Names and limits for the rows above:
 - Point count from image. A2L `NO_AXIS_PTS` in the record layout. Model `header` is a byte count; the point count is not read.
 - Stored as differences. KP `EEPROM, subtract` counts gaps down from 256; `EEPROM, add` is the prefix sum from the start; `EEPROM, backwards` is absolute values in reverse image order (`kp-format.md`). ME7 packs include absolute axes labelled subtract. A2L `DEPOSIT DIFFERENCE`. XDF writes a live helper table of `CELL()` equations for add and subtract (`kp-format.md`); subtract confirmed in TunerPro 6.00.0149.00. Backwards is static labels from the image. `--static-axes` writes static labels for add/subtract too. The model stores `absolute`, `add`, `subtract`, and `backwards`.
 - Rescale / curve. A2L `RES_AXIS`, `CURVE_AXIS`. XDF axis "Normalized" through `XDFFUNCTION`. How close that is to `CURVE_AXIS` is unconfirmed.
-- Map mark / visibility. KP `Marked` (byte 0 or 1) is the WinOLS map-list marker (confirmed). Model `vislevel` is the TunerPro level (integer): KP `Marked` ↔ `vislevel` 1; unmarked is 0 and written as XDF `vislevel` 2. KP v2 `IDState` is a different 0/1 field (unconfirmed; KP residue only). XDF writes and reads `vislevel` as an attribute on `XDFCONSTANT` / `XDFTABLE` ("Show Up To N" means level ≤ N; "Show Only N" is exact). The metadata file carries `vislevel` when the model level differs from the XDF view (unmarked 0 versus written 2).
+- Map mark / visibility. KP `Marked` (byte 0 or 1) is the WinOLS map-list marker (confirmed). Model `vislevel` is the TunerPro level (integer): KP `Marked` ↔ `vislevel` 1; unmarked is 0 and written as XDF `vislevel` 2. On 292 and 329, `IDState` is a different 0/1 field (unconfirmed; KP residue only). XDF writes and reads `vislevel` as an attribute on `XDFCONSTANT` / `XDFTABLE` ("Show Up To N" means level ≤ N; "Show Only N" is exact). The metadata file carries `vislevel` when the model level differs from the XDF view (unmarked 0 versus written 2).
 - Patches. XDF `XDFPATCH`.
 - Measurements. A2L `MEASUREMENT`, which ecuxplot can log.
 
@@ -94,8 +94,8 @@ Names and limits for the rows above:
 
 | Format | Y | P | N | ? |
 |---|---|---|---|---|
-| KP v1 | 21 | 3 | 14 | 2 |
-| KP v2 | 23 | 3 | 12 | 2 |
+| KP 113/116 | 21 | 3 | 14 | 2 |
+| KP 292/329 | 23 | 3 | 12 | 2 |
 | A2L | 31 | 2 | 6 | 0 |
 | DAMOS | 13 | 2 | 9 | 15 |
 | XDF | 23 | 10 | 6 | 0 |

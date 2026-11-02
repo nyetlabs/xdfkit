@@ -130,11 +130,14 @@ func TestEdit(t *testing.T) {
 	})
 }
 
-// TestKPDefaultsFile: the committed kp-defaults.json holds, per layout and
-// record kind, each field's commonest residue over ecuxplot's packs (and a
-// local OLS5 pack when present), where it is commoner than no residue and not
-// 0 (go test ./model -run TestKPDefaultsFile -update rewrites it). Without the
-// local OLS5 file, a committed "ols5" block is kept as-is.
+// TestKPDefaultsFile: the committed kp-defaults.json holds each field's
+// commonest residue over ecuxplot's packs (and a local header 597 pack when
+// present), where it is commoner than no residue and not 0. Values shared by
+// at least two header pools sit in "default"; "100", "200+300", and "500"
+// keep only what differs, and null drops a shared field
+// (go test ./model -run TestKPDefaultsFile -update rewrites it).
+// Without the local 597 file, the committed default and "500" patch are
+// expanded and folded back in, so the collapse still sees that pool.
 func TestKPDefaultsFile(t *testing.T) {
 	total := map[string]int{}
 	seen := map[string]map[string]map[string]int{}
@@ -152,7 +155,7 @@ func TestKPDefaultsFile(t *testing.T) {
 		}
 	}
 	survey := func(f *kp.File) {
-		m, l := FromKP(f), f.Layout().DefaultsKey()+"/"
+		m, l := FromKP(f), f.DefaultsKey()+"/"
 		for i, c := range m.Categories {
 			r, _ := residue(f.Project.Folders[i], c.kpFolder())
 			add(l+"folder", r)
@@ -185,13 +188,13 @@ func TestKPDefaultsFile(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f.Layout() != kp.OLS5 {
-			t.Fatalf("%s: layout %v, want OLS5", ols5KP, f.Layout())
+		if f.HeaderID != 597 {
+			t.Fatalf("%s: header %d, want 597", ols5KP, f.HeaderID)
 		}
 		survey(f)
 		ols5Surveyed = true
 	}
-	gen := map[string]map[string]map[string]json.RawMessage{}
+	gen := map[string]map[string]map[string]any{}
 	for kind, fields := range seen {
 		l, rec, _ := strings.Cut(kind, "/")
 		for k, vals := range fields {
@@ -206,10 +209,10 @@ func TestKPDefaultsFile(t *testing.T) {
 				continue
 			}
 			if gen[l] == nil {
-				gen[l] = map[string]map[string]json.RawMessage{}
+				gen[l] = map[string]map[string]any{}
 			}
 			if gen[l][rec] == nil {
-				gen[l][rec] = map[string]json.RawMessage{}
+				gen[l][rec] = map[string]any{}
 			}
 			var v any
 			d := json.NewDecoder(strings.NewReader(best))
@@ -217,23 +220,32 @@ func TestKPDefaultsFile(t *testing.T) {
 			if err := d.Decode(&v); err != nil {
 				t.Fatal(err)
 			}
-			b, err := json.Marshal(hexRound(v))
-			if err != nil {
-				t.Fatal(err)
-			}
-			gen[l][rec][k] = json.RawMessage(b)
+			gen[l][rec][k] = v
 		}
 	}
 	if !ols5Surveyed {
-		var committed map[string]map[string]map[string]json.RawMessage
-		if err := json.Unmarshal(kpDefaultsJSON, &committed); err != nil {
+		committed, err := decodeDefaults(kpDefaultsJSON)
+		if err != nil {
 			t.Fatal(err)
 		}
-		if committed["ols5"] != nil {
-			gen["ols5"] = committed["ols5"]
+		if expanded, _ := expandDefaults(committed); expanded["500"] != nil {
+			gen["500"] = expanded["500"]
 		}
 	}
-	b, err := json.MarshalIndent(gen, "", "  ")
+	collapsed := collapseDefaults(gen)
+	expanded, _ := expandDefaults(collapsed)
+	got, err := json.Marshal(expanded)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := json.Marshal(gen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatal("collapsing kp defaults does not expand back to the survey")
+	}
+	b, err := json.MarshalIndent(hexRound(collapsed), "", "  ")
 	if err != nil {
 		t.Fatal(err)
 	}

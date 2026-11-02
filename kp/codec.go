@@ -23,7 +23,8 @@ import (
 // `kp:"opt,opt..."` options:
 //
 //   - not stored (derived or bookkeeping); unexported fields are skipped too
-//     v1, v2, ols5, v2only   layout filter (v2 means v2 or OLS5; v2only is v2 alone)
+//     v1, v2, ols5, v2only   walk filter, not a version: v1 is 113 and 116;
+//     v2 is 292, 329, 503, and 597; v2only is 292 and 329; ols5 is 503 and 597
 //     len=N    Hex: N raw bytes
 //     count    slice: int32 element count, then the elements
 //     bytes    slice: int32 byte length, then the elements
@@ -32,10 +33,11 @@ import (
 //
 // A struct implementing checker has check called after its fields are coded.
 type codec struct {
-	b      []byte
-	pos    int
-	enc    bool
-	layout Layout
+	b        []byte
+	pos      int
+	enc      bool
+	layout   Layout
+	headerID int32 // decimal header id; 503 and 597 differ in trailer and marked-block size
 
 	// Offset lookup: path is the JSON path of the field being coded, tracked
 	// only while want is set; found collects the offsets of wanted paths.
@@ -60,7 +62,7 @@ type checker interface{ check(c *codec) }
 
 // sub returns a codec for another buffer that shares c's layout and offset lookup.
 func (c *codec) sub(b []byte) *codec {
-	return &codec{b: b, enc: c.enc, layout: c.layout, want: c.want, path: c.path, found: c.found, block: true}
+	return &codec{b: b, enc: c.enc, layout: c.layout, headerID: c.headerID, want: c.want, path: c.path, found: c.found, block: true}
 }
 
 type field struct {
@@ -101,7 +103,7 @@ func fieldsOf(t reflect.Type) []field {
 			case o == "v1":
 				f.layouts |= 1 << V1
 			case o == "v2":
-				f.layouts |= 1<<V2 | 1<<OLS5 // v2 or WinOLS 5
+				f.layouts |= 1<<V2 | 1<<OLS5 // walks for 292/329 and 503/597
 			case o == "v2only":
 				f.layouts |= 1 << V2
 			case o == "ols5":
@@ -502,7 +504,8 @@ func (c *codec) strOpt(p *string, nul bool) {
 	var n int32
 	c.i32(&n)
 	if n < 0 {
-		// WinOLS 5 empty strings may use -1; v1/v2 use 0, and -1 is a terminator.
+		// 503 and 597 empty strings use a negative length (no NUL): -1, and -3 on 503.
+		// 113, 116, 292, and 329 use 0, and -1 is a terminator.
 		if c.layout == OLS5 {
 			*p = ""
 			return

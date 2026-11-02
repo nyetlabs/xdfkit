@@ -70,7 +70,7 @@ func TestSurvey(t *testing.T) {
 		if s.img != nil {
 			img = fmt.Sprintf("image %d bytes", len(s.img))
 		}
-		fmt.Fprintf(&b, "- `%s`: v%d, %d maps, %d folders, %s\n", s.label, s.f.Layout(), len(s.f.Project.Maps), len(s.f.Project.Folders), img)
+		fmt.Fprintf(&b, "- `%s`: header %d, %d maps, %d folders, %s\n", s.label, s.f.HeaderID, len(s.f.Project.Maps), len(s.f.Project.Folders), img)
 	}
 	b.WriteString("\nPer field: distinct values per layout with the commonest; how many files it varies within; for fields with a commonest value (the default), the named fields equal to it on non-default records, other fields non-default on the same records, and examples.\n")
 	for _, k := range []string{"file", "folder", "map", "axis"} {
@@ -384,7 +384,8 @@ func (t *table) report(b *strings.Builder, kind string, samples []sample) {
 				}
 			}
 			if cs := histogram(rs, i); len(cs) > 0 {
-				fmt.Fprintf(b, "- v%d: %d distinct: %s\n", l, len(cs), top(cs, 6))
+				name := map[Layout]string{V1: "113/116", V2: "292/329"}[l]
+				fmt.Fprintf(b, "- %s: %d distinct: %s\n", name, len(cs), top(cs, 6))
 			}
 		}
 		varies := 0

@@ -2,19 +2,21 @@
 
 WinOLS map pack (`*.kp`), read and written by `kp/`. Integers are little-endian. A string is an int32 byte count, that many ISO-8859-15 bytes, and a NUL. A zero count has no NUL.
 
-The Go structs are the record layouts. `kp/codec.go` walks fields in declaration order; the tag grammar is at the top of that file. JSON names are those fields with a lower-case first letter. `kp-defaults.json` uses the JSON names (`model.md`). File, Project and Folder always use that walk. On OLS5, Map and Axis leave it for a hand walk in `kp/ols5.go` (`codeOLS5`): float ranges, name padding, ID/Range pads, string modes and a two-byte `Term2` differ from the v1/v2 tags, so Map/Axis `kp` tags are not the OLS5 source of truth. Shared primitives (`strRaw`, `mirrorI32`, `hexBytes`) serve both paths.
+The Go structs are the record layouts. `kp/codec.go` walks fields in declaration order; the tag grammar is at the top of that file. JSON names are those fields with a lower-case first letter. `kp-defaults.json` uses the JSON names (`model.md`). File, Project and Folder always use that walk. On 503 and 597, Map and Axis leave it for a hand walk in `kp/ols5.go` (`codeOLS5`): float ranges, name padding, ID/Range pads, string modes and a two-byte `Term2` differ from the 113/116 and 292/329 tags, so Map/Axis `kp` tags are not the source of truth for 503 and 597. Shared primitives (`strRaw`, `mirrorI32`, `hexBytes`) serve both paths.
 
 ## Versions
 
-| Layout | Header id at 0x10 | Value at 0x14 | Fixed header ends | Maps |
+The int32 at offset 0x10 is a decimal header id. Headers that share a row share a record walk, named by hundred: 100 (113 and 116), 200+300 (292 and 329), and 500 (503 and 597). The Go constants and `kp` tags are still v1, v2, and ols5.
+
+| Header | Walk | Value at 0x14 | Fixed header ends | Maps |
 | --- | --- | --- | --- | --- |
-| v1 | 0x71 or 0x74 | 0 | 0x5c | inline |
-| v2 | 0x124 or 0x149 | file length | 0x60 | zip entry `intern` |
-| OLS5 | 0x255 | file length | 0x60 | zip entry `intern` |
+| 113, 116 | 100 | 0 | 0x5c | inline |
+| 292, 329 | 200+300 | file length | 0x60 | zip entry `intern` |
+| 503, 597 | 500 | file length | 0x60 | zip entry `intern` |
 
-0x149 is accepted. The archived packs use 0x124. WinOLS 2.24 writes v2 with header id 0x124 and version string `OLS 5.0 (Windows)`. The filename string is the name the file was exported under, usually upper case.
+329 is accepted. The archived packs use 292. WinOLS 2.24 writes header 292 and version string `OLS 5.0 (Windows)`. The filename string is the name the file was exported under, usually upper case.
 
-OLS5 is the WinOLS 5 pack layout (header `0x255`). It is read-only: `Encode` returns an error until a WinOLS 5 save oracle exists. Outer filename and version strings have no trailing NUL. Map and value/axis unit strings use the raw (no trailing NUL) form; the map name is length-prefixed with a NUL and three pad bytes when non-empty, or four pad bytes when empty. Map value ranges are six `float64`s in the file and are stored in the existing `[3][2]int64` slots (values seen so far are whole). Empty map-block strings may use length `-1` (no NUL). Folder `Pad` is 36 bytes. `EndTag` is 8 bytes (`99 78 00 42 02 00 00 00`). Axis `Values` are a byte length that is a multiple of 4. Per-layout defaults for KP-only residue use the `"ols5"` key in `kp-defaults.json` (from a local sample when regenerating).
+503 and 597 use one walk and differ in a few sizes. They are read-only: `Encode` returns an error until a save oracle exists. Name and version trailers are 84 bytes on 503 and 93 on 597. A marked map's extra block is 65 bytes on 503 and 69 on 597, and the stub after the maps matches that size. Outer filename and version strings have no trailing NUL. Map and value/axis unit strings use the raw (no trailing NUL) form; the map name is length-prefixed with a NUL and three pad bytes when non-empty, or four pad bytes when empty. Map value ranges are six `float64`s in the file and are stored in the existing `[3][2]int64` slots (values seen so far are whole). Empty map-block strings use a negative length and no NUL (`-1`, and `-3` on header 503). Folder `Pad` is 36 bytes. `EndTag` is 8 bytes (`99 78 00 42 02 00 00 00`). Axis `Values` are a byte length that is a multiple of 4. KP-only residue defaults in `kp-defaults.json` are pooled by hundred: `"100"` (113 and 116), `"200+300"` (292 and 329), and `"500"` (503 and 597; from a local 597 pack when regenerating). `"default"` holds values shared by at least two pools; each pool lists only what differs, and null drops a shared field.
 
 Every archived pack ends with `33 88 72 98`. `EndOffset` is the offset of that marker (file length minus 4). WinOLS imports a file whose length changed without updating `EndOffset`, and raises its crash-report dialog.
 
@@ -30,45 +32,45 @@ flowchart TD
   end
   E --> F[Maps]
   F --> G["MapsTag, folders, trailing bytes"]
-  F --> H["v1: count, then records"]
-  F --> I["v2/OLS5: zip length, then the zip"]
+  F --> H["113 and 116: count, then records"]
+  F --> I["292, 329, 503, 597: zip length, then the zip"]
   I --> J["intern: flag 0, count, records"]
 ```
 
-The bytes from 0x18 to the end of the fixed header are zeros (`FixedHeader`). The header between the version string and `EndOffset` is `HeaderBody`. Both, and `Project.Trailing`, are kept raw. They change between saves and are not map data. The header walk is `kp.walkHeader`. On OLS5 the body stays opaque except for locating the end-tag magic.
+The bytes from 0x18 to the end of the fixed header are zeros (`FixedHeader`). The header between the version string and `EndOffset` is `HeaderBody`. Both, and `Project.Trailing`, are kept raw. They change between saves and are not map data. The header walk is `kp.walkHeader`. On 503 and 597 the body stays opaque except for locating the end-tag magic.
 
 After `EndOffset`:
 
-- `EndTag`, 12 bytes on v1/v2: `00 00 00 00 99 78 00 42 02 00 00 00`; OLS5: 8 bytes `99 78 00 42 02 00 00 00`
-- Project name, int32[4] `NameTag`, v2 `NamePad` (4 zeros); OLS5 uses a longer name trailer instead of the v1/v2 tags
-- Project version, int32[4] `VersionTag` (equal to `NameTag`), v2 `VersionPad` (4 zeros); OLS5 likewise
-- int32 `Build`, v2/OLS5 `BuildFlag` (1)
+- `EndTag`, 12 bytes on 113, 116, 292, and 329: `00 00 00 00 99 78 00 42 02 00 00 00`; 8 bytes on 503 and 597: `99 78 00 42 02 00 00 00`
+- Project name, int32[4] `NameTag` and `NamePad` (4 zeros) on 292 and 329; a name trailer on 503 and 597 (84 bytes on 503, 93 on 597)
+- Project version, int32[4] `VersionTag` (equal to `NameTag`) and `VersionPad` on 292 and 329; a version trailer on 503 and 597, same sizes as the name trailer
+- int32 `Build`, and `BuildFlag` (1) on 292, 329, 503, and 597
 
 `NameTag`, `VersionTag`, `Build`, and `MapsTag` are the same in every archived pack and in WinOLS 2.24 exports, including an empty project.
 
 Maps, then int32[3] `MapsTag`, then the folder table:
 
-- v1: int32 count, then the map records
-- v2 and OLS5: int32 zip length, then the zip. The folder table follows the zip. The inflated `intern` entry is one byte 0 (`InternFlag`), an int32 count, then the map records
+- 113 and 116: int32 count, then the map records
+- 292, 329, 503, and 597: int32 zip length, then the zip. The folder table follows the zip. The inflated `intern` entry is one byte 0 (`InternFlag`), an int32 count, then the map records
 
-Each folder is int32 id, int32 `BuiltIn`, name, 2 bytes `Flags` (`01 01`), int32 `Style` (`0x1000000`), and in v2 15 zero bytes `Pad` (OLS5: 36). `BuiltIn` is 9000 on My maps, 9001 on Hexdump, and 0 on every other folder. mapdump sorts folders by name, drops duplicate names, and renumbers folder ids. This reader keeps the table as stored.
+Each folder is int32 id, int32 `BuiltIn`, name, 2 bytes `Flags` (`01 01`), int32 `Style` (`0x1000000`), and 15 zero bytes `Pad` on 292 and 329 (36 bytes on 503 and 597). `BuiltIn` is 9000 on My maps, 9001 on Hexdump, and 0 on every other folder. mapdump sorts folders by name, drops duplicate names, and renumbers folder ids. This reader keeps the table as stored.
 
 ## Round trip
 
-`Parse` and `Encode` share one walk, so every byte is a field or a raw block. Encode writes the v2 length at 0x14 and `EndOffset` back into the `File`. OLS5 Encode is not supported yet.
+`Parse` and `Encode` share one walk, so every byte is a field or a raw block. Encode writes the length at 0x14 and `EndOffset` back into the `File` for headers 292 and 329. Encode of 503 and 597 is not supported yet.
 
-- v1: parse then encode is byte-identical, including JSON in between
-- v2: the original zip is reused while the map block is unchanged. A changed block is re-deflated with Go `compress/flate` at level 9. The inflated block, and the file outside the zip, match aside from the two lengths
+- 113 and 116: parse then encode is byte-identical, including JSON in between
+- 292 and 329: the original zip is reused while the map block is unchanged. A changed block is re-deflated with Go `compress/flate` at level 9. The inflated block, and the file outside the zip, match aside from the two lengths
 
-Decoding fails when a bool is not 0 or 1, a string has no NUL, a free-editable list length is not a multiple of 4, or bytes remain after the v2 maps.
+Decoding fails when a bool is not 0 or 1, a string has no NUL, a free-editable list length is not a multiple of 4, or bytes remain after the maps on 292 and 329.
 
-## v2 zip
+## Zip on 292, 329, 503, and 597
 
 One local entry, name `intern`, method 8, general-purpose flag 2, DOS date and time zero, version 20. The archived streams match zlib 1.2.x raw deflate at level 9, memLevel 8, window 15. WinOLS 2.24 links zlib 1.2.3. Go's deflate differs, so a rewritten file must update the zip length, the length at 0x14, and `EndOffset`. WinOLS 2.24 imports those files.
 
 ## Map
 
-Order is the `kp.Map` struct. v2-only fields are marked.
+Order is the `kp.Map` struct. Fields that only 292 and 329 carry are marked.
 
 | Field | Type | |
 | --- | --- | --- |
@@ -155,8 +157,8 @@ Both records are stored on every map. WinOLS uses X for a 1D map, X and Y for a 
 | `DataSource` | int32 | [Enums](#enums). Address matters for image sources |
 | `Addr` | int32 | |
 | `Type`, `Width`, `Base` | int32 | `Width` is the element size in bytes |
-| `Mirror` | v2 int32, v1 byte | 0 or 1. [below](#mirror) |
-| `MirrorPad` | 9 bytes, v2 | zeros |
+| `Mirror` | int32 on 292 and 329, byte on 113 and 116 | 0 or 1. [below](#mirror) |
+| `MirrorPad` | 9 bytes on 292 and 329 | zeros |
 | `Reciprocal` | byte | |
 | `Precision` | int32 | |
 | `Signed` | byte | |
@@ -178,7 +180,7 @@ WinOLS "&Mirror map". The image stays in stored order. WinOLS shows the axis, an
 
 Datasource 4. `Values` is length-prefixed; the length is always 4 bytes times the axis point count. The points are packed consecutively in the axis element type (little-endian for multi-byte), then zero-padded to that length. An 8-bit axis with values 1..8 is 32 bytes (`01`..`08`, then zeros). A 16-bit axis (KFMIOP-06 X) packs `u16` LE values the same way and pads to 4×points. Free editable also clears the axis address and sets its factor to 1. Switching away from free editable (including to EEPROM backwards) leaves `Values` empty.
 
-In v2 the list is empty except on free-editable axes. In v1 both axis records hold zeros, 4 bytes per stored row, on almost every map.
+On 292 and 329 the list is empty except on free-editable axes. On 113 and 116 both axis records hold zeros, 4 bytes per stored row, on almost every map.
 
 ## Enums
 
@@ -235,7 +237,7 @@ The XDF writer emits a live helper table for an unsigned 8, 16 or 32-bit add or 
 
 Compared with an imported pack:
 
-- Header id 0x124 and version `OLS 5.0 (Windows)`, as [above](#versions)
+- Header id 292 and version `OLS 5.0 (Windows)`, as [above](#versions)
 - `End` rewritten to start plus byte length where the pack had a stale end
 - `Cursor`, `Marked`, and `ViewScale` changed on maps opened in the session
 - The `intern` stream matches zlib level 9, memLevel 8, as in the archived packs

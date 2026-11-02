@@ -17,7 +17,7 @@ Converts map definitions between WinOLS KP, A2L, DAMOS, TunerPro XDF and a canon
     - "EEPROM, add" and "EEPROM, subtract" axes are live helper tables by default (`kp-format.md`). "EEPROM, backwards" is static labels (reverse absolute). TunerPro 6.00.0149.00 shows FHSA.0 X (subtract) in 8D0907558E as 60, 80.25, 90, 99. `--static-axes` writes add/subtract as labels, for TunerPro before 5.00.8414 (2014).
   - CSV map list (output only), in ecuxplot mapdump's format: one row per object in address order, value ranges read from the flash image, and a column per reference definition with the names of its maps whose id matches. It replaces mapdump (`mapcsv/`, `xdfkit -f csv -i image -r ref`). Differences from mapdump: axis columns follow the organisation (`kp-format.md`), objects without cells get "-" in the value columns, the raw range of 32-bit cells is masked to 32 bits instead of printed as 0x0, and float cells are read as floats.
   - Edit stamp: every JSON output (the model and the metadata file) carries SHA-256 digests of its canonical text (RFC 8785 and `jq -S .`). The metadata file also carries both digests of the XDF view (the JSON its elements parse to). The XDF itself has no stamp line. See `stamp-and-metadata.md`.
-- Inputs: KP v1 (header codes 0x71/0x74) and KP v2 (0x124/0x149), exactly as ecuxplot's mapdump reads them (`org.nyet.mappack.Parser` in [ecuxplot](https://github.com/nyetlabs/ecuxplot)); KP OLS5 (header `0x255`, WinOLS 5 pack layout, read-only; `kp-format.md`); A2L; DAMOS `.dam`; canonical JSON or YAML; XDF, with its metadata file if there is one (implemented), or an embedded metadata block (not implemented yet).
+- Inputs: KP headers 113, 116, 292, and 329, exactly as ecuxplot's mapdump reads them (`org.nyet.mappack.Parser` in [ecuxplot](https://github.com/nyetlabs/ecuxplot)); KP headers 503 and 597 (read-only; `kp-format.md`); A2L; DAMOS `.dam`; canonical JSON or YAML; XDF, with its metadata file if there is one (implemented), or an embedded metadata block (not implemented yet).
 - Users are assumed to have no licensed WinOLS options. The route into WinOLS is KP (lossless for what the model and template carry; the format is undocumented). A2L/DAMOS/XDF into WinOLS goes through the model and the KP writer.
 - Reader order: A2L (`a2l/`) before DAMOS (`dam/`). Both emit schema 1 objects with axes and conversions inlined and addresses lowered to file offsets (`model.md`). Shared-axis, conversion and record-layout lists, and `image` identity, are not read yet. A2L follows ASAM MCD-2 MC (text as ISO-8859-1). DAMOS has no public spec; the reader uses the record layout and `/REP` order in `model.md` and warns where that does not cover a field. DAMOS display text is DOS code page 850 (Bosch ASAP2DAM), except `0xB0` which is the degree sign as in Latin-1 (`°KW`), not CP850's shade.
 - No A2L or DAMOS writers. In every WinOLS version checked (1.222 and 1.505 manuals, current product pages), DAMOS and A2L can only be imported, and only through the licensed Damos plugin (now OLS521, €785). The import is one-way, mostly limited to 1D/2D maps, and in EVC's words uses heuristics, so "the result isn't 100% safe".
@@ -38,7 +38,7 @@ Converts map definitions between WinOLS KP, A2L, DAMOS, TunerPro XDF and a canon
 - CLI options: a single hyphen introduces single-letter options only (`-f xdf`, `-fxdf`, `-mi image`); long options take two hyphens (`--force`, `--template`, `--format`). A long option spelled with one hyphen (`-force`) is an error that names the two-hyphen spelling. Every single-letter option also has a long name; options may come before or after the files. The CLI parses options with `github.com/spf13/pflag`. Flags given to `go test` (`-run`, `-update`) follow `go test`'s convention.
 - Project name: `xdfkit` (Go module `go.nyet.org/xdfkit`, repo `github.com/nyetlabs/xdfkit`).
 - The WinOLS binaries are packed (VMProtect and repacked sections), and unpacking means defeating the copy protection, which this project won't do. KP decoding therefore relies on feature-sweep samples (KP files saved by WinOLS with one property changed at a time) plus the UI strings in `OLS_LangE.dll`, which is readable as shipped.
-- KP v2 compression: the `intern` entry is raw deflate that zlib 1.2.x at level 9 reproduces exactly (see `kp-format.md`). Go's `compress/flate` produces a different, still valid, stream. xdfkit uses pure Go and judges the stage-1 round trip on the inflated block; WinOLS 2.24 opens re-deflated files (once `EndOffset` is updated; `kp-format.md`).
+- KP zip compression, on headers 292, 329, 503, and 597: the `intern` entry is raw deflate that zlib 1.2.x at level 9 reproduces exactly (see `kp-format.md`). Go's `compress/flate` produces a different, still valid, stream. xdfkit uses pure Go and judges the stage-1 round trip on the inflated block; WinOLS 2.24 opens re-deflated files (once `EndOffset` is updated; `kp-format.md`).
 
 ## Merge
 
@@ -67,7 +67,7 @@ XDF output writes one table per category and per alternate (`stamp-and-metadata.
 
 ```mermaid
 flowchart LR
-    kpIn["KP v1/v2/OLS5"] --> kpReader
+    kpIn[KP] --> kpReader
     a2lIn[A2L] --> a2lReader
     damIn["DAMOS .dam"] --> damReader
     jsonIn["JSON or YAML"] --> jsonReader
@@ -104,7 +104,7 @@ flowchart LR
 ## Verification
 
 - KP to XDF: every archived pack writes a parseable ASCII XDF with one table or constant per object (`go test ./xdf`), and XDF plus metadata file round-trips (below).
-- KP to JSON to KP: byte-identical for v1; identical inflated block and container fields for v2 (the stage 1 gate).
+- KP to JSON to KP: byte-identical for headers 113 and 116; identical inflated block and container fields for 292 and 329 (the stage 1 gate).
 - Round trip: for every test input, input to JSON to model to JSON is identical, and JSON to YAML to JSON is identical. Input to XDF (with embedded block) to model to JSON is not implemented yet, including test strings containing `--`, `-->`, `<!--`, `]]>`, a trailing `-`, and non-ASCII. Notes are excluded from that comparison.
 - XDF plus metadata file to JSON equals the source JSON for every test input, with and without the image. Editing a table in the XDF makes the reader warn that the XDF is edited and reconcile each object with its metadata (`go test ./xdf ./api`).
 - Stamps: every output verifies clean under both digests; `jq -S 'del(.stamp)' f.json | shasum -a 256` equals the `jq -S .` digest and the RFC 8785 transform of `jq -c 'del(.stamp)'` hashes to the `RFC8785` one; changing any value flags `edited`; reindenting or reordering object keys doesn't; respelling a number flags `mixed`.

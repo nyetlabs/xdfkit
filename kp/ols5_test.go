@@ -26,8 +26,11 @@ func TestOLS5Parse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Layout() != OLS5 {
-		t.Fatalf("layout %v, want OLS5", f.Layout())
+	if f.Layout() != OLS5 || f.HeaderID != header597 {
+		t.Fatalf("layout %v header %d, want OLS5 597", f.Layout(), f.HeaderID)
+	}
+	if len(f.Project.NameTrailer) != 93 || len(f.Project.VersionTrailer) != 93 {
+		t.Fatalf("597 trailers %d %d", len(f.Project.NameTrailer), len(f.Project.VersionTrailer))
 	}
 	if n := len(f.Project.Maps); n < 6000 {
 		t.Fatalf("maps %d, want thousands", n)
@@ -37,6 +40,62 @@ func TestOLS5Parse(t *testing.T) {
 	}
 	if _, err := f.Encode(); err == nil {
 		t.Fatal("Encode of OLS5 should fail")
+	}
+}
+
+// Header 503 is the other OLS5 header beside 597.
+func TestOLS5Header503(t *testing.T) {
+	b, err := os.ReadFile("../testdata/local/4B0906018DH_0002.kp")
+	if err != nil {
+		t.Skip(err)
+	}
+	f, err := Parse(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Layout() != OLS5 || f.HeaderID != header503 {
+		t.Fatalf("layout %v header %d", f.Layout(), f.HeaderID)
+	}
+	if len(f.Project.NameTrailer) != 84 || len(f.Project.VersionTrailer) != 84 {
+		t.Fatalf("503 trailers %d %d", len(f.Project.NameTrailer), len(f.Project.VersionTrailer))
+	}
+	if n := len(f.Project.Maps); n != 4053 {
+		t.Fatalf("maps %d", n)
+	}
+	want := map[string]struct {
+		start uint32
+		cols  int32
+		fac   float64
+	}{
+		"A0":      {0x1679a, 1, 1.9073486328125e-06},
+		"AGRRMAX": {0x11f5b, 1, 0.390625},
+	}
+	got := map[string]*Map{}
+	for _, m := range f.Project.Maps {
+		if _, ok := want[m.ID]; ok {
+			got[m.ID] = m
+		}
+	}
+	for id, w := range want {
+		m := got[id]
+		if m == nil {
+			t.Errorf("missing %s", id)
+			continue
+		}
+		if m.Start != w.start || m.Cols != w.cols || m.Value.Factor != w.fac {
+			t.Errorf("%s start=%#x cols=%d factor=%g", id, m.Start, m.Cols, m.Value.Factor)
+		}
+	}
+	if len(f.Project.Folders) != 3 {
+		t.Fatalf("folders %d", len(f.Project.Folders))
+	}
+	for i, name := range []string{"Hexdump", "My maps", "Potential maps"} {
+		if f.Project.Folders[i].Name != name {
+			t.Errorf("folder %d %q", i, f.Project.Folders[i].Name)
+		}
+	}
+	if _, err := f.Encode(); err == nil {
+		t.Fatal("Encode of header 503 should fail")
 	}
 }
 

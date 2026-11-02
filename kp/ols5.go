@@ -2,11 +2,12 @@ package kp
 
 import "math"
 
-// OLS5 is the WinOLS 5 pack layout (header 0x255). Read-only for now.
+// OLS5 is the record walk for decimal headers 503 and 597. Read-only.
+// Trailer and marked-block sizes follow the header.
 
 type ols5MapExtra struct {
 	CommentPre  Hex // 12 bytes after CommentFlag (unconfirmed)
-	MarkedExtra Hex // 69 bytes when Marked != 0 (unconfirmed)
+	MarkedExtra Hex // 65 bytes on header 503, 69 on 597, when Marked != 0 (unconfirmed)
 	NameExtra   [2]int32
 	IDPad4      [4]int32 // replaces IDPad/IDFlag/IDState (unconfirmed)
 	RangePad    [12]int32
@@ -42,7 +43,7 @@ func (a *Axis) ols5() *ols5AxisExtra {
 
 func (m *Map) codeOLS5(c *codec) {
 	if c.enc {
-		c.fail("WinOLS 5 map encode is not supported yet")
+		c.fail("OLS5 map encode is not supported yet")
 	}
 	ex := m.ols5()
 	c.u8(&m.Marked)
@@ -51,7 +52,11 @@ func (m *Map) codeOLS5(c *codec) {
 	c.u8(&m.CommentFlag)
 	c.raw(&ex.CommentPre, 12)
 	if m.Marked != 0 {
-		c.raw(&ex.MarkedExtra, 69)
+		n := 69
+		if c.headerID == header503 {
+			n = 65
+		}
+		c.raw(&ex.MarkedExtra, n)
 	}
 	c.strOLS5Name(&m.Name)
 	c.i32(&ex.NameExtra[0])
@@ -121,7 +126,7 @@ func (m *Map) codeOLS5(c *codec) {
 
 func (a *Axis) codeOLS5(c *codec) {
 	if c.enc {
-		c.fail("WinOLS 5 axis encode is not supported yet")
+		c.fail("OLS5 axis encode is not supported yet")
 	}
 	ex := a.ols5()
 	c.strRaw(&a.Value.Description)
