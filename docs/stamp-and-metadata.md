@@ -1,86 +1,66 @@
 # Edit stamp and XDF metadata file
 
-Every JSON and XDF output carries a stamp that tells whether its data was hand edited since xdfkit wrote it, and XDF output comes with a metadata file holding what XDF can't represent. JSON is written in `jq -S .` form.
+Every JSON and XDF output carries a stamp that tells whether its data was hand edited since xdfkit wrote it. XDF output comes with a metadata file holding what XDF can't represent. JSON is written in `jq -S .` form. Default output names replace the input's extension (`foo.kp` → `foo.xdf`, `foo.json`). The XDF metadata file is `foo.meta.json` next to `foo.xdf`.
 
 ## Canonical text
 
-- `C(doc)` is exactly what `jq -S .` prints for `doc`: 2-space indent, object keys sorted at every level (by code point), UTF-8 without escaping non-ASCII, one trailing newline.
-- `canon/` computes `C` itself (no jq at runtime); tests require identical bytes from real jq. Unedited files are therefore a `jq -S .` fixed point.
-- Unlike Go's `encoding/json`, jq doesn't escape `<`, `>`, `&`, U+2028 or U+2029, writes exponents as `1E-7` (jq 1.8; 1.6 differs again), and struct fields come out sorted like map keys.
-- Numbers are spelled as jq 1.8 reprints them, by Go type (Typed numbers): integers as integers, floats as shortest round-trip decimals with `.0` on whole values (`-30.0`, `1000000000000000000000.0`), plain decimals from 1e-6 up, and jq's exponent form below (`4.7E-7`), since jq 1.8 rewrites `0.00000047` that way. Addresses stay below 2^53.
-- Real cases: factors `4.7E-7` (FMDWAT) and `5.96E-8` (FVERZDYN) in five ecuxplot packs, offset `-7.31383E-307` (junk, unconfirmed) on DELTATA in three.
-- The `jq -S .` digest uses jq 1.8's exponent spelling for values below 1e-6. The canon name stays `jq -S .` (no jq version in the name). Checking that digest by hand needs jq 1.8 or later; older jq can disagree on those numbers and look like an edit. RFC 8785 is unaffected.
+- `C(doc)` is exactly what `jq -S .` prints: 2-space indent, keys sorted by code point, UTF-8 without escaping non-ASCII, one trailing newline.
+- `canon/` computes `C` without calling jq; tests require identical bytes from real jq.
+- Numbers follow Go types (Typed numbers). Exponents below 1e-6 use jq 1.8's spelling (`4.7E-7`). Hand-checking the `jq -S .` digest needs jq 1.8+. RFC 8785 is unaffected.
+- Addresses stay below 2^53.
 
 ## Typed numbers
 
-Implemented in `canon/typed.go` (`Marshal`, `MarshalStamped`, `Unmarshal`). JSON has one number type: Go rejects `16.0` for an integer field, a whole float written `1` looks like an integer (YAML infers type from spelling), and the `jq -S .` digest tells `1` from `1.0` while RFC 8785 doesn't. So `canon` codes JSON by reflection over the Go types (like the KP codec), and the CLI reads and writes JSON only through it.
+Implemented in `canon/typed.go`. Tags and YAML edge cases: `go doc go.nyet.org/xdfkit/canon`.
 
-- Writing:
-  - Integer kinds: integer literals.
-  - Floats: shortest round-trip digits, jq 1.8's exponent form below 1e-6, and whole values always with `.0` (`1.0`, `-30.0`, `-0.0`), so the type is visible in the file. jq 1.7+ keeps `1.0` as written, so `jq -S .` stays a fixed point; RFC 8785 is unaffected.
-  - Types with their own JSON form (`kp.Hex`, the enums) still go through `MarshalJSON`; numbers in that output, and `json.Number` values, are respelled to jq's form.
-  - Struct tags follow `encoding/json`: names, `-`, `omitempty`, `omitzero`, and fields promoted from untagged embedded structs. `[]byte` is base64.
-- Reading:
-  - Integer kinds accept any literal whose exact value is a whole number in range (`16`, `16.0`, `1.6E1`), checked exactly with `math/big`, so there is no rounding above 2^53. Anything else is an error naming the field's path, as in `project.maps[3].cols: 16.5 is not an integer`.
-  - Floats accept any number.
-  - Unknown fields are errors, except the top-level `stamp`. Types with `UnmarshalJSON` get their subtree. Arrays must have exactly the Go array's length. Key names match exactly (no case folding).
-- Effects:
-  - A respelled number still shows as `mixed` (the jq digest flags it), but the file always converts.
-  - YAML (`canon/yaml.go`) is converted node for node to and from the canonical JSON with number spellings kept, so these rules and the stamp apply unchanged. Strings that YAML would read as another type (`"0x1F"`, `"true"`) are quoted. On input, YAML number spellings that JSON lacks (`0x1F`, `1_000`) are normalized, `.inf` and `.nan` are errors, and timestamps are read as strings.
+- Writing: integers as integer literals; floats as shortest round-trip decimals with `.0` on whole values; jq 1.8 exponent form below 1e-6.
+- Reading: integer fields accept any exact whole literal in range; other values error with the JSON path. Floats accept any number. Unknown fields are errors, except top-level `stamp`.
+- A respelled number (`1` as `1.0`) is `mixed` under the jq digest but still converts. YAML keeps number spellings node for node.
 
 ## Stamp
 
-- Two digests, kept side by side until experience shows which one to keep. Both are SHA-256 over the document without its `stamp`, written `sha256:<hex>` (the OCI digest form):
-  - `RFC8785`: the JSON Canonicalization Scheme (RFC 8785), the common standard for hashing JSON: compact, sorted keys, numbers compared by value and printed as ECMAScript does. Computed with `github.com/gowebpki/jcs`.
-  - `jq -S .`: `C(doc)` above, the same text xdfkit writes.
-- In JSON (full model and metadata files): a top-level `stamp` object, placed wherever the key sort puts it:
+- Two digests, SHA-256 over the document without its `stamp`, written `sha256:<hex>`:
+  - `RFC8785` via `github.com/gowebpki/jcs`
+  - `jq -S .`: `C(doc)` above
+- Top-level `stamp` on JSON (model and metadata):
 
 ```json
 "stamp": {
   "digests": [
-    {
-      "canon": "RFC8785",
-      "digest": "sha256:9cdc..."
-    },
-    {
-      "canon": "jq -S .",
-      "digest": "sha256:4c8a..."
-    }
+    {"canon": "RFC8785", "digest": "sha256:9cdc..."},
+    {"canon": "jq -S .", "digest": "sha256:4c8a..."}
   ],
   "tool": "xdfkit 0.1.0"
 }
 ```
-
-- The `jq -S .` digest can be checked with jq 1.8 alone; the RFC 8785 one needs a JCS tool (a digest command in xdfkit is planned):
 
 ```sh
 jq -S 'del(.stamp)' file.json | shasum -a 256
 jq -r '.stamp.digests[] | select(.canon == "jq -S .") | .digest' file.json
 ```
 
-- `xdfkit verify file` checks every digest it knows and prints the overall result with each digest's: `clean`, `edited`, `mixed` (the digests disagree), `unknown` (no digest in a supported form) or `unstamped`. It exits 1 when a file is not clean. `xdfkit verify --status file` prints only that status word and exits 0 when the file could be read. A reader that loads an `edited` file uses it as written and does not warn. `xdfkit verify` reports `edited`. `mixed` and `unknown` still need a look.
-- An edit is any value change, added or removed key, or reordered array. Whitespace and key order count under neither digest. Respelling a number (`1` as `1.0`) counts only under `jq -S .` (jq 1.7+ keeps literals) and shows as `mixed`.
-- The stamp detects hand edits, not tampering: anyone can recompute it. It isn't a signature.
+- `xdfkit verify file` prints `clean`, `edited`, `mixed`, `unknown`, or `unstamped`; exits 1 when not clean. `--status` prints only the word. `edited` loads without warning; `mixed` and `unknown` need a look.
+- An edit is any value change, added or removed key, or reordered array. Whitespace and key order count under neither digest. Number respelling counts only under `jq -S .` (`mixed`).
+- The stamp detects hand edits, not tampering.
 
 ### XDF stamp
 
-- An XDF has no JSON of its own, so its digest covers the XDF view: the model JSON that xdfkit's XDF reader builds from the XDF elements alone (`xdf.Read` without a metadata file), without object keys, which the reader derives from the titles of all objects. That excludes comments, the embedded block, the stamp line itself, and label values (the model has no field for them), and objects are sorted by uniqueid. Digests: the same two forms as the JSON stamp, over the XDF view.
-- This catches real edits made in TunerPro (values, addresses, scaling, axes, added or deleted tables). It ignores TunerPro reformatting, attribute order and table order.
-- Where it is stored: in the metadata file, `xdf.digests` (both forms, for the whole view). The XDF itself has no stamp line. A header description line that starts with `xdfkit-stamp:` is left out of the view.
-- A tuner subset (`model.md`, `provenance.subset`) adds the line `xdfkit-subset: tuner sha256:<table>` to the same description. The reader takes it out of the project name and into `provenance.subset`, so a tuner XDF read without its metadata file, or with another XDF's, still reads as a subset.
+- Digests cover the XDF view: model JSON from XDF elements alone (`xdf.Read` without metadata), without object keys (from titles). Excludes comments, stamp lines, and label values. Objects sorted by uniqueid.
+- Stored in the metadata file as `xdf.digests`. The XDF itself has no stamp line. A header description line starting with `xdfkit-stamp:` is left out of the view.
+- A tuner subset (`model.md`) adds `xdfkit-subset: tuner sha256:<table>` to that description; the reader restores `provenance.subset`.
 
 ## Metadata file
 
 Implemented in `xdf/meta.go` (`xdf.Meta`, `xdf.Read`).
 
-- Written next to every XDF output file: `name.xdf` and `name.meta.json` (see `naming.md`). XDF written to stdout gets none. API callers get it as `ConvertResponse.Meta` and pass it back as `ConvertRequest.Meta`.
-- Contents: the difference between the model and the XDF view of the XDF written from it. It is the residue, not the full model. The model carries no KP residue (`model.md`), so neither does the metadata file; KP output from an XDF takes the undecoded KP fields from a template or the defaults, as from JSON.
+- Written next to every XDF: `name.xdf` and `name.meta.json`. Stdout gets none. API: `ConvertResponse.Meta` / `ConvertRequest.Meta`.
+- Contents: the difference between the model and the XDF view (residue, not the full model). KP residue stays out (`model.md`).
 
 ```json
 {
   "model": {"categories": [...], "provenance": {...}},
   "objects": {
-    "0x1": {"categories": [2], "id": "KFLDRQ2 (AR 27C02)", "inverse": true, "key": "KFLDRQ2 (AR 27C02)"}
+    "0x1": {"categories": [2], "id": "KFLDRQ2", "inverse": true, "key": "KFLDRQ2"}
   },
   "schema": "xdfkit-xdf-meta/1",
   "stamp": {...},
@@ -90,20 +70,40 @@ Implemented in `xdf/meta.go` (`xdf.Meta`, `xdf.Read`).
 }
 ```
 
-- `model`: a JSON Merge Patch (RFC 7396) from the view without its objects to the model without its objects: provenance, categories (KP folder ids and order; the XDF numbers categories by sorted name), project fields the XDF lost.
-- `objects`: per object, keyed by its XDF `uniqueid`, the merge patch from its view to the model object, left out when empty. Typical entries: the key, the full id (the XDF title has only its first word), the comment (merged into the XDF description), category ids, `inverse`, `vislevel` when the model level differs from the XDF attribute (unmarked 0 versus written 2), `value.description`, the display base, axis `mirror`, `header` and `signature`, the storage of "add"/"subtract" axes (the live helper is not part of the model), and precision the writer limited to six digits. Keyed by uniqueid rather than title because titles repeat; TunerPro keeps uniqueids through a save (observed on 8D0907551M).
-- `xdf`: the digests of the view (see XDF stamp).
-- Its own `stamp`.
-- Reconstruction (`xdf.Read`): model = XDF view merged with metadata, by uniqueid.
-  - Digest matches `xdf.digests`: the merge is exact, so XDF plus metadata reproduces the model and JSON to XDF to JSON is lossless (tested on every archived pack, with and without image).
-  - Digest differs (edited in TunerPro): warning. The project takes the `model` patch over the XDF's header, and XDF categories missing from the metadata are added. Each object takes the XDF's values, and keeps the metadata's for what XDF can't express (key, `inverse`, `value.description`, display settings, axis `mirror`, `header`, `signature`, axis storage the XDF can't show) and where the metadata's value lowers to what the XDF holds (id, description and comment when the title and description are unchanged; category, shape, units, conversion, precision; `vislevel` when the writer would emit the XDF's attribute from the metadata level). Unedited objects therefore come out as before. A warning names each object whose metadata fields were not applied; it can't name which XDF values changed, because the metadata file doesn't hold the original view.
-  - Objects in the metadata but missing from the XDF are dropped with a warning; objects new in the XDF (or with a repeated uniqueid) have no metadata, get a key from their title, and are reported.
-  - Metadata stamp doesn't match: someone hand edited the metadata file. Warn and use it anyway.
-  - No metadata file: the plain XDF view, with provenance format `xdf`.
-- The XDF view: title as id, description as description, `CATEGORYMEM` as categories, cells from `EMBEDDEDDATA` (type flags: signed, little endian, float), the equation as factor and offset (any expression linear in X, or factor/X + offset for KP's reciprocal; anything else reads as X with a warning), `decimalpl` (default: `DEFAULTS sigdigits`) as precision, output type 3 as base 16 and the others as base 10. When `mmedtypeflags` is omitted on a cell wider than 8 bits, endian follows `DEFAULTS lsbfirst`, or little-endian if that attribute is missing too (C167 / ME7; unsigned "big" KP types often leave the flag off). A present flags value still controls the LE bit, including explicit big (`0x00`). A missing `mmedaddress` is address 0 (TunerPro omits it when saving). `min` and `max` are kept only when they differ from the range the writer invents from the conversion and the raw integer span; a match is omitted. Table axes with a location are image axes; label axes are ordinal, and dropped when they have at most one label. Elements other than tables and constants (`XDFFLAG`, `XDFPATCH`, `XDFFUNCTION`) are ignored with a warning. Input that isn't valid UTF-8 is read as Windows-1252.
-- One TunerPro table has one category and one equation. A map in several categories, or with an alternate display (`model.md`), is written as one table per category and per alternate. The primary table keeps uniqueid `0x1` onward in source order, so a pack with one category per map is unchanged. Each extra table's description starts with `xdfkit-fold: 0xPRIMARY` (the primary uniqueid) and its uniqueid is above the primaries. The view records that line and leaves it out of the description. The metadata file pairs only the primary tables with the model, so the extra categories and `alternates` live on the primary object. Read with the metadata file drops the extra tables. Without it they stay, and `merge --smart` folds them again. An edit to an extra table is dropped: it is derived from the primary. `CATEGORYMEM` index 0, 1, 2 on one table is a nested path, not several groups.
+- `model`: JSON Merge Patch (RFC 7396) from the view without objects to the model without objects.
+- `objects`: per object, keyed by XDF `uniqueid`, the merge patch from its view to the model object (omitted when empty). Typical residue: key, full id, comment, category ids, `inverse`, `vislevel`, `value.description`, display base, axis `mirror` / `header` / `signature`, add/subtract storage, precision capped at six digits.
+- `xdf`: digests of the view. Own `stamp`.
 
-## Relation to the embedded block
+### Reconstruction (`xdf.Read`)
 
-- The metadata file is the durable, primary copy of the residue. The comment block in `xdf-embedding.md` doesn't survive a TunerPro save (confirmed).
-- The embedded block is optional (`--embed`, off by default) and carries the same payload as the metadata file (residue plus digests, XML encoded), not a second full model. Keeping one source of truth avoids the two copies disagreeing.
+- Digest matches: exact merge; XDF plus metadata reproduces the model.
+- Digest differs (edited in TunerPro): warn; project takes the `model` patch; each object prefers XDF values and keeps metadata for what XDF cannot express. A warning names objects whose metadata fields were not applied.
+- Objects only in metadata: dropped with a warning. New XDF objects: key from title.
+- Metadata stamp mismatch: warn and use it anyway.
+- No metadata: plain XDF view, provenance format `xdf`.
+
+### XDF view
+
+- Title → id; description → description; `CATEGORYMEM` → categories.
+- Cells from `EMBEDDEDDATA`; equation → factor/offset (linear in X, or factor/X + offset; else X with a warning).
+- `decimalpl` (default `DEFAULTS sigdigits`) → precision; output type 3 → base 16, else 10.
+- Missing `mmedtypeflags` on a wider cell: endian from `DEFAULTS lsbfirst`, else little-endian.
+- Missing `mmedaddress` → address 0. `min`/`max` kept only when they differ from the writer's invented range.
+- Image axes: location present; label axes: ordinal (dropped at ≤1 label). Non-UTF-8 input read as Windows-1252.
+
+### Categories and alternates
+
+One TunerPro table has one category and one equation. A map in several categories, or with an alternate (`model.md`), is one table per category and per alternate. Primary tables keep uniqueid `0x1` onward; extras get `xdfkit-fold: 0xPRIMARY` in the description. Metadata pairs only primaries. Read with metadata drops extras; without it they stay (`merge --smart` folds them).
+
+### Live helpers (add / subtract)
+
+For an unsigned 8/16/32-bit add or subtract axis that is not reciprocal, the writer emits a 1-column helper table at the axis address, linked with `embedinfo type="3"`:
+
+- Subtract: last row `(2^bits - X) * factor + offset`; earlier rows `CELL(ROW()+1;0;FALSE) - factor * X`.
+- Add: first row `factor * X + offset`; later rows `CELL(ROW()-1;0;FALSE) + factor * X`.
+
+Rows numbered from 1. `--static-axes` writes static labels instead (needed for TunerPro before 5.00.8414). Signed, float, reciprocal add/subtract, and backwards use labels. The reader leaves helpers out of the model; the metadata file keeps the axis storage. Formulas: `kp-format.md`.
+
+## Embedded block (not implemented)
+
+Optional `--embed` would put the same payload as the metadata file in an XML comment after `XDFHEADER`. The metadata file remains the durable primary copy; a TunerPro save drops the comment. Not implemented.

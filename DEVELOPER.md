@@ -11,9 +11,7 @@ make help       # all targets
 
 - `make install` copies `build/xdfkit` without building, so it can run under sudo. It takes `DESTDIR` for staging a package; `BINDIR` links are absolute paths into `LIBDIR`.
 - `make lint` needs only Go and must pass before sending changes. `go.mod` has no toolchain directive; keep it that way.
-- Tests use the archived ecuxplot packs and mapdump CSVs in `testdata/archive/ecuxplot/`, images from the private corpus, and jq 1.8. Without the corpus or jq those tests skip; `XDFKIT_REQUIRE_DATA=1` and `XDFKIT_REQUIRE_CORPUS=1` (as in CI) make them fail instead.
-- The corpus is the private `ecu-corpus` repo (`docs/corpus.md`): a full clone at `../ecu-corpus` if present, else the `ecu-corpus/` submodule (`make corpus` fetches it, `make corpus-bump` moves it to the corpus head). `XDFKIT_CORPUS` overrides both.
-- The lint rules also have synthetic fixtures (`testdata/lint/cases.json`) that run without the corpus.
+- Tests use the archived ecuxplot packs and mapdump CSVs in `testdata/archive/ecuxplot/`, images from the private corpus (`docs/corpus.md`), and jq 1.8. Without the corpus or jq those tests skip; `XDFKIT_REQUIRE_DATA=1` and `XDFKIT_REQUIRE_CORPUS=1` (as in CI) make them fail instead. Lint also has synthetic fixtures (`testdata/lint/cases.json`) that need no corpus.
 
 ## Formats
 
@@ -68,12 +66,11 @@ me7-logger imports `model`, `xdf` and `canon` (`docs/integrations.md`): after ch
 
 | Document | Covers |
 | --- | --- |
-| `docs/design.md` | Formats, implementation, architecture, CLI, verification |
+| `docs/design.md` | Formats, implementation, architecture, merge, verification |
 | `docs/model.md` | The model and its JSON |
 | `docs/format-matrix.md` | Which format supports which field |
 | `docs/kp-format.md` | KP header layout |
 | `docs/autocorrect.md` | `lint` and `fix` |
-| `docs/stamp-and-metadata.md` | Edit stamp and XDF metadata file |
-| `docs/corpus.md` | Test images from ecu-corpus |
-| `docs/naming.md` | Output file names |
+| `docs/stamp-and-metadata.md` | Edit stamp, XDF metadata file, default output names |
+| `docs/corpus.md` | Test images from ecu-corpus; image stem shape |
 | `docs/integrations.md` | ecuxplot, ME7Sum, me7-logger |

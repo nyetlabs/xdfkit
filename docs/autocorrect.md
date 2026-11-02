@@ -1,43 +1,34 @@
 # Autocorrect (`lint` and `fix`)
 
-Fixing KP files mechanically, instead of hand-editing each axis in WinOLS. Evidence for the rules: scans of every EEPROM axis in the ecuxplot packs against their bins, and the axis datasource section of `kp-format.md`. Implemented in `lint/` (rules R1 to R6 and R8 to R10), exposed as the `lint` and `fix` methods of `api/` and the CLI commands below. Tests: the findings on the archived ecuxplot packs with their corpus images, and synthetic fixtures that need no corpus (`testdata/lint/cases.json`, `lint/fixture_test.go`): made-up images holding a Bosch ident and raw axis values, with maps built through the model, covering R1 (both confidences), R2, R3, R4, R5, R6, R8, R9 (one map or axis per cause, and a map and an axis with no record), R10 (8- and 16-bit counts, a 2D map, and two maps it must skip) and an axis shared by two maps; every fix is applied, re-encoded and re-linted.
+Fixing KP files mechanically against the flash image. Implemented in `lint/` (R1–R6, R8–R10); exposed as `api.Lint` / `api.Fix`. Axis datasource formulas: `kp-format.md`. Finding field details: `go doc go.nyet.org/xdfkit/api`.
 
-- Writer: `fix` changes the decoded `kp.File` and re-encodes it with the KP writer, which round-trips every pack (113 and 116 byte-identical, 292 and 329 identical except for the re-deflated zip; `kp-format.md`, Round trip). Each fix changes only fixed-width fields that are already decoded (axis datasource, axis signed flag, map end address), so nothing else in the file moves and unknown fields are carried through as raw bytes. WinOLS 2.24 opens re-encoded 292 files and fixed files cleanly (confirmed).
-- `xdfkit lint -i in.bin [--family me7|m3] [--rules R9,R10] [--json findings.json] in.kp`:
-  - Reports one finding per axis, and one per map for R8 to R10. Axes shared by several maps (same address and point count) are one finding listing every map axis. `--rules` (and `LintRequest.Rules`) keeps only those rules.
-  - Finding JSON (`api.Lint` / `lint --json`) is the interface for callers. Each finding has: `id` (`RULE@0xADDR:POINTS`, for example `R1@0x1504e:4`; for R8 to R10 the map's start address and byte length), `rule`, `confidence`, `message`, evidence fields (`values`, `subtracted`, `opposite`, `countByte`, for R9 `later`/`earlier`/`narrow`, for R9 and R10 `record` and `cause`), optional `fix`, and `maps` (each `index`, `key` when the input was model JSON, `id`, `name`, `axis`). For model JSON, `maps[].index` is the object's position in `objects` and `maps[].key` is its model key. R8 needs no image; R1 to R6 and R9/R10 need the image; R1/R3/R9/R10 are ME7-only, R2/R4 are M3/M5-only.
-  - R9 and R10 `record`: the ME7 record (`model.md`, ME7 record layout) read from the definition's own point counts and widths, not from DAMOS: `start` (first count byte), `counts`, `axes` (each `addr` and `bits`) and `values` (for an axis-point table, the axis). `start`, `counts` and `values` are left out when the cause doesn't determine them. `cause` names how the definition differs from that record, and the message names it too:
-    - `values-pad`: the map's image axes end at its start; the pad byte before 16-bit values was missed, so the values start one byte later.
-    - `table-late`: a 1D map without image axes one byte after its count word: an axis-point table whose values (its axis) start one byte earlier.
-    - `axis-pad`: a 16-bit axis one byte off a pad: right after the map's other axis or its count byte (pad missed, one byte later), or one byte after the pad (one byte earlier).
-    - `axis-width`: an 8-bit axis read as 16-bit: its count byte and a monotonic 8-bit run at the address or one byte earlier.
-    - `shape`: a map without image axes next to the one record whose values start one byte either side of it, with other point counts than the map's (a curve read on the values pad of a 2D map, for example).
-    - `record-start` (R10): the map starts on the record's first count.
-    - No cause: no record explains the address; `record` is set when one was found with the map's own counts but values one byte earlier.
-  - The input may be the KP file or its model JSON (`model.md`). Exits 1 when there are findings.
-- `xdfkit fix -i in.bin (-o out.kp | -n) [--rules R1,R2] [--min-confidence high|medium|low] [--only ID,...] [--findings findings.json] in.kp`:
-  - Applies the proposed fixes, by default those of high confidence.
-  - With `--findings`, it applies the fixes left in a lint JSON file, which is the review workflow: lint to JSON, delete what you disagree with, then fix. `--only`, `--rules` and `--min-confidence` filter that list too. A finding whose axis no longer has the same address and point count is an error, so a stale file can't change the wrong axis.
-  - Never writes in place, and refuses to overwrite an existing file unless `--force` is given. `-n` reports without writing.
-  - Before writing, it parses the encoded output back and compares it with the fixed file; any difference is an error and nothing is written. It then re-lints the output and reports what is left.
-- Rules:
+## CLI
+
+- `xdfkit lint -i in.bin [--family me7|m3] [--rules R9,R10] [--json findings.json] in.kp`
+  - One finding per axis; one per map for R8–R10. Shared axes (same address and point count) are one finding. `--rules` filters.
+  - Finding JSON is the caller interface: `id`, `rule`, `confidence`, `message`, evidence fields, optional `fix`, and `maps`. R8 needs no image; R1–R6 and R9/R10 need the image. R1/R3/R9/R10 are ME7-only; R2/R4 are M3/M5-only.
+  - R9/R10 attach an ME7 `record` (`model.md`) and a `cause` string (`values-pad`, `table-late`, `axis-pad`, `axis-width`, `shape`, `record-start`, or empty).
+  - Input may be KP or model JSON. Exits 1 when there are findings.
+- `xdfkit fix -i in.bin (-o out.kp | -n) [--rules R1,R2] [--min-confidence high|medium|low] [--only ID,...] [--findings findings.json] in.kp`
+  - Applies proposed fixes (default: high confidence). `--findings` applies a reviewed lint JSON. Never writes in place; refuses overwrite without `--force`. `-n` reports without writing.
+  - Before writing: re-parse the encoded output, compare, re-lint, and report what is left.
+- `fix` mutates the decoded `kp.File` and re-encodes (`kp-format.md`, Round trip). Only decoded fixed-width fields change.
+
+## Rules
 
 | Rule | Detects | Fix | Confidence |
 |---|---|---|---|
 | R1 | "subtract" or "add" axis in an absolute-axis family (ME7) whose plain values are monotonic | datasource to "EEPROM" | high |
-| R1 | the same, monotonic only with the opposite signedness | datasource to "EEPROM" and toggle the signed flag | medium |
-| R2 | plain axis in a delta family (M3.x, M5.x) that is not monotonic but, read as "EEPROM, subtract", increases from 0 or more | datasource to "EEPROM, subtract" | high |
-| R3 | ME7 plain axis where only the opposite signedness gives a monotonic axis | toggle the signed flag | medium |
-| R4 | M3.x/M5.x 8-bit axis whose previous byte disagrees with the axis size, when that byte is a plausible count (1 through 24) or the axis declares a data header. A bare 0 or 255 is not a header. An "EEPROM, subtract" axis whose declared size already increases from 0 or more is not reported | set the point count (map cols/rows and end follow) when that size is monotonic; else report only | medium when fixed, else n/a |
-| R5 | 8-bit axis whose stored address is not a valid reading, but a count byte and monotonic axis sit within ±4 bytes | move the axis address; applied only with `--only` or `--min-confidence low` | low |
-| R6 | all values identical; or no reading is monotonic (ME7); or a "subtract" or "add" axis that, read as "subtract", doesn't increase from 0 or more (M3.x/M5.x) | none; report only | n/a |
-| R7 | ME7 only, using the maps me7info located in the image (model JSON with origin `auto`, `integrations.md`): a map whose address matches no located map, a located map whose axis address or point count differs from the definition, or a located map missing from the definition | `xdfkit merge --update` reports it (`design.md`, Merge): a moved address is `corrected`, a missing name is `missing`, and a generator default that was not copied is `default`. Not a lint rule | medium; report only |
-| R8 | map end address other than start + byte length (WinOLS 2.24 writes that value and recomputes it on export; `kp-format.md`, WinOLS 2.24 exports) | set the end address | high |
-| R9 | ME7 only: a map or image axis with 16- or 32-bit integer cells at an odd address (ME7 stores every 16-bit field at an even address: `model.md`, ME7 record layout). Evidence: the readings one byte later and earlier, and for axes the 8-bit reading one byte earlier with its count byte; the message says which readings are monotonic. Comes before the other axis rules. The cause (`values-pad`, `table-late`, `axis-pad`, `axis-width`, `shape`) and the record say where the data is | move map `start` (end follows) for `values-pad` / `table-late`; move axis `addr` for `axis-pad`; set axis to 8-bit and move `addr` for `axis-width`; no fix for `shape` or no cause. Applied only with `--only` or `--min-confidence low` | low when fixed, else n/a |
-| R10 | ME7 only: a curve or map without image axes whose data starts with its own point counts (one byte per axis, in either order for a map) followed by monotonic axes of those sizes, 8- or 16-bit, which is an ME7 curve, map or axis-point table record read from its start (`model.md`, ME7 record layout). Cause `record-start`; the record gives the axes and the values address. A curve is skipped when it already follows a count equal to its point count, as an axis-point table whose first point equals its size does; that also skips a few true hits. For an axis-point table the record's axis is the table's | move map `start` to the record's values address (end follows); applied only with `--only` or `--min-confidence low` | low |
+| R1 | the same, monotonic only with the opposite signedness | datasource to "EEPROM" and toggle signed | medium |
+| R2 | plain axis in a delta family (M3/M5) that is not monotonic but, as "EEPROM, subtract", increases from 0 or more | datasource to "EEPROM, subtract" | high |
+| R3 | ME7 plain axis where only the opposite signedness is monotonic | toggle signed | medium |
+| R4 | M3/M5 8-bit axis whose previous byte disagrees with the size (plausible count 1–24 or declared data header; bare 0/255 is not a header) | set point count when that size is monotonic; else report only | medium when fixed, else n/a |
+| R5 | 8-bit axis address not a valid reading, but a count and monotonic axis sit within ±4 bytes | move axis address; only with `--only` or `--min-confidence low` | low |
+| R6 | all values identical; or no monotonic reading (ME7); or add/subtract that does not increase from 0 as subtract (M3/M5) | none; report only | n/a |
+| R7 | ME7 only, against me7info-located maps (origin `auto`): address or axis mismatch, or missing located map | `xdfkit merge --update` (`design.md`); not a lint rule | medium; report only |
+| R8 | map end other than start + byte length | set end address | high |
+| R9 | ME7: 16- or 32-bit integer cells at an odd address | move start or axis per `cause`; no fix for `shape` / empty cause; only with `--only` or `--min-confidence low` | low when fixed, else n/a |
+| R10 | ME7: curve/map without image axes whose data starts with its own counts then monotonic axes (`cause` `record-start`) | move start to record values address; only with `--only` or `--min-confidence low` | low |
 
-- Only axes whose datasource reads the image and that have at least two integer points are checked; float axes are skipped. R8 checks every map and doesn't read the image; R9 checks every integer map of 16 bits or more, R10 every integer curve or map without image axes.
-- Family: from the Bosch identification string in the image (`40/1/ME7.1/5/...` is ME7, `5655/1/M3.82/...` and `9655/1/M5.92/...` are delta). Images without one need `--family`.
-- R7 is the merge report (`xdfkit merge --update` of the definition with the located model). It is not a `lint` rule. A caller that must reject a moved name does that before merge; merge does not decide that gate.
-- R1 changes what WinOLS displays: WinOLS shows a "subtract" axis as 256 minus the sum of the remaining raw values (see `kp-format.md`, EEPROM, subtract), so a mislabelled absolute axis shows wrong values until fixed.
-- R2 fixes display as intended in WinOLS 2.24 (confirmed on KFFA X in 8D0907558E: 1.0, 1.6, 2.2, ..., 10.5, 11.0 ms/rev).
+- Only image-reading integer axes with at least two points are checked; float axes skipped. R8 checks every map without the image; R9 every integer map of 16+ bits; R10 every integer curve/map without image axes.
+- Family: from the Bosch ident in the image (`…/ME7…` → ME7; `…/M3…` / `…/M5…` → delta). Images without one need `--family`.
