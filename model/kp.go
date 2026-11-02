@@ -43,6 +43,7 @@ func FromKP(f *kp.File) *Model {
 		m.Objects = append(m.Objects, objectFromKP(km, folders[km.FolderID]))
 	}
 	m.AssignKeys()
+	m.CleanDisplay()
 	return m
 }
 
@@ -315,7 +316,7 @@ func (m *Model) KP(template *kp.File) (*kp.File, error) {
 	tm := FromKP(t)
 	folders := map[int]map[string]any{}
 	for i, c := range tm.Categories {
-		r, err := residue(t.Project.Folders[i], c.kpFolder())
+		r, err := residue(folderDisplay(t.Project.Folders[i]), c.kpFolder())
 		if err != nil {
 			return nil, err
 		}
@@ -323,7 +324,7 @@ func (m *Model) KP(template *kp.File) (*kp.File, error) {
 	}
 	maps := map[string][]map[string]any{}
 	for i, o := range tm.Objects {
-		r, err := residue(t.Project.Maps[i], o.kpMap(i))
+		r, err := residue(mapDisplay(t.Project.Maps[i]), o.kpMap(i))
 		if err != nil {
 			return nil, err
 		}
@@ -380,6 +381,38 @@ func axisKind(x *Axis) string {
 }
 
 func (c *Category) kpFolder() *kp.Folder { return &kp.Folder{ID: int32(c.ID), Name: c.Name} }
+
+// folderDisplay and mapDisplay are the template records with display text
+// cleaned the same way as the model, so original spacing is not residue.
+func folderDisplay(fd *kp.Folder) *kp.Folder {
+	c := *fd
+	c.Name = CleanText(c.Name)
+	return &c
+}
+
+func mapDisplay(m *kp.Map) *kp.Map {
+	c := *m
+	c.Name = CleanText(c.Name)
+	c.Comment = strings.TrimSpace(c.Comment)
+	c.Value = cleanKPValue(c.Value)
+	if c.X != nil {
+		x := *c.X
+		x.Value = cleanKPValue(x.Value)
+		c.X = &x
+	}
+	if c.Y != nil {
+		y := *c.Y
+		y.Value = cleanKPValue(y.Value)
+		c.Y = &y
+	}
+	return &c
+}
+
+func cleanKPValue(v kp.Value) kp.Value {
+	v.Description = CleanText(v.Description)
+	v.Units = CleanText(v.Units)
+	return v
+}
 
 var shapes = map[kp.Org]string{kp.OrgSingle: "value", kp.OrgOneD: "1d", kp.OrgTwoD: "2d", kp.OrgTwoDInv: "2d"}
 

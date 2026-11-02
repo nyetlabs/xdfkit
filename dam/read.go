@@ -123,6 +123,7 @@ func Read(b []byte, name string) (*model.Model, []string, error) {
 		Objects:    objs,
 	}
 	m.AssignKeys()
+	m.CleanDisplay()
 	var kinds []string
 	for k := range skipped {
 		kinds = append(kinds, k)
@@ -653,9 +654,9 @@ func add(m map[string]int, k string) map[string]int {
 	return m
 }
 
-// cleanText drops tabs from DAMOS display text (often TAB after a colon).
+// cleanText drops extra spaces from DAMOS display text (often a tab after a colon).
 func cleanText(s string) string {
-	return strings.TrimSpace(strings.ReplaceAll(s, "\t", " "))
+	return model.CleanText(s)
 }
 
 func capWarnings(ws []string) []string {

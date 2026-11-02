@@ -6,8 +6,8 @@
 // It follows mapdump's columns and spelling (numbers as Java's Double.toString,
 // empty fields as "-"), with deliberate differences: the raw minimum and
 // maximum of 32-bit cells are masked to 32 bits (mapdump always printed 0x0),
-// float cells are read as floats, and objects without cells get "-" instead of
-// mapdump's ±9.223372036854776E18.
+// float cells are read as floats, objects without cells get "-" instead of
+// mapdump's ±9.223372036854776E18, and display text is cleaned (model.md).
 package mapcsv
 
 import (

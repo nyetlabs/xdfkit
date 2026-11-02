@@ -115,6 +115,7 @@ func Read(b []byte, name string) (*model.Model, []string, error) {
 		Objects:    objs,
 	}
 	m.AssignKeys()
+	m.CleanDisplay()
 	var kinds []string
 	for k := range skipped {
 		kinds = append(kinds, k)
@@ -830,9 +831,9 @@ func unquote(t token) string {
 	return s
 }
 
-// cleanText drops tabs from A2L display text (Bosch often uses TAB after a colon).
+// cleanText drops extra spaces from A2L display text (Bosch often uses a tab after a colon).
 func cleanText(s string) string {
-	return strings.TrimSpace(strings.ReplaceAll(s, "\t", " "))
+	return model.CleanText(s)
 }
 
 func has(toks []token, s string) bool {

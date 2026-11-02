@@ -355,6 +355,7 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 	if err := canon.Unmarshal(in, m); err != nil {
 		return nil, warnings, err
 	}
+	m.CleanDisplay()
 	return m, subsetWarning(m, warnings), m.Check()
 }
 

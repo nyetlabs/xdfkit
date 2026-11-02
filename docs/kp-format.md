@@ -51,7 +51,7 @@ Each folder: id, `BuiltIn` (9000 My maps, 9001 Hexdump, else 0), name, flags, st
 
 `Parse` and `Encode` share one walk. Encode writes the length at 0x14 and `EndOffset` for 292/329. Encode of 245/503/597 is not supported.
 
-- 113/116: parse then encode is byte-identical (including JSON in between)
+- 113/116: parse then encode is byte-identical (including the KP file's own JSON in between). A KP written from the model carries cleaned display text (`model.md`), so those bytes match when that text was already clean.
 - 292/329: original zip reused while the map block is unchanged; a changed block is re-deflated with Go `compress/flate` level 9. Inflated block and bytes outside the zip match aside from the two lengths
 
 Decoding fails when a bool is not 0 or 1, a string has no NUL, a free-editable list length is not a multiple of 4, or bytes remain after the maps on 292/329.

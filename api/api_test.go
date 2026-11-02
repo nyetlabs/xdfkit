@@ -12,7 +12,9 @@ import (
 
 	"go.nyet.org/xdfkit/internal/corpus"
 	"go.nyet.org/xdfkit/internal/testenv"
+	"go.nyet.org/xdfkit/kp"
 	"go.nyet.org/xdfkit/lint"
+	"go.nyet.org/xdfkit/model"
 )
 
 func TestConvertRoundTrip(t *testing.T) {
@@ -45,7 +47,17 @@ func TestConvertRoundTrip(t *testing.T) {
 			if _, _, err := Convert(js, ConvertRequest{To: KP}); err != nil {
 				t.Fatalf("json to kp: %v", err)
 			}
-			want, _, err := Convert(in, ConvertRequest{To: KP})
+			// KP to KP is a raw re-encode. The template path writes the model's
+			// cleaned display text, so the reference is that round trip.
+			f, err := kp.Parse(in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			cleaned, err := model.FromKP(f).KP(f)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := cleaned.Encode()
 			if err != nil {
 				t.Fatal(err)
 			}

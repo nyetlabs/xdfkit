@@ -76,6 +76,9 @@ func Meta(m *model.Model, x []byte, tool string) ([]byte, error) {
 func Read(x, meta []byte) (*model.Model, []string, error) {
 	v, uids, warnings, folds, err := view(x)
 	if err != nil || meta == nil {
+		if v != nil {
+			v.CleanDisplay()
+		}
 		return v, warnings, err
 	}
 	s, _, err := canon.Verify(meta)
@@ -93,6 +96,9 @@ func Read(x, meta []byte) (*model.Model, []string, error) {
 		return nil, warnings, fmt.Errorf("metadata: schema %q, want %q", mf.Schema, MetaSchemaID)
 	}
 	m, ws, err := merge(v, uids, folds, &mf)
+	if m != nil {
+		m.CleanDisplay()
+	}
 	return m, append(warnings, ws...), err
 }
 

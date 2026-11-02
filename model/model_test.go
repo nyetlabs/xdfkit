@@ -48,13 +48,15 @@ func packModels(t *testing.T, prefix string, fn func(t *testing.T, in []byte, f 
 }
 
 // TestKPRoundTrip: KP to model JSON to KP, with the original as template,
-// gives the same file: the same decoded fields, and for v1 the same bytes.
+// gives the same decoded fields once display text is cleaned, and for v1
+// the same bytes as that cleaned file.
 func TestKPRoundTrip(t *testing.T) {
-	packModels(t, "", func(t *testing.T, in []byte, f *kp.File, js []byte) {
+	packModels(t, "", func(t *testing.T, _ []byte, f *kp.File, js []byte) {
 		var m Model
 		if err := canon.Unmarshal(js, &m); err != nil {
 			t.Fatal(err)
 		}
+		cleanFileDisplay(f)
 		g, err := m.KP(f)
 		if err != nil {
 			t.Fatal(err)
@@ -68,8 +70,14 @@ func TestKPRoundTrip(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if f.Layout() == kp.V1 && !bytes.Equal(out, in) {
-			t.Error("v1 bytes differ")
+		if f.Layout() == kp.V1 {
+			want, err := f.Encode()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(out, want) {
+				t.Error("v1 bytes differ")
+			}
 		}
 		if _, err := kp.Parse(out); err != nil {
 			t.Errorf("re-encoded file: %v", err)
@@ -116,6 +124,7 @@ func TestEdit(t *testing.T) {
 		o := m.Objects[0]
 		o.Value.Conversion.Factor *= 2
 		o.Description += " edited"
+		cleanFileDisplay(f)
 		g, err := m.KP(f)
 		if err != nil {
 			t.Fatal(err)
@@ -157,11 +166,11 @@ func TestKPDefaultsFile(t *testing.T) {
 	survey := func(f *kp.File) {
 		m, l := FromKP(f), f.DefaultsKey()+"/"
 		for i, c := range m.Categories {
-			r, _ := residue(f.Project.Folders[i], c.kpFolder())
+			r, _ := residue(folderDisplay(f.Project.Folders[i]), c.kpFolder())
 			add(l+"folder", r)
 		}
 		for i, o := range m.Objects {
-			r, _ := residue(f.Project.Maps[i], o.kpMap(i))
+			r, _ := residue(mapDisplay(f.Project.Maps[i]), o.kpMap(i))
 			for k, x := range map[string]*Axis{"x": o.X, "y": o.Y} {
 				a, _ := r[k].(map[string]any)
 				delete(r, k)

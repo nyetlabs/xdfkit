@@ -50,6 +50,7 @@ func TestOracle(t *testing.T) {
 			t.Errorf("%s: %v", c.def, err)
 			continue
 		}
+		ref.CleanDisplay()
 		if ref.Provenance == nil || (ref.Provenance.Origin != "damos" && ref.Provenance.Origin != "manual") {
 			t.Errorf("%s: origin %v", c.def, ref.Provenance)
 		}

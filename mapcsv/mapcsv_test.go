@@ -76,6 +76,9 @@ func TestArchive(t *testing.T) {
 			if len(g) != len(w) {
 				t.Fatalf("%d rows, want %d", len(g), len(w))
 			}
+			for _, row := range w {
+				cleanCSVDisplay(row)
+			}
 			bad := 0
 			for i := range w {
 				if strings.HasPrefix(w[i][3], "0x") || strings.HasSuffix(w[i][3], "x0") {
@@ -95,6 +98,32 @@ func TestArchive(t *testing.T) {
 			}
 		})
 	}
+}
+
+// cleanCSVDisplay applies the model's display-text rule to mapdump's
+// columns. Comments (column 18) are trimmed at the ends only.
+func cleanCSVDisplay(row []string) {
+	for _, j := range []int{2, 5, 6, 9, 10} {
+		if j < len(row) {
+			row[j] = csvText(row[j])
+		}
+	}
+	if len(row) > 18 {
+		row[18] = strings.TrimSpace(row[18])
+		if row[18] == "" {
+			row[18] = "-"
+		}
+	}
+	for j := 19; j < len(row); j++ {
+		row[j] = model.CleanText(row[j])
+	}
+}
+
+func csvText(s string) string {
+	if s = model.CleanText(s); s == "" {
+		return "-"
+	}
+	return s
 }
 
 func at(r []string, i int) string {

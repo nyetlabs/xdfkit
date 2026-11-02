@@ -50,6 +50,6 @@ Read by the DAMOS reader and by an A2L `RECORD_LAYOUT` whose counts are bytes. `
 
 No format-specific residue in the model JSON. Understood values become model fields; the rest stay in the KP file.
 
-- With `--template`: header and KP-only fields from the matching `key` / folder id. Same provenance file reproduces 113/116 byte-identical; 292/329 except re-deflated zip when maps changed.
+- With `--template`: header and KP-only fields from the matching `key` / folder id. Display text is cleaned on the way in: each line of a description, units, category name, or project name and version loses its leading and trailing space, and a run of spaces or tabs becomes one space. A comment is trimmed only at the ends of the whole string. Same provenance file reproduces 113/116 aside from that text; 292/329 except a re-deflated zip when maps changed.
 - Without a template: `model/empty.kp` plus `model/kp-defaults.json` (`make schema` regenerates). Derived from the model: widths, end address, `addr2`, stored dimensions, value-range pair (`kp-format.md`).
 - An edited model field wins unless the template holds a value the model can't represent.

@@ -13,7 +13,7 @@ Converts map definitions between WinOLS KP, A2L, DAMOS, TunerPro XDF and a canon
     - KP orientation kept; axis mirror not applied. `vislevel` on each table/constant (model level, or 2 when unmarked).
     - Linked image axes get `embedinfo type="3"` when a matching curve exists.
     - Add/subtract axes are live helpers by default; backwards is static labels; `--static-axes` forces labels (`stamp-and-metadata.md`, Live helpers; formulas in `kp-format.md`).
-  - CSV map list (output only): ecuxplot mapdump format via `mapcsv/` (`xdfkit -f csv -i image -r ref`). Differences: axis columns follow organisation (`kp-format.md`); no-cell objects get `-`; 32-bit raw range masked; floats read as floats.
+  - CSV map list (output only): ecuxplot mapdump format via `mapcsv/` (`xdfkit -f csv -i image -r ref`). Differences: axis columns follow organisation (`kp-format.md`); no-cell objects get `-`; 32-bit raw range masked; floats read as floats; display text is cleaned (`model.md`).
   - Edit stamp on every JSON output (model and metadata file): `stamp-and-metadata.md`.
 - Inputs: KP headers 113, 116, 292, 329 (as ecuxplot mapdump); 245, 503, and 597 read-only (`kp-format.md`); A2L; DAMOS `.dam`; JSON/YAML; XDF with metadata file if present.
 - No licensed WinOLS options assumed. Route into WinOLS is KP. No A2L or DAMOS writers (WinOLS import is one-way through the licensed Damos plugin).
@@ -83,7 +83,7 @@ flowchart LR
 ## Verification
 
 - KP → XDF: parseable ASCII XDF per object (`go test ./xdf`); XDF + metadata round-trips.
-- KP → JSON → KP: byte-identical for 113/116; identical inflated block for 292/329 (stage 1).
+- KP → JSON → KP: 113/116 matches aside from cleaned display text (`model.md`); identical inflated block for 292/329 (stage 1).
 - JSON ↔ model ↔ JSON identical; JSON ↔ YAML ↔ JSON identical.
 - XDF + metadata → JSON equals source JSON (`go test ./xdf ./api`); edited XDF warns and reconciles.
 - Stamps: both digests clean; value change → `edited`; number respelling → `mixed`.
