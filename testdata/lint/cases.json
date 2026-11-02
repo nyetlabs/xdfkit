@@ -51,6 +51,7 @@
       "ident": "5655/1/M3.82/03/400600/DAMOS3N2/",
       "maps": [
         {"id": "SUB", "addr": "0x8000", "x": {"addr": "0x1000", "stored": "subtract", "values": [40, 10, 30, 20]}},
+        {"id": "SUB_COUNT", "addr": "0x8060", "x": {"addr": "0x1060", "stored": "subtract", "count": 13, "points": 4, "values": [40, 10, 30, 20]}},
         {"id": "PLAIN_SUB", "addr": "0x8010", "x": {"addr": "0x1010", "values": [40, 10, 30, 20]}},
         {"id": "COUNT", "addr": "0x8020", "x": {"addr": "0x1020", "count": 5, "points": 4, "values": [10, 20, 30, 40, 50]}},
         {"id": "COUNT_BAD", "addr": "0x8040", "x": {"addr": "0x1040", "count": 5, "points": 4, "values": [10, 20, 30, 40, 10]}},

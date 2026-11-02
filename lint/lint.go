@@ -236,6 +236,8 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 	switch {
 	case !delta && !monotonic(v) && sub:
 		return set("R2", High, "plain axis in an M3.x image that is increasing only read as \"EEPROM, subtract\"", &Fix{DataSource: ptr(kp.DSEepromSubtract)})
+	case a.DataSource == kp.DSEepromSubtract && sub:
+		return nil
 	case countDisagrees(a, fd.CountByte, n):
 		c := *fd.CountByte
 		msg := fmt.Sprintf("count byte before the axis is %d, axis size is %d: check address or size", c, n)

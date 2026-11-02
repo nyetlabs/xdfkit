@@ -61,6 +61,9 @@ const sample = `
 10, /SPZ, ONSST, {on the shared axis}, 7, $800600, $800600
 /SPW, 1, 1, 0, 1
 /SPX, 2, 1, 0, 10, 9
+
+11, /SPZ, SPLIT, {two addresses}, 1, $800700, $800800
+/SPW, 1, 1, 0, 1
 `
 
 func TestRead(t *testing.T) {
@@ -108,6 +111,10 @@ func TestRead(t *testing.T) {
 	wm := m.Objects[by["WMAP"]]
 	if wm.Address != 0x410 || wm.Rows != 4 || wm.Cols != 2 || wm.Y == nil || *wm.Y.Address != 0x404 || *wm.X.Address != 0x40C {
 		t.Fatalf("word map addr %x x %v y %v", wm.Address, wm.X, wm.Y)
+	}
+	split := m.Objects[by["SPLIT"]]
+	if split.Address != 0x800 {
+		t.Fatalf("split address %x", split.Address)
 	}
 	sh := m.Objects[by["ONSST"]]
 	sst := m.Objects[by["SST"]]

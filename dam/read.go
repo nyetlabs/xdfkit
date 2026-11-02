@@ -166,6 +166,13 @@ func parseSPZ(f []string) (record, bool) {
 	if !ok {
 		return record{}, false
 	}
+	// A second hex is the record start when the two differ. The first then
+	// sits in the overlapping _0_A / _1_A block.
+	if i+5 < len(f) {
+		if alt, ok := parseHex(f[i+5]); ok && alt != addr {
+			addr = alt
+		}
+	}
 	index := 0
 	if i > 0 {
 		index, _ = strconv.Atoi(f[0])
