@@ -17,6 +17,15 @@ func TestDetectA2LAndDAMOS(t *testing.T) {
 	if Detect([]byte("schema: xdfkit-model/1\n")) != YAML {
 		t.Fatal("yaml")
 	}
+	if Detect([]byte("/* note */\n/begin PROJECT P \"\"\n")) != A2L {
+		t.Fatal("a2l without ASAP2_VERSION")
+	}
+	if Detect([]byte("/* /begin PROJECT hidden */\nschema: 1\n")) != YAML {
+		t.Fatal("project mention inside a comment")
+	}
+	if Detect([]byte("/begin PROJECT_NO X\n")) != YAML {
+		t.Fatal("PROJECT_NO is not PROJECT")
+	}
 	a2l := []byte(`
 ASAP2_VERSION 1 31
 /begin PROJECT P ""

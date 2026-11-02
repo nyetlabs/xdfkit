@@ -1,6 +1,7 @@
 package a2l
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -203,8 +204,95 @@ func TestRead(t *testing.T) {
 	}
 }
 
+func TestDamosLayout(t *testing.T) {
+	const src = `
+/begin PROJECT P ""
+/begin MODULE M ""
+/begin MOD_COMMON ""
+  BYTE_ORDER MSB_LAST
+  S_REC_LAYOUT DAMOS
+/end MOD_COMMON
+/begin COMPU_METHOD ident ""
+  RAT_FUNC "%3.0" ""
+  COEFFS 0 1 0 0 0 1
+/end COMPU_METHOD
+/begin COMPU_METHOD zk ""
+  RAT_FUNC "%6.1" "ms"
+  COEFFS 0 0 10240 0 1 40
+/end COMPU_METHOD
+/begin RECORD_LAYOUT Curve
+  NO_AXIS_PTS_X 1 UBYTE
+  AXIS_PTS_X 2 UBYTE INDEX_INCR DIRECT
+  FNC_VALUES 3 UWORD COLUMN_DIR DIRECT
+/end RECORD_LAYOUT
+/begin RECORD_LAYOUT Map
+  NO_AXIS_PTS_X 1 UBYTE
+  NO_AXIS_PTS_Y 2 UBYTE
+  AXIS_PTS_X 3 UBYTE INDEX_INCR DIRECT
+  AXIS_PTS_Y 4 UBYTE INDEX_INCR DIRECT
+  FNC_VALUES 5 UBYTE COLUMN_DIR DIRECT
+/end RECORD_LAYOUT
+/begin CHARACTERISTIC Curve "say ""hi"""
+  CURVE 0x800010 Curve 0 ident 0 1
+  /begin AXIS_DESCR STD_AXIS x ident 4 0 1 /end AXIS_DESCR
+/end CHARACTERISTIC
+/begin CHARACTERISTIC Map "m"
+  MAP 0x800100 Map 0 ident 0 1
+  /begin AXIS_DESCR STD_AXIS row ident 6 0 1 /end AXIS_DESCR
+  /begin AXIS_DESCR STD_AXIS col ident 4 0 1 /end AXIS_DESCR
+/end CHARACTERISTIC
+/begin CHARACTERISTIC Time "t"
+  VALUE 0x800200 Kw 0 zk 0 1
+/end CHARACTERISTIC
+/begin CHARACTERISTIC ID "BOSCH"
+  ASCII 0x800300 Kwb 0 KennText 0 1
+  NUMBER 12
+/end CHARACTERISTIC
+/end MODULE
+/end PROJECT
+`
+	m, _, err := Read([]byte(src), "d.a2l")
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]*model.Object{}
+	for _, o := range m.Objects {
+		by[o.ID] = o
+	}
+	c := by["Curve"]
+	if c == nil || c.Description != `say "hi"` || c.Address != 0x16 || c.Cols != 4 || c.X == nil || c.X.Address == nil || *c.X.Address != 0x11 {
+		t.Fatalf("curve %+v", c)
+	}
+	mp := by["Map"]
+	if mp == nil || mp.Rows != 6 || mp.Cols != 4 || mp.Y == nil || mp.X == nil || mp.Y.Address == nil || *mp.Y.Address != 0x102 {
+		t.Fatalf("map %+v x %+v y %+v", mp, mp.X, mp.Y)
+	}
+	tm := by["Time"]
+	if tm == nil || !tm.Value.Conversion.Reciprocal || tm.Value.Conversion.Factor != 10240 || tm.Value.Conversion.Offset != -40 {
+		t.Fatalf("time %+v", tm.Value.Conversion)
+	}
+	id := by["ID"]
+	if id == nil || id.Shape != "1d" || id.Cols != 12 || id.Address != 0x300 {
+		t.Fatalf("ascii %+v", id)
+	}
+}
+
 func TestNotA2L(t *testing.T) {
 	if _, _, err := Read([]byte("not a file\n"), "x"); err == nil {
 		t.Fatal("expected an error")
+	}
+}
+
+func TestReadMissingVersion(t *testing.T) {
+	b := []byte(strings.Replace(sample, "ASAP2_VERSION 1 31\n", "", 1))
+	m, warnings, err := Read(b, "demo.a2l")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m.Project.Name != "DEMO" || len(m.Objects) == 0 {
+		t.Fatalf("project %+v objects %d", m.Project, len(m.Objects))
+	}
+	if !slices.Contains(warnings, "ASAP2_VERSION missing") {
+		t.Fatalf("warnings %v", warnings)
 	}
 }

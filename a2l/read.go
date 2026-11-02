@@ -18,15 +18,18 @@ import (
 // Read parses an A2L file. name is the provenance file name.
 func Read(b []byte, name string) (*model.Model, []string, error) {
 	toks := tokenize(b)
+	var warnings []string
 	if !has(toks, "ASAP2_VERSION") {
-		return nil, nil, fmt.Errorf("a2l: not an ASAP2 file")
+		if !hasBlock(toks, "PROJECT") {
+			return nil, nil, fmt.Errorf("a2l: not an ASAP2 file")
+		}
+		warnings = append(warnings, "ASAP2_VERSION missing")
 	}
 	r := &reader{alignW: 1, alignL: 1, little: true}
 	r.comps = map[string]compu{}
 	r.layouts = map[string][]member{}
 	r.axes = map[string]*axisPts{}
 	var funcs []function
-	var warnings []string
 	var skipped map[string]int
 	note := func(s string) { skipped = add(skipped, s) }
 	blocks := allBlocks(toks)
@@ -134,6 +137,7 @@ type reader struct {
 	alignW    int
 	alignL    int
 	little    bool
+	damos     bool
 	proj      string
 	ver       string
 	unlowered int
@@ -187,7 +191,7 @@ func (r *reader) characteristic(body []token) (*model.Object, string, []string) 
 	lo, _ := strconv.ParseFloat(body[7].s, 64)
 	hi, _ := strconv.ParseFloat(body[8].s, 64)
 	switch kind {
-	case "VALUE", "CURVE", "MAP", "VAL_BLK":
+	case "VALUE", "CURVE", "MAP", "VAL_BLK", "ASCII":
 	default:
 		return nil, kind, nil
 	}
@@ -242,18 +246,19 @@ func (r *reader) characteristic(body []token) (*model.Object, string, []string) 
 	}
 	pts := map[string]int{}
 	for i, a := range axes {
-		key := "AXIS_PTS_X"
-		if i == 1 {
-			key = "AXIS_PTS_Y"
-		}
-		pts[key] = a.max
+		pts[axisKey(i)] = a.max
 	}
 	valOff, axisOff := place(ms, pts, r.alignW, r.alignL)
 	o.Address = off + model.Addr(valOff)
+	// ASAM lists the column axis first. A DAMOS map lists the row axis first.
+	col, row := 0, 1
+	if kind == "MAP" && r.damos {
+		col, row = 1, 0
+	}
 	switch kind {
 	case "VALUE":
 		o.Shape, o.Rows, o.Cols = "value", 1, 1
-	case "VAL_BLK":
+	case "VAL_BLK", "ASCII":
 		if number < 1 {
 			number = 1
 		}
@@ -267,20 +272,21 @@ func (r *reader) characteristic(body []token) (*model.Object, string, []string) 
 		o.Shape, o.Rows, o.Cols = "1d", 1, n
 	default:
 		nx, ny := 1, 1
-		if len(axes) > 0 && axes[0].max > 0 {
-			nx = axes[0].max
+		if col < len(axes) && axes[col].max > 0 {
+			nx = axes[col].max
 		}
-		if len(axes) > 1 && axes[1].max > 0 {
-			ny = axes[1].max
+		if row < len(axes) && axes[row].max > 0 {
+			ny = axes[row].max
 		}
 		o.Shape, o.Rows, o.Cols = "2d", ny, nx
 	}
 	for i, a := range axes {
 		ax, w := r.axis(a, off, axisOff, i, ms)
 		warnings = append(warnings, w...)
-		if i == 0 {
+		switch i {
+		case col:
 			o.X = ax
-		} else if i == 1 {
+		case row:
 			o.Y = ax
 		}
 	}
@@ -318,10 +324,7 @@ func parseAxisDescr(body []token) axisDesc {
 }
 
 func (r *reader) axis(a axisDesc, base model.Addr, axisOff map[string]int, index int, ms []member) (*model.Axis, []string) {
-	key := "AXIS_PTS_X"
-	if index == 1 {
-		key = "AXIS_PTS_Y"
-	}
+	key := axisKey(index)
 	c := r.comps[a.conv]
 	v := valueOf(c, c.prec, nil, nil)
 	switch a.attr {
@@ -416,6 +419,13 @@ func (r *reader) modCommon(body []token) {
 			if i+1 < len(body) {
 				r.little = body[i+1].s != "MSB_FIRST"
 			}
+		case "S_REC_LAYOUT":
+			// DAMOS inline records: 16-bit fields start on an even address,
+			// and a map's first axis is the rows.
+			if i+1 < len(body) && body[i+1].s == "DAMOS" {
+				r.damos = true
+				r.alignW, r.alignL = 2, 2
+			}
 		case "ALIGNMENT_WORD":
 			if i+1 < len(body) {
 				r.alignW, _ = strconv.Atoi(body[i+1].s)
@@ -493,19 +503,22 @@ func parseCompu(body []token) (compu, bool) {
 //
 // The model stores phys = factor*raw + offset (or factor/raw + offset when
 // reciprocal). Linear (a = d = e = 0, b and f nonzero) is factor f/b and
-// offset -c/b. Reciprocal (a = b = d = f = 0, e nonzero) is factor c/e.
-// That matches KP/XDF on Bosch ME7 exports (e.g. COEFFS 0 1 0 0 0 0.01 → 0.01).
+// offset -c/b. Reciprocal (a = b = d = 0, e nonzero) is factor c/e and
+// offset -f/e. That matches KP/XDF on Bosch ME7 exports (e.g. COEFFS 0 1 0 0 0 0.01
+// is 0.01, and COEFFS 0 0 10240 0 1 40 is 10240/raw - 40).
 func ratFunc(a, b, c, d, e, f float64) (model.Conversion, string) {
 	z := func(x float64) bool { return math.Abs(x) < 1e-12 }
+	off := func(x float64) float64 {
+		if z(x) {
+			return 0
+		}
+		return x
+	}
 	switch {
 	case z(a) && z(d) && z(e) && !z(b) && !z(f):
-		off := -c / b
-		if z(off) {
-			off = 0
-		}
-		return model.Conversion{Factor: f / b, Offset: off}, ""
-	case z(a) && z(b) && z(d) && z(f) && !z(e):
-		return model.Conversion{Factor: c / e, Reciprocal: true}, ""
+		return model.Conversion{Factor: f / b, Offset: off(-c / b)}, ""
+	case z(a) && z(b) && z(d) && !z(e):
+		return model.Conversion{Factor: c / e, Offset: off(-f / e), Reciprocal: true}, ""
 	default:
 		return model.Conversion{Factor: 1}, "RAT_FUNC is not linear or reciprocal; read as X"
 	}
@@ -651,6 +664,13 @@ func place(ms []member, pts map[string]int, alignW, alignL int) (int, map[string
 	return off, at
 }
 
+func axisKey(i int) string {
+	if i == 1 {
+		return "AXIS_PTS_Y"
+	}
+	return "AXIS_PTS_X"
+}
+
 func findMember(ms []member, kind string) member {
 	for _, m := range ms {
 		if m.kind == kind {
@@ -764,14 +784,21 @@ func tokenize(b []byte) []token {
 		case c == '"':
 			i++
 			var sb strings.Builder
-			for i < len(b) && b[i] != '"' {
+			for i < len(b) {
+				if b[i] == '"' {
+					// ASAP2 escapes a quote as "".
+					if i+1 < len(b) && b[i+1] == '"' {
+						sb.WriteByte('"')
+						i += 2
+						continue
+					}
+					i++
+					break
+				}
 				if b[i] == '\\' && i+1 < len(b) {
 					i++
 				}
 				sb.WriteRune(rune(b[i]))
-				i++
-			}
-			if i < len(b) {
 				i++
 			}
 			out = append(out, token{sb.String(), true})
@@ -811,6 +838,15 @@ func cleanText(s string) string {
 func has(toks []token, s string) bool {
 	for _, t := range toks {
 		if t.s == s {
+			return true
+		}
+	}
+	return false
+}
+
+func hasBlock(toks []token, name string) bool {
+	for _, bl := range nested(toks) {
+		if bl.name == name {
 			return true
 		}
 	}

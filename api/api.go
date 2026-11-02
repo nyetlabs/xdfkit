@@ -419,8 +419,8 @@ func encode(f *kp.File, to string) ([]byte, error) {
 var kpMagic = []byte("\x0b\x00\x00\x00WinOLS File")
 
 // Detect names the input format from its contents: json for a JSON object,
-// xdf for XML, kp for the KP signature, a2l for ASAP2_VERSION, damos for an
-// ASAP2DAM banner, else yaml.
+// xdf for XML, kp for the KP signature, a2l for ASAP2_VERSION or a
+// /begin PROJECT block, damos for an ASAP2DAM banner, else yaml.
 func Detect(in []byte) string {
 	text := bytes.TrimLeft(bytes.TrimPrefix(in, []byte("\uFEFF")), " \t\r\n")
 	switch {
@@ -438,10 +438,41 @@ func Detect(in []byte) string {
 	switch {
 	case bytes.Contains(head, []byte("ASAP2DAM")):
 		return DAMOS
-	case bytes.Contains(head, []byte("ASAP2_VERSION")):
+	case bytes.Contains(head, []byte("ASAP2_VERSION")), hasA2LProject(head):
 		return A2L
 	}
 	return YAML
+}
+
+// hasA2LProject reports a /begin PROJECT block in b, skipping /* */ comments.
+// PROJECT_NO and a mention inside a comment do not count.
+func hasA2LProject(b []byte) bool {
+	for i := 0; i < len(b); {
+		switch {
+		case b[i] == '/' && i+1 < len(b) && b[i+1] == '*':
+			i += 2
+			for i+1 < len(b) && !(b[i] == '*' && b[i+1] == '/') {
+				i++
+			}
+			if i+1 >= len(b) {
+				return false
+			}
+			i += 2
+		case bytes.HasPrefix(b[i:], []byte("/begin")):
+			rest := bytes.TrimLeft(b[i+len("/begin"):], " \t\r\n")
+			if bytes.HasPrefix(rest, []byte("PROJECT")) && identEnd(rest, len("PROJECT")) {
+				return true
+			}
+			i += len("/begin")
+		default:
+			i++
+		}
+	}
+	return false
+}
+
+func identEnd(b []byte, n int) bool {
+	return len(b) == n || b[n] <= ' ' || b[n] == '"' || b[n] == '/'
 }
 
 // VerifyResponse is the stamp status of a JSON document: clean, edited, mixed,
