@@ -5,13 +5,13 @@ import (
 	"fmt"
 )
 
-// Org is the map organisation.
+// Org is WinOLS Type / Typ (eEinzel, eEindim, eZweidim, eZweiInv).
 type Org int32
 
-// Type is the element type (width, endianness, float).
-type Type int32
+// DataOrg is WinOLS DataOrg (element width, endianness, float).
+type DataOrg int32
 
-// DataSource is where an axis takes its values from.
+// DataSource is where an axis takes its values from (WinOLS DataSrc).
 type DataSource int32
 
 const (
@@ -36,28 +36,28 @@ var dsNames = map[DataSource]string{
 	DSFreeEditable: "free-editable", DSEepromBackwards: "eeprom-backwards",
 }
 
-var typeNames = map[Type]string{
+var dataOrgNames = map[DataOrg]string{
 	1: "u8", 2: "16-hilo", 3: "16-lohi", 4: "32-hilo", 5: "32-lohi", 6: "float-hilo", 7: "float-lohi",
 }
 
 // Width returns the element size in bytes, or 0 if unknown.
-func (t Type) Width() int {
+func (d DataOrg) Width() int {
 	switch {
-	case t == 1:
+	case d == 1:
 		return 1
-	case t == 2 || t == 3:
+	case d == 2 || d == 3:
 		return 2
-	case t >= 4 && t <= 7:
+	case d >= 4 && d <= 7:
 		return 4
 	}
 	return 0
 }
 
 // LE reports little-endian storage.
-func (t Type) LE() bool { return t > 1 && t&1 == 1 }
+func (d DataOrg) LE() bool { return d > 1 && d&1 == 1 }
 
 // Float reports IEEE single precision.
-func (t Type) Float() bool { return t == 6 || t == 7 }
+func (d DataOrg) Float() bool { return d == 6 || d == 7 }
 
 // FromImage reports whether axis values are read from the image.
 func (d DataSource) FromImage() bool {
@@ -72,7 +72,7 @@ func name[K ~int32](names map[K]string, k K) string {
 }
 
 func (o Org) String() string        { return name(orgNames, o) }
-func (t Type) String() string       { return name(typeNames, t) }
+func (d DataOrg) String() string    { return name(dataOrgNames, d) }
 func (d DataSource) String() string { return name(dsNames, d) }
 
 func unname[K ~int32](names map[K]string, b []byte, k *K) error {
@@ -95,9 +95,9 @@ func unname[K ~int32](names map[K]string, b []byte, k *K) error {
 }
 
 func (o Org) MarshalJSON() ([]byte, error)        { return json.Marshal(o.String()) }
-func (t Type) MarshalJSON() ([]byte, error)       { return json.Marshal(t.String()) }
+func (d DataOrg) MarshalJSON() ([]byte, error)    { return json.Marshal(d.String()) }
 func (d DataSource) MarshalJSON() ([]byte, error) { return json.Marshal(d.String()) }
 
 func (o *Org) UnmarshalJSON(b []byte) error        { return unname(orgNames, b, o) }
-func (t *Type) UnmarshalJSON(b []byte) error       { return unname(typeNames, b, t) }
+func (d *DataOrg) UnmarshalJSON(b []byte) error    { return unname(dataOrgNames, b, d) }
 func (d *DataSource) UnmarshalJSON(b []byte) error { return unname(dsNames, b, d) }

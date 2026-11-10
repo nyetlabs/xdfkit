@@ -26,7 +26,7 @@ func TestOLS5Fixture597(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Layout() != OLS5 || f.HeaderID != header597 {
+	if f.Layout() != OLS5 || f.HeaderID != 597 {
 		t.Fatalf("layout %v header %d", f.Layout(), f.HeaderID)
 	}
 	if len(f.Project.NameTrailer) != 93 || len(f.Project.VersionTrailer) != 93 {
@@ -49,7 +49,7 @@ func TestOLS5Fixture503(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Layout() != OLS5 || f.HeaderID != header503 {
+	if f.Layout() != OLS5 || f.HeaderID != 503 {
 		t.Fatalf("layout %v header %d", f.Layout(), f.HeaderID)
 	}
 	if len(f.Project.NameTrailer) != 84 || len(f.Project.VersionTrailer) != 84 {
@@ -72,7 +72,7 @@ func TestOLS5Parse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Layout() != OLS5 || f.HeaderID != header597 {
+	if f.Layout() != OLS5 || f.HeaderID != 597 {
 		t.Fatalf("layout %v header %d, want OLS5 597", f.Layout(), f.HeaderID)
 	}
 	if len(f.Project.NameTrailer) != 93 || len(f.Project.VersionTrailer) != 93 {
@@ -99,7 +99,7 @@ func TestOLS5Header503(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.Layout() != OLS5 || f.HeaderID != header503 {
+	if f.Layout() != OLS5 || f.HeaderID != 503 {
 		t.Fatalf("layout %v header %d", f.Layout(), f.HeaderID)
 	}
 	if len(f.Project.NameTrailer) != 84 || len(f.Project.VersionTrailer) != 84 {

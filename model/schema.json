@@ -48,20 +48,20 @@
           "pattern": "^0x[0-9A-Fa-f]{1,8}$",
           "type": "string"
         },
+        "backwards": {
+          "description": "WinOLS bRueckwaerts / bBackwards: show the axis in descending order; storage is unchanged.",
+          "type": "boolean"
+        },
         "data": {
           "$ref": "#/$defs/Data",
           "description": "Axis-point storage, for image and editable axes."
         },
         "header": {
-          "description": "Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count.",
+          "description": "Header bytes before the axis data (WinOLS DataHeader, unconfirmed); usually a point count.",
           "type": "integer"
         },
-        "mirror": {
-          "description": "KP \"mirror map\" axis setting: WinOLS shows the axis in descending order; storage is unchanged.",
-          "type": "boolean"
-        },
         "signature": {
-          "description": "Marker value WinOLS associates with the axis (KP SignatureByte, the byte before the axis data; unconfirmed); omitted when none.",
+          "description": "Marker value WinOLS associates with the axis (SignatureByte; unconfirmed); omitted when none.",
           "type": "integer"
         },
         "source": {
@@ -89,7 +89,7 @@
           "description": "Axis-point meaning and conversion."
         },
         "values": {
-          "description": "Fixed axis points in display units, for editable axes. KP packs them as consecutive elements in the axis type, zero-padded to 4 bytes per point.",
+          "description": "Fixed axis points in display units, for editable axes. KP packs them as consecutive elements in the axis DataOrg, zero-padded to 4 bytes per point.",
           "items": {
             "type": "number"
           },
@@ -304,6 +304,7 @@
             "xdf",
             "a2l",
             "damos",
+            "csv",
             "image"
           ],
           "type": "string"
@@ -453,10 +454,6 @@
     "View": {
       "additionalProperties": false,
       "properties": {
-        "base": {
-          "description": "Number base shown (KP: 10, 16 or 2).",
-          "type": "integer"
-        },
         "difference": {
           "description": "Show the difference to the original.",
           "type": "boolean"
@@ -464,6 +461,10 @@
         "percent": {
           "description": "Show the difference in percent.",
           "type": "boolean"
+        },
+        "radix": {
+          "description": "Number base shown (WinOLS Radix: 10, 16 or 2).",
+          "type": "integer"
         }
       },
       "required": [],

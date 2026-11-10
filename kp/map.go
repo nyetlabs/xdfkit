@@ -1,7 +1,7 @@
 package kp
 
 // Map is one map definition. Fields are in file order (see codec for the tags).
-// Undecoded fields are named as described in the package doc.
+// Names follow WinOLS HelpEn where known (docs/kp-format.md).
 type Map struct {
 	Index          int         `json:"index" kp:"-"`
 	Key            string      `json:"-" kp:"-"`                // model object key when the map came from model JSON; lint only
@@ -10,25 +10,25 @@ type Map struct {
 	Comment        string      `json:"comment,omitzero" kp:"v2"`
 	CommentFlag    byte        `json:"commentFlag,omitzero" kp:"v2"` // 0 (unconfirmed)
 	Name           string      `json:"name"`
-	Organization   Org         `json:"organization"`
-	RightPane      int32       `json:"rightPane"` // the script's RWin: 0 none, 1 hex, 2 bars, 3 both (unconfirmed)
-	Type           Type        `json:"type"`
-	Width          int32       `json:"width"` // element size in bytes; equals Type's width in every known pack
-	Base           int32       `json:"base"`
+	Type           Org         `json:"type"`    // HelpEn Type / Typ (eEinzel…)
+	RWin           int32       `json:"rwin"`    // HelpEn RWin: 0 none, 1 hex, 2 bars, 3 both (CSV-confirmed on 8xx)
+	DataOrg        DataOrg     `json:"dataOrg"` // HelpEn DataOrg (eByte, eHiLo, …)
+	Width          int32       `json:"width"`   // element size in bytes; equals DataOrg's width in every known pack
+	Radix          int32       `json:"radix"`   // HelpEn Radix (10/16/2)
 	FolderID       int32       `json:"folderId"`
 	ID             string      `json:"id"`
-	IDPad          int32       `json:"idPad"`                        // 0 (unconfirmed)
-	IDFlag         byte        `json:"idFlag"`                       // 0 (unconfirmed)
-	IDState        int32       `json:"idState,omitzero" kp:"v2,245"` // 0 or 1, mostly per pack (unconfirmed); was wrongly named Marked
-	Range          [3][2]int64 `json:"range"`                        // map properties value range, low and high, for 8-, 16- and 32-bit data (32-bit unconfirmed)
-	Reciprocal     bool        `json:"reciprocal"`                   // bKehrwert: physical = factor/raw + offset
-	Signed         bool        `json:"signed"`                       // bVorzeichen (unconfirmed)
-	Difference     bool        `json:"difference"`                   // bDelta: map window "difference" toggle (unconfirmed)
-	Percent        bool        `json:"percent"`                      // bProzent: map window "percent" toggle (unconfirmed)
+	IDPad          int32       `json:"idPad"`                           // 0 (unconfirmed)
+	IDFlag         byte        `json:"idFlag"`                          // 0 (unconfirmed)
+	IDState        int32       `json:"idState,omitzero" kp:"v2,hybrid"` // 0 or 1, mostly per pack (unconfirmed); was wrongly named Marked
+	Range          [3][2]int64 `json:"range"`                           // value range low/high for 8-, 16- and 32-bit (32-bit unconfirmed)
+	Reciprocal     bool        `json:"reciprocal"`                      // HelpEn bKehrwert / bReciprocal
+	Signed         bool        `json:"signed"`                          // HelpEn bSigned / bVorzeichen (CSV-confirmed on 8xx)
+	Difference     bool        `json:"difference"`                      // HelpEn bDelta candidate (unconfirmed; always 0 on 839 CSV pair)
+	Percent        bool        `json:"percent"`                         // HelpEn bPercent / bProzent candidate (unconfirmed; always 0 on 839 CSV pair)
 	Cols           int32       `json:"cols"`
 	Rows           int32       `json:"rows"`
-	Cursor         [2]int32    `json:"cursor"` // editor state, the last cursor cell (unconfirmed)
-	Precision      int32       `json:"precision"`
+	Cursor         [2]int32    `json:"cursor"`    // editor state, the last cursor cell (unconfirmed)
+	Precision      int32       `json:"precision"` // HelpEn Nachkommastellen / Precision
 	Value          Value       `json:"value"`
 	Start          uint32      `json:"start"`
 	End            uint32      `json:"end"`
@@ -44,7 +44,7 @@ type Map struct {
 	YPad           int16       `json:"yPad"`       // 0 (unconfirmed)
 	StoredCols     int32       `json:"storedCols"` // Cols and Rows in storage order: swapped on 2d-inverse maps
 	StoredRows     int32       `json:"storedRows"`
-	ViewMode       int32       `json:"viewMode"`         // 1 text, 2 2D, 3 3D (the script's ViewMode)
+	ViewMode       int32       `json:"viewMode"`         // HelpEn ViewMode: 1 text, 2 2D, 3 3D (CSV-confirmed on 8xx)
 	ViewFlags      [2]byte     `json:"viewFlags"`        // 1, 1 (unconfirmed)
 	View2DScale    [2]float64  `json:"view2DScale"`      // 2D view scaling, 1.0, 1.0 by default (unconfirmed)
 	View2DRef      int32       `json:"view2DRef"`        // -1 until the view mode is first changed, then 0 (unconfirmed meaning)
@@ -61,12 +61,12 @@ func (m *Map) check(c *codec) {
 		c.pos -= len(m.Term2)
 		c.fail("unexpected term2 %v", m.Term2)
 	}
-	twoD := m.Organization == OrgTwoD || m.Organization == OrgTwoDInv
-	m.X.Defined = twoD || m.Organization == OrgOneD
+	twoD := m.Type == OrgTwoD || m.Type == OrgTwoDInv
+	m.X.Defined = twoD || m.Type == OrgOneD
 	m.Y.Defined = twoD
 }
 
-// Value is the scaling block shared by maps and axes.
+// Value is the scaling block shared by maps and axes (Feldwerte / Stuetz).
 type Value struct {
 	Description string  `json:"description"`
 	Units       string  `json:"units"`
@@ -75,36 +75,36 @@ type Value struct {
 }
 
 // Axis is an X or Y axis record. Every map stores both; Defined is set on the axes
-// its organisation implies (X for 1D, X and Y for 2D). The unused slots (the second
+// its Type implies (X for 1D, X and Y for 2D). The unused slots (the second
 // axis of a 1D map, both axes of a single value) are still parsed.
 type Axis struct {
 	Defined       bool       `json:"defined" kp:"-"`
 	Value         Value      `json:"value"`
-	DataSource    DataSource `json:"dataSource"`
+	DataSource    DataSource `json:"dataSource"` // HelpEn DataSrc
 	Addr          uint32     `json:"addr"`
-	Type          Type       `json:"type"`
-	Width         int32      `json:"width"` // element size in bytes; equals Type's width on all but 2 known axes
-	Base          int32      `json:"base"`
-	Mirror        bool       `json:"mirror" kp:"hook"`                 // "mirror map": shown in descending order; v2/245: int32, v1: byte
-	MirrorPad     Hex        `json:"mirrorPad,omitzero" kp:"v2,len=9"` // zeros (unconfirmed); header 245: 1 byte via Mirror hook
-	Reciprocal    bool       `json:"reciprocal"`                       // bKehrwert: physical = factor/raw + offset
-	Precision     int32      `json:"precision"`                        // -1 on some unused slots
+	DataOrg       DataOrg    `json:"dataOrg"`                             // HelpEn DataOrg
+	Width         int32      `json:"width"`                               // element size in bytes; equals DataOrg's width on all but 2 known axes
+	Radix         int32      `json:"radix"`                               // HelpEn Radix
+	Backwards     bool       `json:"backwards" kp:"hook"`                 // HelpEn bRueckwaerts / bBackwards: show descending; v2: int32, v1: byte
+	BackwardsPad  Hex        `json:"backwardsPad,omitzero" kp:"v2,len=9"` // zeros (unconfirmed); V2 hybrid: 1 byte via Backwards hook
+	Reciprocal    bool       `json:"reciprocal"`                          // bKehrwert
+	Precision     int32      `json:"precision"`                           // -1 on some unused slots
 	Signed        bool       `json:"signed"`
 	Values        Hex        `json:"values" kp:"bytes"` // free editable values in the axis type, 4 bytes per point
-	DataHeader    int32      `json:"dataHeader"`        // the script's DataHeader: header bytes before the axis data (unconfirmed)
-	SignatureByte int32      `json:"signatureByte"`     // the script's SignaturByte (marker byte before the axis), -1 for none (unconfirmed)
+	DataHeader    int32      `json:"dataHeader"`        // HelpEn DataHeader (unconfirmed)
+	SignatureByte int32      `json:"signatureByte"`     // HelpEn SignaturByte / SignatureByte, -1 for none (unconfirmed)
 }
 
-// hook codes Mirror: v1 byte; v2/OLS5 int32; 245 int32 plus 1-byte MirrorPad.
+// hook codes Backwards: v1 byte; v2/OLS5 int32; V2 hybrid int32 plus 1-byte BackwardsPad.
 func (a *Axis) hook(c *codec, _ string) {
-	if c.headerID == header245 && c.block {
-		c.mirrorI32(&a.Mirror)
-		c.raw(&a.MirrorPad, 1)
+	if c.hybrid && c.block {
+		c.mirrorI32(&a.Backwards)
+		c.raw(&a.BackwardsPad, 1)
 		return
 	}
 	if c.layout == V1 {
-		c.bool(&a.Mirror)
+		c.bool(&a.Backwards)
 		return
 	}
-	c.mirrorI32(&a.Mirror)
+	c.mirrorI32(&a.Backwards)
 }

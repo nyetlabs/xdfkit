@@ -374,7 +374,7 @@ func TestSchemaValidates(t *testing.T) {
 	})
 }
 
-// TestOmittedBase writes an omitted display base as 10, keeps an explicit
+// TestOmittedBase writes an omitted display radix as 10, keeps an explicit
 // base, and gives an axis with no storage a real width.
 func TestOmittedBase(t *testing.T) {
 	m := &Model{Schema: SchemaID, Objects: []*Object{{
@@ -382,21 +382,21 @@ func TestOmittedBase(t *testing.T) {
 		Data:  Data{Bits: 16, Endian: "little"},
 		Value: Value{Conversion: Conversion{Factor: 1}},
 		X:     &Axis{Source: "unknown", Value: Value{Conversion: Conversion{Factor: 1}}},
-		Y:     &Axis{Source: "ordinal", View: View{Base: 16}, Value: Value{Conversion: Conversion{Factor: 1}}},
+		Y:     &Axis{Source: "ordinal", View: View{Radix: 16}, Value: Value{Conversion: Conversion{Factor: 1}}},
 	}}}
 	f, err := m.KP(nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	mp := f.Project.Maps[0]
-	if mp.Base != 10 || mp.X.Base != 10 {
-		t.Fatalf("base map %d x %d", mp.Base, mp.X.Base)
+	if mp.Radix != 10 || mp.X.Radix != 10 {
+		t.Fatalf("radix map %d x %d", mp.Radix, mp.X.Radix)
 	}
-	if mp.X.Type != 1 || mp.X.Width != 1 || mp.X.DataSource != kp.DSOrdinal {
-		t.Fatalf("x type %s width %d source %s", mp.X.Type, mp.X.Width, mp.X.DataSource)
+	if mp.X.DataOrg != 1 || mp.X.Width != 1 || mp.X.DataSource != kp.DSOrdinal {
+		t.Fatalf("x type %s width %d source %s", mp.X.DataOrg, mp.X.Width, mp.X.DataSource)
 	}
-	if mp.Y.Base != 16 || mp.Y.Width != 1 {
-		t.Fatalf("y base %d width %d", mp.Y.Base, mp.Y.Width)
+	if mp.Y.Radix != 16 || mp.Y.Width != 1 {
+		t.Fatalf("y radix %d width %d", mp.Y.Radix, mp.Y.Width)
 	}
 }
 

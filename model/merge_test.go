@@ -61,7 +61,7 @@ func TestMergeDescriptionKeepsAddress(t *testing.T) {
 
 func TestMergeUpdateMovesAddress(t *testing.T) {
 	base := &Model{Schema: SchemaID, Objects: []*Object{obj("KFZW", 0x100, 0.75)}}
-	base.Objects[0].View.Base = 16
+	base.Objects[0].View.Radix = 16
 	base.Objects[0].Value.Units = "grad KW"
 	in := obj("KFZW", 0x200, 1)
 	in.Data.Signed = true
@@ -76,7 +76,7 @@ func TestMergeUpdateMovesAddress(t *testing.T) {
 	if o.Address != 0x200 || !o.Data.Signed || o.Cols != 4 {
 		t.Fatalf("layout %#v", o)
 	}
-	if o.Value.Conversion.Factor != 0.75 || o.View.Base != 16 || o.Value.Units != "grad KW" {
+	if o.Value.Conversion.Factor != 0.75 || o.View.Radix != 16 || o.Value.Units != "grad KW" {
 		t.Fatalf("kept display %#v", o.Value)
 	}
 	acts(t, as, "address")

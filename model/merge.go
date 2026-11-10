@@ -456,7 +456,7 @@ func axisDefaultDiff(id string, base, in *Axis) []string {
 	if base.View != in.View {
 		s = append(s, id+".view")
 	}
-	if base.Mirror != in.Mirror {
+	if base.Backwards != in.Backwards {
 		s = append(s, id+".mirror")
 	}
 	if base.Header != in.Header {

@@ -1,7 +1,7 @@
-// Package mapcsv writes a model as the map list CSV that ecuxplot's mapdump
-// printed (docs/design.md): one row per object in address order, with value
-// ranges read from the image and the names of matching maps in reference
-// definitions.
+// Package mapcsv writes a model as the legacy mapdump CSV (xdfkit -f mapdump;
+// docs/design.md): one row per object in address order, with value ranges
+// read from the image and the names of matching maps in reference definitions.
+// WinOLS HelpEn CSV is olscsv (-f csv), not this package.
 //
 // It follows mapdump's columns and spelling (numbers as Java's Double.toString,
 // empty fields as "-"), with deliberate differences: the raw minimum and

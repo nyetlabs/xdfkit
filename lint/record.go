@@ -79,7 +79,7 @@ func even(a uint32, w int) uint32 {
 }
 
 // intType is the little-endian integer type of w bytes (1 or 2).
-func intType(w int) kp.Type { return kp.Type(2*w - 1) } // u8, 16-lohi
+func intType(w int) kp.DataOrg { return kp.DataOrg(2*w - 1) } // u8, 16-lohi
 
 // axisOK reports whether n w-byte points at a are monotonic, read unsigned
 // or signed.
@@ -164,7 +164,7 @@ func sameCounts(a, b []int) bool {
 // imageAxis reports whether a is an axis of n integer points read from the
 // image.
 func imageAxis(a *kp.Axis, n int) bool {
-	return a != nil && a.Defined && a.DataSource.FromImage() && n >= 2 && a.Type.Width() > 0 && !a.Type.Float()
+	return a != nil && a.Defined && a.DataSource.FromImage() && n >= 2 && a.DataOrg.Width() > 0 && !a.DataOrg.Float()
 }
 
 // mapCounts are a map's point counts, one per axis.
@@ -178,17 +178,17 @@ func mapCounts(m *kp.Map) []int {
 // mapRecord explains a map of w-byte cells at an odd address from the record
 // the image holds around it.
 func mapRecord(m *kp.Map, img []byte) (string, *Record) {
-	s, w := m.Start, m.Type.Width()
+	s, w := m.Start, m.DataOrg.Width()
 	type span struct {
 		a    uint32
 		n, w int
 	}
 	var spans []span
 	if imageAxis(m.X, int(m.Cols)) {
-		spans = append(spans, span{m.X.Addr, int(m.Cols), m.X.Type.Width()})
+		spans = append(spans, span{m.X.Addr, int(m.Cols), m.X.DataOrg.Width()})
 	}
 	if m.Rows > 1 && imageAxis(m.Y, int(m.Rows)) {
-		spans = append(spans, span{m.Y.Addr, int(m.Rows), m.Y.Type.Width()})
+		spans = append(spans, span{m.Y.Addr, int(m.Rows), m.Y.DataOrg.Width()})
 	}
 	if len(spans) > 0 {
 		sort.Slice(spans, func(i, j int) bool { return spans[i].a < spans[j].a })
@@ -237,7 +237,7 @@ func axisRecord(a *kp.Axis, n int, other *kp.Axis, on int, img []byte) (string, 
 	at := a.Addr
 	end := uint32(0)
 	if imageAxis(other, on) {
-		end = other.Addr + uint32(on*other.Type.Width())
+		end = other.Addr + uint32(on*other.DataOrg.Width())
 	}
 	at16 := func(start, addr uint32, cause string) (string, *Record) {
 		r := &Record{Start: start, Axes: []RecordAxis{{addr, 16}}}

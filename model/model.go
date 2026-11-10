@@ -27,7 +27,7 @@ type Model struct {
 
 // Provenance identifies the original file.
 type Provenance struct {
-	Format    string     `json:"format" doc:"Source format; image: located in a flash image by a program such as me7info." enum:"kp|xdf|a2l|damos|image"`
+	Format    string     `json:"format" doc:"Source format; image: located in a flash image by a program such as me7info." enum:"kp|xdf|a2l|damos|csv|image"`
 	Origin    string     `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), manual (made by hand, as KP map packs usually are), auto (found in the image by a program)." enum:"damos|a2l|manual|auto"`
 	File      string     `json:"file,omitempty" doc:"Original file name."`
 	SHA256    string     `json:"sha256" doc:"SHA-256 of the original file (the image, for format image), lowercase hex." pattern:"^[0-9a-f]{64}$"`
@@ -132,7 +132,7 @@ type Conversion struct {
 
 // View holds display settings.
 type View struct {
-	Base       int  `json:"base,omitzero" doc:"Number base shown (KP: 10, 16 or 2)."`
+	Radix      int  `json:"radix,omitzero" doc:"Number base shown (WinOLS Radix: 10, 16 or 2)."`
 	Difference bool `json:"difference,omitzero" doc:"Show the difference to the original."`
 	Percent    bool `json:"percent,omitzero" doc:"Show the difference in percent."`
 }
@@ -145,10 +145,10 @@ type Axis struct {
 	Data      *Data     `json:"data,omitempty" doc:"Axis-point storage, for image and editable axes."`
 	Value     Value     `json:"value" doc:"Axis-point meaning and conversion."`
 	View      View      `json:"view,omitzero" doc:"Display settings."`
-	Mirror    bool      `json:"mirror,omitzero" doc:"KP \"mirror map\" axis setting: WinOLS shows the axis in descending order; storage is unchanged."`
-	Header    int       `json:"header,omitzero" doc:"Header bytes before the axis data (KP field DataHeader, unconfirmed); usually a point count."`
-	Signature *int      `json:"signature,omitempty" doc:"Marker value WinOLS associates with the axis (KP SignatureByte, the byte before the axis data; unconfirmed); omitted when none."`
-	Values    []float64 `json:"values,omitempty" doc:"Fixed axis points in display units, for editable axes. KP packs them as consecutive elements in the axis type, zero-padded to 4 bytes per point."`
+	Backwards bool      `json:"backwards,omitzero" doc:"WinOLS bRueckwaerts / bBackwards: show the axis in descending order; storage is unchanged."`
+	Header    int       `json:"header,omitzero" doc:"Header bytes before the axis data (WinOLS DataHeader, unconfirmed); usually a point count."`
+	Signature *int      `json:"signature,omitempty" doc:"Marker value WinOLS associates with the axis (SignatureByte; unconfirmed); omitted when none."`
+	Values    []float64 `json:"values,omitempty" doc:"Fixed axis points in display units, for editable axes. KP packs them as consecutive elements in the axis DataOrg, zero-padded to 4 bytes per point."`
 }
 
 // Addr is a file offset, written as a hex string ("0x13D52").

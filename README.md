@@ -35,7 +35,8 @@ xdfkit --template in.kp out.xdf back.kp     # XDF back to KP
 xdfkit lint -i image.bin in.kp              # report axis mistakes
 xdfkit fix -i image.bin -o fixed.kp in.kp   # fix them
 xdfkit merge --update golden.json located.json out.json
-xdfkit -f csv -i image.bin in.kp            # map list with value ranges
+xdfkit -f csv in.kp                         # WinOLS map-list CSV
+xdfkit -f mapdump -i image.bin in.kp        # legacy mapdump with value ranges
 xdfkit in.kp out.json                       # KP to JSON (or out.yaml)
 xdfkit verify out.json                      # has it been edited by hand?
 ```
