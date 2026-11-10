@@ -282,9 +282,9 @@ func (a *raxis) value(prec int) (model.Value, model.View, error) {
 	if err != nil {
 		c, err = model.Conversion{Factor: 1}, fmt.Errorf("equation %q: %v; read as X", a.Math.Equation, err)
 	}
-	v := model.View{Base: 10}
+	v := model.View{Radix: 10}
 	if strings.TrimSpace(a.OutputType) == "3" {
-		v.Base = 16
+		v.Radix = 16
 	}
 	return model.Value{Units: trim(a.Units), Precision: prec, Conversion: c}, v, err
 }

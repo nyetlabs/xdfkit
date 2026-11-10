@@ -421,14 +421,14 @@ func objectFromKP(km *kp.Map, inFolder bool) *Object {
 		ID:          km.ID,
 		Description: km.Name,
 		Comment:     km.Comment,
-		Shape:       shapes[km.Organization],
-		Inverse:     km.Organization == kp.OrgTwoDInv,
+		Shape:       shapes[km.Type],
+		Inverse:     km.Type == kp.OrgTwoDInv,
 		Address:     Addr(km.Start),
 		Rows:        int(km.Rows),
 		Cols:        int(km.Cols),
-		Data:        dataFromKP(km.Type, km.Signed),
+		Data:        dataFromKP(km.DataOrg, km.Signed),
 		Value:       valueFromKP(km.Value, int(km.Precision), km.Reciprocal),
-		View:        View{Base: int(km.Base), Difference: km.Difference, Percent: km.Percent},
+		View:        View{Radix: int(km.Radix), Difference: km.Difference, Percent: km.Percent},
 		X:           axisFromKP(km.X, axisCount(km, true)),
 		Y:           axisFromKP(km.Y, axisCount(km, false)),
 	}
@@ -482,33 +482,33 @@ func (o *Object) kpMap(i int) *kp.Map {
 	if o.Inverse {
 		org = kp.OrgTwoDInv
 	}
-	t := kpType(o.Data)
+	t := kpDataOrg(o.Data)
 	km := &kp.Map{
-		Index:        i,
-		Key:          o.Key,
-		Comment:      o.Comment,
-		Name:         o.Description,
-		Organization: org,
-		Type:         t,
-		Width:        int32(t.Width()),
-		Base:         kpBase(o.View.Base),
-		ID:           o.ID,
-		Reciprocal:   o.Value.Conversion.Reciprocal,
-		Signed:       o.Data.Signed,
-		Difference:   o.View.Difference,
-		Percent:      o.View.Percent,
-		Cols:         int32(o.Cols),
-		Rows:         int32(o.Rows),
-		Precision:    int32(o.Value.Precision),
-		Value:        kpValue(o.Value),
-		Start:        uint32(o.Address),
-		End:          uint32(o.Address) + uint32(o.Rows*o.Cols*t.Width()),
-		Addr2:        uint32(o.Address),
-		X:            o.X.kpAxis(o.modelAxisCount(true)),
-		Y:            o.Y.kpAxis(o.modelAxisCount(false)),
-		StoredCols:   int32(o.Cols),
-		StoredRows:   int32(o.Rows),
-		Term2:        kp.Hex{1, 1, 1},
+		Index:      i,
+		Key:        o.Key,
+		Comment:    o.Comment,
+		Name:       o.Description,
+		Type:       org,
+		DataOrg:    t,
+		Width:      int32(t.Width()),
+		Radix:      kpRadix(o.View.Radix),
+		ID:         o.ID,
+		Reciprocal: o.Value.Conversion.Reciprocal,
+		Signed:     o.Data.Signed,
+		Difference: o.View.Difference,
+		Percent:    o.View.Percent,
+		Cols:       int32(o.Cols),
+		Rows:       int32(o.Rows),
+		Precision:  int32(o.Value.Precision),
+		Value:      kpValue(o.Value),
+		Start:      uint32(o.Address),
+		End:        uint32(o.Address) + uint32(o.Rows*o.Cols*t.Width()),
+		Addr2:      uint32(o.Address),
+		X:          o.X.kpAxis(o.modelAxisCount(true)),
+		Y:          o.Y.kpAxis(o.modelAxisCount(false)),
+		StoredCols: int32(o.Cols),
+		StoredRows: int32(o.Rows),
+		Term2:      kp.Hex{1, 1, 1},
 	}
 	if o.Inverse {
 		km.StoredCols, km.StoredRows = km.StoredRows, km.StoredCols
@@ -522,7 +522,7 @@ func (o *Object) kpMap(i int) *kp.Map {
 	return km
 }
 
-func dataFromKP(t kp.Type, signed bool) Data {
+func dataFromKP(t kp.DataOrg, signed bool) Data {
 	d := Data{Bits: 8 * t.Width(), Signed: signed, Float: t.Float()}
 	if d.Bits == 0 {
 		d.Bits = 8
@@ -533,8 +533,8 @@ func dataFromKP(t kp.Type, signed bool) Data {
 	return d
 }
 
-func kpType(d Data) kp.Type {
-	le := kp.Type(0)
+func kpDataOrg(d Data) kp.DataOrg {
+	le := kp.DataOrg(0)
 	if d.Endian == "little" {
 		le = 1
 	}
@@ -683,11 +683,11 @@ func axisFromKP(a *kp.Axis, n int) *Axis {
 		return nil
 	}
 	x := &Axis{
-		Source: "unknown",
-		Value:  valueFromKP(a.Value, int(a.Precision), a.Reciprocal),
-		View:   View{Base: int(a.Base)},
-		Mirror: a.Mirror,
-		Header: int(a.DataHeader),
+		Source:    "unknown",
+		Value:     valueFromKP(a.Value, int(a.Precision), a.Reciprocal),
+		View:      View{Radix: int(a.Radix)},
+		Backwards: a.Backwards,
+		Header:    int(a.DataHeader),
 	}
 	if a.SignatureByte != noSignature {
 		s := int(a.SignatureByte)
@@ -696,7 +696,7 @@ func axisFromKP(a *kp.Axis, n int) *Axis {
 	if ds := int(a.DataSource); ds >= 0 && ds < len(axisSources) {
 		x.Source, x.Stored = axisSources[ds].source, axisSources[ds].stored
 	}
-	d := dataFromKP(a.Type, a.Signed)
+	d := dataFromKP(a.DataOrg, a.Signed)
 	switch x.Source {
 	case "image":
 		addr := Addr(a.Addr)
@@ -718,7 +718,7 @@ func (x *Axis) kpAxis(n int) *kp.Axis {
 		return a
 	}
 	a.Defined = true
-	a.Mirror = x.Mirror
+	a.Backwards = x.Backwards
 	a.DataHeader = int32(x.Header)
 	a.SignatureByte = noSignature
 	if x.Signature != nil {
@@ -727,7 +727,7 @@ func (x *Axis) kpAxis(n int) *kp.Axis {
 	a.Value = kpValue(x.Value)
 	a.Reciprocal = x.Value.Conversion.Reciprocal
 	a.Precision = int32(x.Value.Precision)
-	a.Base = kpBase(x.View.Base)
+	a.Radix = kpRadix(x.View.Radix)
 	for ds, s := range axisSources {
 		if s.source == x.Source && s.stored == x.Stored {
 			a.DataSource = kp.DataSource(ds)
@@ -737,12 +737,12 @@ func (x *Axis) kpAxis(n int) *kp.Axis {
 		a.Addr = uint32(*x.Address)
 	}
 	if x.Data != nil {
-		a.Type, a.Signed = kpType(*x.Data), x.Data.Signed
+		a.DataOrg, a.Signed = kpDataOrg(*x.Data), x.Data.Signed
 	} else {
-		// No storage. Type 0 has no width. An 8-bit ordinal is the unused-slot width.
-		a.Type = 1
+		// No storage. DataOrg 0 has no width. An 8-bit ordinal is the unused-slot width.
+		a.DataOrg = 1
 	}
-	a.Width = int32(a.Type.Width())
+	a.Width = int32(a.DataOrg.Width())
 	if x.Source == "editable" && n > 0 && x.Data != nil && !x.Data.Float {
 		a.Values = packAxisValues(x.Values, *x.Data, x.Value.Conversion, n)
 	}
@@ -837,7 +837,7 @@ func putAxisRaw(b []byte, order binary.ByteOrder, w int, signed bool, raw int64)
 
 // kpBase is the KP display base. 0 is omitted in the model; WinOLS crashes
 // when a map with base 0 is opened. 10, 16 and 2 are written as given.
-func kpBase(b int) int32 {
+func kpRadix(b int) int32 {
 	if b == 0 {
 		return 10
 	}

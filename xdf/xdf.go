@@ -407,7 +407,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 			UniqueID: uid, VisLevel: vl, Title: title, Description: desc, CategoryMem: mem,
 			Data:       cells(o.Data, o.Address),
 			Units:      trim(o.Value.Units),
-			OutputType: outputType(prec, o.View.Base, shown(o.Value.Conversion, o.Data, o.Address, 1, image)),
+			OutputType: outputType(prec, o.View.Radix, shown(o.Value.Conversion, o.Data, o.Address, 1, image)),
 			DecimalPl:  decimalPl(prec),
 			Math:       formula(o.Value.Conversion),
 		}, nil
@@ -448,7 +448,7 @@ func object(o *model.Object, index int, catIndex map[int]int, link func(*model.O
 		z.Data.ColCount = o.Cols
 	}
 	applyRange(&z, o.Value.Min, o.Value.Max)
-	z.OutputType = outputType(prec, o.View.Base, shown(o.Value.Conversion, o.Data, o.Address, o.Rows*o.Cols, image))
+	z.OutputType = outputType(prec, o.View.Radix, shown(o.Value.Conversion, o.Data, o.Address, o.Rows*o.Cols, image))
 	if prec != 0 {
 		z.OutputType = "1"
 	}
@@ -508,7 +508,7 @@ func axisPoints(id string, x *model.Axis, size int, image []byte, static bool) (
 		}
 		prec = limitPrecision(x.Value, d.Bits, d.Signed)
 		if !ordinal {
-			base = x.View.Base
+			base = x.View.Radix
 		}
 	}
 	a.DecimalPl = decimalPl(prec)

@@ -7,8 +7,9 @@ import (
 )
 
 // Shrink returns a minimal pack with at most maxMaps maps and the first two
-// folders (when present). V1/V2 use Encode. Headers 245/503/597 rebuild the
-// zip from raw map spans recorded while decoding intern (Encode unsupported).
+// folders (when present). 1xx and non-hybrid 2xx/3xx use Encode. V2 hybrids
+// and 5xx rebuild the zip from raw map spans recorded while decoding intern
+// (Encode unsupported). 8xx is not supported yet.
 func Shrink(src []byte, maxMaps int) ([]byte, error) {
 	if maxMaps < 1 {
 		return nil, fmt.Errorf("kp: maxMaps must be >= 1")
@@ -23,12 +24,13 @@ func Shrink(src []byte, maxMaps int) ([]byte, error) {
 	if n := len(f.Project.Folders); n > 2 {
 		f.Project.Folders = f.Project.Folders[:2]
 	}
-	switch f.HeaderID {
-	case header113, header116, header292, header329:
+	hybrid := v2Hybrid(f.HeaderID, f.HeaderLen)
+	switch {
+	case is1xx(f.HeaderID) || ((is2xx(f.HeaderID) || is3xx(f.HeaderID)) && !hybrid):
 		f.Project.zip = nil
 		f.Project.intern = nil
 		return f.Encode()
-	case header245, header503, header597:
+	case hybrid || is5xx(f.HeaderID):
 		return shrinkZipKP(src, f, maxMaps)
 	default:
 		return nil, fmt.Errorf("kp: shrink: unsupported header %d", f.HeaderID)
@@ -36,7 +38,7 @@ func Shrink(src []byte, maxMaps int) ([]byte, error) {
 }
 
 func shrinkZipKP(src []byte, f *File, maxMaps int) ([]byte, error) {
-	spans, flag, stub, err := mapSpans(f.Project.intern, f.HeaderID)
+	spans, flag, stub, err := mapSpans(f.Project.intern, f.HeaderID, f.HeaderLen)
 	if err != nil {
 		return nil, err
 	}
@@ -59,17 +61,18 @@ func shrinkZipKP(src []byte, f *File, maxMaps int) ([]byte, error) {
 }
 
 // mapSpans returns each map's [start,end) in intern, the InternFlag, and bytes
-// after the last map (OLS5 stub; empty on 245).
-func mapSpans(intern []byte, headerID int32) (spans [][2]int, flag byte, stub []byte, err error) {
+// after the last map (OLS5 stub; empty on V2 hybrid).
+func mapSpans(intern []byte, headerID, headerLen int32) (spans [][2]int, flag byte, stub []byte, err error) {
 	defer catch(&err)
 	layout := V2
-	switch headerID {
-	case header245:
+	hybrid := v2Hybrid(headerID, headerLen)
+	switch {
+	case hybrid:
 		layout = V1
-	case header503, header597:
+	case is5xx(headerID):
 		layout = OLS5
 	}
-	c := &codec{b: intern, layout: layout, headerID: headerID, block: true}
+	c := &codec{b: intern, layout: layout, headerID: headerID, hybrid: hybrid, sizes: ols5SizesFor(headerID), block: true}
 	c.u8(&flag)
 	n := c.count(0)
 	spans = make([][2]int, 0, n)
@@ -94,7 +97,13 @@ func spliceZip(src []byte, f *File, z []byte) ([]byte, error) {
 	if off+4+oldN > len(src) {
 		return nil, fmt.Errorf("kp: zip extends past file")
 	}
-	tc := &codec{enc: true, layout: f.Layout(), headerID: f.HeaderID}
+	tc := &codec{
+		enc:      true,
+		layout:   f.Layout(),
+		headerID: f.HeaderID,
+		hybrid:   v2Hybrid(f.HeaderID, f.HeaderLen),
+		sizes:    ols5SizesFor(f.HeaderID),
+	}
 	for i := range f.Project.MapsTag {
 		tc.i32(&f.Project.MapsTag[i])
 	}

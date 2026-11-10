@@ -43,7 +43,7 @@ func TestSurvey(t *testing.T) {
 			flatten(reflect.ValueOf(*m), "", r, "X", "Y")
 			flatten(reflect.ValueOf(*m.X), "x.", r, "")
 			flatten(reflect.ValueOf(*m.Y), "y.", r, "")
-			derive(r, m.Value.Factor, m.Value.Offset, s.img, m.Start, int(m.Cols*m.Rows), m.Type, m.Signed)
+			derive(r, m.Value.Factor, m.Value.Offset, s.img, m.Start, int(m.Cols*m.Rows), m.DataOrg, m.Signed)
 			for _, ax := range []struct {
 				name string
 				a    *Axis
@@ -54,11 +54,11 @@ func TestSurvey(t *testing.T) {
 				r.set("values (kind)", leaf{s: listKind(ax.a.Values)})
 				r.set("slot", leaf{s: ax.name})
 				r.set("points", num(float64(ax.n)))
-				for _, k := range []string{"organization", "type", "cols", "rows", "start", "id"} {
+				for _, k := range []string{"type", "dataOrg", "cols", "rows", "start", "id"} {
 					r.set("map."+k, tables["map"].get(tables["map"].rows[len(tables["map"].rows)-1], k))
 				}
 				if ax.a.DataSource.FromImage() {
-					derive(r, ax.a.Value.Factor, ax.a.Value.Offset, s.img, ax.a.Addr, int(ax.n), ax.a.Type, ax.a.Signed)
+					derive(r, ax.a.Value.Factor, ax.a.Value.Offset, s.img, ax.a.Addr, int(ax.n), ax.a.DataOrg, ax.a.Signed)
 				}
 			}
 		}
@@ -250,7 +250,7 @@ func leafOf(v reflect.Value, path string, r *rec) {
 
 // derive adds values computed from the scaling and the image: 1/factor, and
 // the raw and physical minimum and maximum of the n values at addr.
-func derive(r *rec, factor, offset float64, img []byte, addr uint32, n int, ty Type, signed bool) {
+func derive(r *rec, factor, offset float64, img []byte, addr uint32, n int, ty DataOrg, signed bool) {
 	if factor != 0 {
 		r.set("(1/factor)", num(1/factor))
 	}
@@ -306,7 +306,7 @@ var unconfirmed = map[string]bool{
 	"fixedHeader": true, "endTag": true, "nameTag": true, "namePad": true, "versionTag": true,
 	"versionPad": true, "build": true, "buildFlag": true, "internFlag": true, "mapsTag": true,
 	"flags": true, "style": true, "pad": true,
-	"linkId": true, "commentFlag": true, "rightPane": true, "idPad": true,
+	"linkId": true, "commentFlag": true, "idPad": true,
 	"idFlag": true, "idState": true, "range": true, "cursor": true, "imageSizePad": true,
 	"addr2": true, "addr2Flags": true, "addr2ImageSize": true, "addr2Pad": true, "yFlag": true,
 	"yPad": true, "viewFlags": true, "view2DScale": true, "view2DRef": true, "viewFlag": true,
@@ -474,7 +474,7 @@ func (t *table) report(b *strings.Builder, kind string, samples []sample) {
 				break
 			}
 			ex := []string{samples[r.file].label[:min(len(samples[r.file].label), 12)]}
-			for _, c := range []string{"id", "map.id", "name", "value.factor", "value.offset", "value.units", "organization", "map.organization", "slot", "dataSource"} {
+			for _, c := range []string{"id", "map.id", "name", "value.factor", "value.offset", "value.units", "type", "map.type", "slot", "dataSource"} {
 				if l := t.get(r, c); l.set && l.String() != "" {
 					ex = append(ex, c+"="+l.String())
 				}

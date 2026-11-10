@@ -15,8 +15,8 @@ import (
 	"go.nyet.org/xdfkit/internal/testenv"
 )
 
-// mapdump's legend for the CSV "Organization" column, which is really the value type.
-var mapdumpType = map[Type]string{
+// mapdump's legend for the CSV "Organization" column, which is really DataOrg.
+var mapdumpDataOrg = map[DataOrg]string{
 	1: "8 Bit", 2: "16 Bit (HiLo)", 3: "16 Bit (LoHi)", 4: "32 Bit (HiLoHilo)",
 	5: "32 Bit (LoHiLoHi)", 6: "32 BitFloat (HiLoHiLo)", 7: "32 BitFloat (LoHiLoHi)",
 }
@@ -39,7 +39,7 @@ func dash(s string) string {
 // row renders the CSV columns this test compares: ID, Address, Name, Size, type, X address, Y address.
 func row(m *Map) string {
 	return strings.Join([]string{dash(m.ID), fmt.Sprintf("0x%x", m.Start), dash(m.Name),
-		fmt.Sprintf("%dx%d", m.Cols, m.Rows), mapdumpType[m.Type], axisAddr(m.X), axisAddr(m.Y)}, "|")
+		fmt.Sprintf("%dx%d", m.Cols, m.Rows), mapdumpDataOrg[m.DataOrg], axisAddr(m.X), axisAddr(m.Y)}, "|")
 }
 
 // TestMatchesMapdump compares every map against mapdump's CSV output in the archive.

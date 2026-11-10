@@ -23,11 +23,11 @@ import (
 // `kp:"opt,opt..."` options:
 //
 //   - not stored (derived or bookkeeping); unexported fields are skipped too
-//     v1         walk for headers 113 and 116
-//     v2         walk for headers 292, 329, 503, and 597 (and 245's project/zip)
-//     v2only     walk for headers 292 and 329 (and 245's project/zip) only
-//     ols5       walk for headers 503 and 597 only
-//     245        header 245's intern only (layout forced to V1 there); ORs with v1/v2/…
+//     v1         walk for 1xx
+//     v2         walk for 2xx/3xx/5xx/8xx (and V2-hybrid project/zip)
+//     v2only     walk for non-OLS5 2xx/3xx (and V2-hybrid project/zip) only
+//     ols5       walk for 5xx/8xx only
+//     hybrid     V2-hybrid intern only (layout forced to V1 there); ORs with v1/v2/…
 //     len=N      Hex: N raw bytes
 //     count      slice: int32 element count, then the elements
 //     bytes      slice: int32 byte length, then the elements
@@ -40,7 +40,9 @@ type codec struct {
 	pos      int
 	enc      bool
 	layout   Layout
-	headerID int32 // decimal header id; 503 and 597 differ in trailer and marked-block size
+	headerID int32     // decimal header id
+	hybrid   bool      // V2 hybrid (HeaderLen 0): V1-sized header and V1 map records
+	sizes    ols5Sizes // OLS5 trailer / MarkedExtra lengths from ols5SizesFor
 
 	// Offset lookup: path is the JSON path of the field being coded, tracked
 	// only while want is set; found collects the offsets of wanted paths.
@@ -65,7 +67,7 @@ type checker interface{ check(c *codec) }
 
 // sub returns a codec for another buffer that shares c's layout and offset lookup.
 func (c *codec) sub(b []byte) *codec {
-	return &codec{b: b, enc: c.enc, layout: c.layout, headerID: c.headerID, want: c.want, path: c.path, found: c.found, block: true}
+	return &codec{b: b, enc: c.enc, layout: c.layout, headerID: c.headerID, hybrid: c.hybrid, sizes: c.sizes, want: c.want, path: c.path, found: c.found, block: true}
 }
 
 // Layout bits for field.layouts. Tag "v2" sets maskV2|maskOLS5; "v2only" is maskV2.
@@ -79,25 +81,25 @@ type field struct {
 	index      int
 	goName     string
 	name       string // JSON name
-	layouts    uint8  // bit mask of Layout values; 0 means every layout (unless on245)
+	layouts    uint8  // bit mask of Layout values; 0 means every layout (unless onHybrid)
 	n          int
 	skip, hook bool
 	count      bool
 	bytes      bool
 	rest       bool
-	on245      bool // tag "245": header 245 map block
+	onHybrid   bool // tag "hybrid": V2-hybrid map block
 }
 
-// include reports whether f is coded on c. Layout tags and "245" combine with OR.
-// A field with no layout or "245" tags is coded on every walk.
+// include reports whether f is coded on c. Layout tags and "hybrid" combine with OR.
+// A field with no layout or "hybrid" tags is coded on every walk.
 func (f field) include(c *codec) bool {
-	if f.layouts == 0 && !f.on245 {
+	if f.layouts == 0 && !f.onHybrid {
 		return true
 	}
 	if f.layouts != 0 && f.layouts&(1<<c.layout) != 0 {
 		return true
 	}
-	return f.on245 && c.headerID == header245 && c.block
+	return f.onHybrid && c.hybrid && c.block
 }
 
 var fieldCache sync.Map // reflect.Type -> []field
@@ -127,8 +129,8 @@ func fieldsOf(t reflect.Type) []field {
 				f.layouts |= maskV2
 			case "ols5":
 				f.layouts |= maskOLS5
-			case "245":
-				f.on245 = true
+			case "hybrid":
+				f.onHybrid = true
 			case "count":
 				f.count = true
 			case "bytes":
@@ -431,7 +433,7 @@ func (c *codec) i32(p *int32) {
 	*p = int32(v)
 }
 
-// mirrorI32 codes Mirror as an int32 that must be 0 or 1 (v2 and OLS5).
+// mirrorI32 codes Backwards as an int32 that must be 0 or 1 (v2 and OLS5).
 func (c *codec) mirrorI32(p *bool) {
 	var v int32
 	if *p {
@@ -440,7 +442,7 @@ func (c *codec) mirrorI32(p *bool) {
 	c.i32(&v)
 	if v != 0 && v != 1 {
 		c.pos -= 4
-		c.fail("mirror int32 %d", v)
+		c.fail("backwards int32 %d", v)
 	}
 	*p = v == 1
 }

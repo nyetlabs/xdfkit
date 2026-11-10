@@ -48,10 +48,10 @@ type Fix struct {
 	DataSource *kp.DataSource `json:"dataSource,omitempty"`
 	Signed     *bool          `json:"signed,omitempty"`
 	End        *uint32        `json:"end,omitempty"`
-	Points     *int           `json:"points,omitempty"` // new axis point count (AX01); map cols/rows and end follow
-	Addr       *uint32        `json:"addr,omitempty"`   // new axis address (AX02, RC01)
-	Start      *uint32        `json:"start,omitempty"`  // new map start (RC01, RC02); end follows
-	Type       *kp.Type       `json:"type,omitempty"`   // new axis element type (RC01 axis-width)
+	Points     *int           `json:"points,omitempty"`  // new axis point count (AX01); map cols/rows and end follow
+	Addr       *uint32        `json:"addr,omitempty"`    // new axis address (AX02, RC01)
+	Start      *uint32        `json:"start,omitempty"`   // new map start (RC01, RC02); end follows
+	DataOrg    *kp.DataOrg    `json:"dataOrg,omitempty"` // new axis DataOrg (RC01 axis-width)
 }
 
 // Finding is one problem with one axis (address and point count) or one map
@@ -65,7 +65,7 @@ type Finding struct {
 	Addr       uint32         `json:"addr"`
 	Points     int            `json:"points"` // bytes for map findings
 	DataSource *kp.DataSource `json:"dataSource,omitempty"`
-	Type       kp.Type        `json:"type"`
+	DataOrg    kp.DataOrg     `json:"dataOrg"`
 	Signed     bool           `json:"signed"`
 	Values     []int64        `json:"values,omitempty"`     // raw, as stored
 	Subtracted []int64        `json:"subtracted,omitempty"` // Values as WinOLS shows a "subtract" axis
@@ -159,20 +159,20 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 	if !imageAxis(a, n) {
 		return nil
 	}
-	w := a.Type.Width()
-	v := read(img, a.Addr, n, a.Type, a.Signed)
+	w := a.DataOrg.Width()
+	v := read(img, a.Addr, n, a.DataOrg, a.Signed)
 	if v == nil {
 		return nil
 	}
 	fd := &Finding{
-		Points: n, Addr: a.Addr, DataSource: &a.DataSource, Type: a.Type, Signed: a.Signed,
+		Points: n, Addr: a.Addr, DataSource: &a.DataSource, DataOrg: a.DataOrg, Signed: a.Signed,
 		Values: v, Subtracted: subtracted(v, w),
 	}
 	if w == 1 && a.Addr >= 1 {
 		c := int(img[a.Addr-1])
 		fd.CountByte = &c
 	}
-	opp := read(img, a.Addr, n, a.Type, !a.Signed)
+	opp := read(img, a.Addr, n, a.DataOrg, !a.Signed)
 	delta := a.DataSource != kp.DSEeprom
 	set := func(rule, conf, msg string, fix *Fix) *Finding {
 		fd.ID = fmt.Sprintf("%s@0x%x:%d", rule, a.Addr, n)
@@ -180,9 +180,9 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 		return fd
 	}
 	if family == ME7 && w > 1 && a.Addr%2 == 1 {
-		fd.Later = read(img, a.Addr+1, n, a.Type, a.Signed)
-		fd.Earlier = read(img, a.Addr-1, n, a.Type, a.Signed)
-		fd.Narrow = read(img, a.Addr-1, n, kp.Type(1), a.Signed)
+		fd.Later = read(img, a.Addr+1, n, a.DataOrg, a.Signed)
+		fd.Earlier = read(img, a.Addr-1, n, a.DataOrg, a.Signed)
+		fd.Narrow = read(img, a.Addr-1, n, kp.DataOrg(1), a.Signed)
 		fd.CountByte = nil
 		if a.Addr >= 2 {
 			c := int(img[a.Addr-2])
@@ -241,7 +241,7 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 	case countDisagrees(a, fd.CountByte, n):
 		c := *fd.CountByte
 		msg := fmt.Sprintf("count byte before the axis is %d, axis size is %d: check address or size", c, n)
-		if v2 := read(img, a.Addr, c, a.Type, a.Signed); monotonic(v2) {
+		if v2 := read(img, a.Addr, c, a.DataOrg, a.Signed); monotonic(v2) {
 			return set("AX01", Medium, msg+"; size "+fmt.Sprint(c)+" is monotonic", &Fix{Points: &c})
 		}
 		return set("AX01", None, msg, nil)
@@ -261,7 +261,7 @@ func check(a *kp.Axis, n int, other *kp.Axis, on int, img []byte, family string)
 // r5 looks for a count byte and monotonic axis a few bytes from the stored
 // address. Low confidence; fix applies only with --only (or --min-confidence low).
 func r5(a *kp.Axis, n int, img []byte, set func(rule, conf, msg string, fix *Fix) *Finding) *Finding {
-	if a.Type.Width() != 1 || n < 2 {
+	if a.DataOrg.Width() != 1 || n < 2 {
 		return nil
 	}
 	for _, d := range []int{1, -1, 2, -2, 3, -3, 4, -4} {
@@ -273,7 +273,7 @@ func r5(a *kp.Axis, n int, img []byte, set func(rule, conf, msg string, fix *Fix
 		if int(img[caddr-1]) != n {
 			continue
 		}
-		if !monotonic(read(img, caddr, n, a.Type, a.Signed)) {
+		if !monotonic(read(img, caddr, n, a.DataOrg, a.Signed)) {
 			continue
 		}
 		return set("AX02", Low, fmt.Sprintf("count %d and monotonic axis at 0x%x (%+d from stored)", n, caddr, d), &Fix{Addr: &caddr})
@@ -307,7 +307,7 @@ func subtracted(v []int64, w int) []int64 {
 }
 
 // mapBytes is the byte length of a map's data, or 0 if unknown.
-func mapBytes(m *kp.Map) int { return int(m.Cols) * int(m.Rows) * m.Type.Width() }
+func mapBytes(m *kp.Map) int { return int(m.Cols) * int(m.Rows) * m.DataOrg.Width() }
 
 // checkEnd applies rule MP01: WinOLS writes a map's end address as start +
 // byte length and recomputes it on export, so a different value is stale.
@@ -320,7 +320,7 @@ func checkEnd(m *kp.Map) *Finding {
 	return &Finding{
 		ID: fmt.Sprintf("MP01@0x%x:%d", m.Start, n), Rule: "MP01", Confidence: High,
 		Message: fmt.Sprintf("end address 0x%x, but start + %d bytes is 0x%x", m.End, n, end),
-		Addr:    m.Start, Points: n, Type: m.Type, Signed: m.Signed, End: ptr(m.End),
+		Addr:    m.Start, Points: n, DataOrg: m.DataOrg, Signed: m.Signed, End: ptr(m.End),
 		Fix: &Fix{End: &end},
 	}
 }
@@ -332,8 +332,8 @@ const alignCells = 16
 // only, so integer cells of 16 bits or more at an odd address are
 // mislocated. Report only; the readings one byte either side are evidence.
 func checkAlign(m *kp.Map, img []byte, family string) *Finding {
-	n, w := int(m.Cols)*int(m.Rows), m.Type.Width()
-	if family != ME7 || w < 2 || m.Type.Float() || m.Start%2 == 0 || n <= 0 {
+	n, w := int(m.Cols)*int(m.Rows), m.DataOrg.Width()
+	if family != ME7 || w < 2 || m.DataOrg.Float() || m.Start%2 == 0 || n <= 0 {
 		return nil
 	}
 	k := min(n, alignCells)
@@ -345,10 +345,10 @@ func checkAlign(m *kp.Map, img []byte, family string) *Finding {
 	return &Finding{
 		ID: fmt.Sprintf("RC01@0x%x:%d", m.Start, n*w), Rule: "RC01", Confidence: conf,
 		Message: fmt.Sprintf("%d-bit map at an odd address (ME7 stores 16-bit data at even addresses); %s", 8*w, describe(cause, rec)),
-		Addr:    m.Start, Points: n * w, Type: m.Type, Signed: m.Signed,
-		Values:  read(img, m.Start, k, m.Type, m.Signed),
-		Later:   read(img, m.Start+1, k, m.Type, m.Signed),
-		Earlier: read(img, m.Start-1, k, m.Type, m.Signed),
+		Addr:    m.Start, Points: n * w, DataOrg: m.DataOrg, Signed: m.Signed,
+		Values:  read(img, m.Start, k, m.DataOrg, m.Signed),
+		Later:   read(img, m.Start+1, k, m.DataOrg, m.Signed),
+		Earlier: read(img, m.Start-1, k, m.DataOrg, m.Signed),
 		Record:  rec, Cause: cause, Fix: fix,
 	}
 }
@@ -359,8 +359,8 @@ func checkAlign(m *kp.Map, img []byte, family string) *Finding {
 // (docs/model.md). A map without image axes whose data reads as such a
 // record with its own point counts points at the record start. Report only.
 func checkHeader(m *kp.Map, img []byte, family string) *Finding {
-	n, w := int(m.Cols), m.Type.Width()
-	if family != ME7 || n < 2 || w == 0 || m.Type.Float() || imageAxis(m.X, n) || imageAxis(m.Y, int(m.Rows)) {
+	n, w := int(m.Cols), m.DataOrg.Width()
+	if family != ME7 || n < 2 || w == 0 || m.DataOrg.Float() || imageAxis(m.X, n) || imageAxis(m.Y, int(m.Rows)) {
 		return nil
 	}
 	counts := mapCounts(m)
@@ -380,7 +380,7 @@ func checkHeader(m *kp.Map, img []byte, family string) *Finding {
 		return &Finding{
 			ID: fmt.Sprintf("RC02@0x%x:%d", m.Start, mapBytes(m)), Rule: "RC02", Confidence: Low,
 			Message: fmt.Sprintf("map without image axes starts on its own point counts and monotonic axes; %s", describe(RecordStart, &r)),
-			Addr:    m.Start, Points: mapBytes(m), Type: m.Type, Signed: m.Signed,
+			Addr:    m.Start, Points: mapBytes(m), DataOrg: m.DataOrg, Signed: m.Signed,
 			Values: read(img, r.Axes[0].Addr, r.Counts[0], intType(r.Axes[0].Bits/8), false),
 			Record: &r, Cause: RecordStart, Fix: fix,
 		}
@@ -391,7 +391,7 @@ func checkHeader(m *kp.Map, img []byte, family string) *Finding {
 func ptr[T any](v T) *T { return &v }
 
 // read returns n raw values at addr, or nil if they don't fit in the image.
-func read(img []byte, addr uint32, n int, t kp.Type, signed bool) []int64 {
+func read(img []byte, addr uint32, n int, t kp.DataOrg, signed bool) []int64 {
 	w := t.Width()
 	end := uint64(addr) + uint64(n*w)
 	if end > uint64(len(img)) {
@@ -521,9 +521,9 @@ func Apply(f *kp.File, fs []Finding) error {
 			if fd.Fix.Addr != nil {
 				a.Addr = *fd.Fix.Addr
 			}
-			if fd.Fix.Type != nil {
-				a.Type = *fd.Fix.Type
-				a.Width = int32(fd.Fix.Type.Width())
+			if fd.Fix.DataOrg != nil {
+				a.DataOrg = *fd.Fix.DataOrg
+				a.Width = int32(fd.Fix.DataOrg.Width())
 			}
 			if fd.Fix.Points != nil {
 				setAxisPoints(m, ref.Axis, *fd.Fix.Points)
@@ -557,8 +557,8 @@ func recordFix(cause string, r *Record) *Fix {
 			return nil
 		}
 		a := r.Axes[0].Addr
-		t := kp.Type(1)
-		return &Fix{Addr: &a, Type: &t}
+		t := kp.DataOrg(1)
+		return &Fix{Addr: &a, DataOrg: &t}
 	}
 	return nil
 }
@@ -572,7 +572,7 @@ func setAxisPoints(m *kp.Map, axis string, n int) {
 		m.Cols = int32(n)
 	}
 	m.StoredCols, m.StoredRows = m.Cols, m.Rows
-	if m.Organization == kp.OrgTwoDInv {
+	if m.Type == kp.OrgTwoDInv {
 		m.StoredCols, m.StoredRows = m.Rows, m.Cols
 	}
 	if nb := mapBytes(m); nb > 0 {

@@ -226,7 +226,7 @@ func reconcileAxis(v, c *model.Axis) *model.Axis {
 		return nil
 	case v.Source == "image" && c.Source == "image":
 		o = *v
-		o.Stored, o.Mirror, o.Header, o.Signature = c.Stored, c.Mirror, c.Header, c.Signature
+		o.Stored, o.Backwards, o.Header, o.Signature = c.Stored, c.Backwards, c.Header, c.Signature
 	case v.Source != "image" && (labels(c) || c.Stored == "subtract" || c.Stored == "add" || c.Stored == "backwards"):
 		o = *c
 		o.Value.Units = v.Value.Units

@@ -26,7 +26,7 @@ The format-neutral model every reader converts into and every writer converts ou
 - `min` / `max`: display units; omitted when the source has none. XDF writer emits only when both are set. KP stores a raw typed pair per width (`kp-format.md`); convert with the map conversion. Missing model pair → default raw span; KP default pair omitted from the model.
 - `view.base`: 10, 16 or 2 (omitted → 10). WinOLS crashes on base 0. A defined axis with no storage is an 8-bit ordinal.
 - `alternates`: other displays of the same cells (own id, description, categories, value, view; optional axis display). Address and storage stay on the object. `merge --smart` adds one when two objects share a raw layout and differ in units or conversion (`design.md`).
-- Axes: `source` is `image`, `ordinal`, `editable` (KP "Free editable"), or `unknown` (written back as ordinal). Image axes also have `stored` (`absolute` / `add` / `subtract` / `backwards`; `kp-format.md`), `address`, `data`. Editable axes carry `data` and `values` (display units). Every axis has `value`, `view`, `mirror`, and optional `signature` (KP `SignatureByte`, unconfirmed).
+- Axes: `source` is `image`, `ordinal`, `editable` (KP "Free editable"), or `unknown` (written back as ordinal). Image axes also have `stored` (`absolute` / `add` / `subtract` / `backwards`; `kp-format.md`), `address`, `data`. Editable axes carry `data` and `values` (display units). Every axis has `value`, `view` (`radix`), `backwards` (WinOLS bBackwards), and optional `signature` (KP `SignatureByte`, unconfirmed).
 - Names are format-neutral English; each writer maps them.
 - `image` identity (part number, version, Bosch ident, SHA-256) is planned, not in schema 1.
 

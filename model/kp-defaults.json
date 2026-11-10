@@ -59,7 +59,7 @@
           "0xFFFFFFFF"
         ]
       ],
-      "rightPane": 2,
+      "rwin": 2,
       "view2DRef": -1,
       "view2DScale": [
         1.0,
@@ -78,10 +78,10 @@
       "viewScaleRef": -1
     },
     "slot": {
-      "base": 16,
-      "mirror": true,
+      "backwards": true,
+      "dataOrg": "u8",
+      "radix": 16,
       "signatureByte": -1,
-      "type": "u8",
       "value": {
         "factor": 1.0
       },

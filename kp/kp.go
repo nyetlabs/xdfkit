@@ -1,7 +1,9 @@
 // Package kp reads and writes WinOLS map packs ("OLS Map Pack", *.kp).
-// The int32 at offset 0x10 is a decimal header id: 113/116 inline maps;
-// 245/292/329/503/597 zip "intern". 245, 503, and 597 are read-only until a
-// save oracle exists. Header hybrids: docs/kp-format.md.
+// The int32 at offset 0x10 is a decimal header id. Routing keys off the
+// hundred series (1xx, 2xx/3xx, 5xx, 8xx); known samples are 113/116, 245,
+// 292/329, 503/597, and 839. Hex/BCD does not show a clear major/minor/patch
+// split. OLS5 and V2 hybrids (HeaderLen 0) are read-only until a save oracle
+// exists. Details: docs/kp-format.md.
 //
 // Fields whose meaning isn't known get the most likely name, marked
 // "(unconfirmed)" in a comment; constants with no known meaning are named Pad
@@ -17,6 +19,7 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
+	"slices"
 )
 
 // Layout is a shared record walk, not a WinOLS version (see headerGroup).
@@ -28,27 +31,54 @@ const (
 	OLS5 Layout = 5
 )
 
-const (
-	header113 = 113
-	header116 = 116
-	header245 = 245
-	header292 = 292
-	header329 = 329
-	header503 = 503
-	header597 = 597
-)
+// knownHeaders are sample ids we have opened. Routing is by hundred series;
+// an id need not be listed here to parse (e.g. another 2xx still uses the V2 walk).
+var knownHeaders = []int32{113, 116, 245, 292, 329, 503, 597, 839}
+
+func knownHeader(id int32) bool { return slices.Contains(knownHeaders, id) }
+
+// headerSeries is id/100: 1, 2, 3, 5, or 8 for known walks.
+func headerSeries(id int32) int32 { return id / 100 }
+
+func is1xx(id int32) bool { return headerSeries(id) == 1 }
+func is2xx(id int32) bool { return headerSeries(id) == 2 }
+func is3xx(id int32) bool { return headerSeries(id) == 3 }
+func is5xx(id int32) bool { return headerSeries(id) == 5 }
+func is8xx(id int32) bool { return headerSeries(id) == 8 }
+
+// v2Hybrid is the 245-class container: V2 project/zip, V1-sized fixed header
+// and V1 map records (HeaderLen 0). Detected by series + HeaderLen, not by
+// equating the id to 245 alone.
+func v2Hybrid(id, headerLen int32) bool {
+	return (is2xx(id) || is3xx(id)) && headerLen == 0
+}
+
+// ols5Sizes is trailer / MarkedExtra length for OLS5. MarkedExtra 0 means scan (8xx).
+type ols5Sizes struct{ NameTrailer, VersionTrailer, MarkedExtra int }
+
+func ols5SizesFor(id int32) ols5Sizes {
+	switch {
+	case is8xx(id):
+		return ols5Sizes{105, 109, 0}
+	case is5xx(id) && id/10 == 50: // 50x (sample 503)
+		return ols5Sizes{84, 84, 65}
+	case is5xx(id):
+		return ols5Sizes{93, 93, 69}
+	}
+	return ols5Sizes{}
+}
 
 // File is a parsed map pack. Fields are in file order (see codec for the tags).
 type File struct {
 	Signature   string  `json:"signature"`
-	HeaderID    int32   `json:"headerId"`              // decimal: 113/116, 245, 292/329, or 503/597
-	HeaderLen   int32   `json:"headerLen"`             // file length except 113, 116, and 245, where it is 0; recomputed by Encode on 292 and 329
-	FixedHeader Hex     `json:"fixedHeader" kp:"hook"` // from 0x18 through 0x5c (113, 116, 245) or 0x60 (the other headers); zeros
-	Filename    string  `json:"filename" kp:"hook"`    // 503 and 597: no trailing NUL
-	Version     string  `json:"version" kp:"hook"`     // 503 and 597: no trailing NUL
+	HeaderID    int32   `json:"headerId"`              // decimal; walk by hundred series (docs/kp-format.md)
+	HeaderLen   int32   `json:"headerLen"`             // file length; 0 on 1xx and on V2 hybrids (245-class); recomputed by Encode on non-hybrid V2
+	FixedHeader Hex     `json:"fixedHeader" kp:"hook"` // through 0x5c (1xx and V2 hybrid) or 0x60; zeros
+	Filename    string  `json:"filename" kp:"hook"`    // OLS5: no trailing NUL
+	Version     string  `json:"version" kp:"hook"`     // OLS5: no trailing NUL
 	HeaderBody  Hex     `json:"headerBody" kp:"hook"`  // between Version and EndOffset; partly uninitialized memory
-	EndOffset   int32   `json:"endOffset"`             // offset of the end marker (recomputed by Encode except on 503 and 597)
-	EndTag      Hex     `json:"endTag" kp:"hook"`      // 12 bytes on 113, 116, 292, 329; 8 bytes on 503 and 597 (unconfirmed)
+	EndOffset   int32   `json:"endOffset"`             // offset of the end marker (recomputed by Encode except OLS5)
+	EndTag      Hex     `json:"endTag" kp:"hook"`      // 12 bytes on V1/V2; 8 on OLS5 (unconfirmed)
 	Project     Project `json:"project"`
 }
 
@@ -56,17 +86,17 @@ type Project struct {
 	Name           string    `json:"name"`
 	NameTag        [4]int32  `json:"nameTag,omitzero" kp:"v1,v2only"` // constant: a type tag (unconfirmed)
 	NamePad        Hex       `json:"namePad,omitzero" kp:"v2only,len=4"`
-	NameTrailer    Hex       `json:"nameTrailer,omitzero" kp:"ols5,hook"` // after Name+NUL; 84 bytes on header 503, 93 on 597 (unconfirmed)
+	NameTrailer    Hex       `json:"nameTrailer,omitzero" kp:"ols5,hook"` // after Name+NUL; length from ols5SizesFor
 	Version        string    `json:"version"`
 	VersionTag     [4]int32  `json:"versionTag,omitzero" kp:"v1,v2only"` // constant, equals NameTag: a type tag (unconfirmed)
 	VersionPad     Hex       `json:"versionPad,omitzero" kp:"v2only,len=4"`
-	VersionTrailer Hex       `json:"versionTrailer,omitzero" kp:"ols5,hook"` // after Version+NUL; 84 bytes on header 503, 93 on 597 (unconfirmed)
+	VersionTrailer Hex       `json:"versionTrailer,omitzero" kp:"ols5,hook"` // after Version+NUL; length from ols5SizesFor
 	Build          int32     `json:"build"`                                  // constant: a build or format id (unconfirmed)
 	BuildFlag      Hex       `json:"buildFlag,omitzero" kp:"v2,len=1"`       // constant 1 (unconfirmed); also OLS5
 	InternFlag     byte      `json:"internFlag,omitzero" kp:"-"`             // v2/OLS5: first byte of the map block, 0 (unconfirmed)
 	Maps           []*Map    `json:"maps" kp:"hook"`
 	MapsTag        [3]int32  `json:"mapsTag"` // constant: a type tag (unconfirmed)
-	Folders        []*Folder `json:"folders" kp:"count"`
+	Folders        []*Folder `json:"folders" kp:"hook"`
 	Trailing       Hex       `json:"trailing" kp:"rest"` // mostly uninitialized memory
 
 	intern, zip []byte // v2/OLS5 as read: inflated map block and its zip archive
@@ -79,7 +109,7 @@ type Folder struct {
 	Name    string `json:"name"`
 	Flags   Hex    `json:"flags" kp:"len=2"`       // 1, 1: expanded and visible (unconfirmed)
 	Style   int32  `json:"style"`                  // 0x1000000 (unconfirmed)
-	Pad     Hex    `json:"pad,omitzero" kp:"hook"` // v2: 15 bytes; header 245: 14; OLS5: 36 (unconfirmed)
+	Pad     Hex    `json:"pad,omitzero" kp:"hook"` // v2: 15 bytes; V2 hybrid: 14; OLS5: 36 (unconfirmed)
 }
 
 const headerLenOff = 0x14
@@ -96,9 +126,9 @@ func Parse(data []byte) (f *File, err error) {
 // WinOLS used zlib, so a fresh archive is equivalent but not byte-identical.
 // The length-derived fields (HeaderLen in v2, EndOffset) are recomputed and
 // stored back into f, so f matches what parsing the output gives.
-// Headers 245, 503, and 597 are read-only until a save oracle exists.
+// OLS5 and V2 hybrids (HeaderLen 0) are read-only until a save oracle exists.
 func (f *File) Encode() (out []byte, err error) {
-	if f.Layout() == OLS5 || f.HeaderID == header245 {
+	if f.Layout() == OLS5 || v2Hybrid(f.HeaderID, f.HeaderLen) {
 		return nil, fmt.Errorf("kp: Encode of header %d is not supported yet", f.HeaderID)
 	}
 	defer catch(&err)
@@ -137,14 +167,18 @@ func (f *File) Offset(path string) (Location, error) {
 }
 
 // headerGroup is the record walk and the kp-defaults.json key for a header id.
+// Membership is by hundred series; OLS5 trailer/MarkedExtra sizes use ols5SizesFor
+// (50x vs other 5xx); V2 hybrid via HeaderLen 0.
 func headerGroup(id int32) (Layout, string) {
-	switch id {
-	case header113, header116:
+	switch headerSeries(id) {
+	case 1:
 		return V1, "100"
-	case header245, header292, header329:
-		return V2, "200+300" // 245 special-cases FixedHeader, walkHeader, intern
-	case header503, header597:
+	case 2, 3:
+		return V2, "200+300" // hybrid (HeaderLen 0) special-cases FixedHeader, walkHeader, intern
+	case 5:
 		return OLS5, "500"
+	case 8:
+		return OLS5, "800"
 	}
 	return 0, ""
 }
@@ -168,8 +202,10 @@ func (f *File) hook(c *codec, field string) {
 	case "FixedHeader":
 		c.layout = f.Layout()
 		c.headerID = f.HeaderID
+		c.hybrid = v2Hybrid(f.HeaderID, f.HeaderLen)
+		c.sizes = ols5SizesFor(f.HeaderID)
 		end := 0x60
-		if c.layout == V1 || c.headerID == header245 {
+		if c.layout == V1 || c.hybrid {
 			end = 0x5c
 		} else if c.layout == 0 {
 			c.fail("unknown kp header %d", f.HeaderID)
@@ -201,9 +237,18 @@ func (f *File) hook(c *codec, field string) {
 }
 
 // codeOLS5HeaderBody keeps the body opaque by locating the WinOLS 5 EndTag magic.
+// 8xx uses a variable first four EndTag bytes (and trailers of 105/109).
 func (f *File) codeOLS5HeaderBody(c *codec) {
 	if c.enc {
 		c.put(f.HeaderBody...)
+		return
+	}
+	if is8xx(c.headerID) {
+		i := findOLS5EndTag(c.b[c.pos:])
+		if i < 4 {
+			c.fail("WinOLS 5 end tag not found")
+		}
+		c.raw(&f.HeaderBody, i-4)
 		return
 	}
 	i := bytes.Index(c.b[c.pos:], endTagOLS5)
@@ -213,8 +258,35 @@ func (f *File) codeOLS5HeaderBody(c *codec) {
 	c.raw(&f.HeaderBody, i-4) // leave EndOffset (4) before the tag
 }
 
+// findOLS5EndTag finds an 8-byte EndTag ending in 02 00 00 00 followed by a
+// length-prefixed NUL project name (8xx first four EndTag bytes vary).
+func findOLS5EndTag(b []byte) int {
+	suffix := []byte{0x02, 0x00, 0x00, 0x00}
+	for i := 0; i+8+4 < len(b); i++ {
+		if !bytes.Equal(b[i+4:i+8], suffix) {
+			continue
+		}
+		n := int(int32(binary.LittleEndian.Uint32(b[i+8:])))
+		if n < 1 || i+8+4+n >= len(b) || b[i+8+4+n] != 0 {
+			continue
+		}
+		name := b[i+8+4 : i+8+4+n]
+		ok := true
+		for _, ch := range name {
+			if ch < 0x20 || ch > 0x7e {
+				ok = false
+				break
+			}
+		}
+		if ok {
+			return i
+		}
+	}
+	return -1
+}
+
 // walkHeader steps over the header after the filename and version strings
-// (mapdump Parser.parseHeader; 245 skips term2a/"Binary data", unconfirmed).
+// (mapdump Parser.parseHeader; V2 hybrid skips term2a/"Binary data", unconfirmed).
 func walkHeader(c *codec, l Layout) {
 	var s string
 	skip := func(n int) { c.take(n) }
@@ -229,7 +301,7 @@ func walkHeader(c *codec, l Layout) {
 		c.str(&s)
 		c.str(&s)
 		skip(10 * 4)
-		if c.headerID == header245 {
+		if c.hybrid {
 			skip(38)
 		} else {
 			c.term("2a")
@@ -246,24 +318,22 @@ func walkHeader(c *codec, l Layout) {
 	}
 }
 
-// ols5Trailer is the raw block after the project name or version NUL.
-// Header 503 is 84 bytes; header 597 is 93.
-func ols5Trailer(headerID int32) int {
-	if headerID == header503 {
-		return 84
-	}
-	return 93
-}
-
 // hook codes the maps: inline in v1; in v2/OLS5 a zip "intern" (OLS5 may leave
 // a short trailing block). NameTrailer/VersionTrailer are OLS5-only.
 func (p *Project) hook(c *codec, field string) {
 	switch field {
 	case "NameTrailer":
-		c.raw(&p.NameTrailer, ols5Trailer(c.headerID))
+		c.raw(&p.NameTrailer, c.sizes.NameTrailer)
 		return
 	case "VersionTrailer":
-		c.raw(&p.VersionTrailer, ols5Trailer(c.headerID))
+		c.raw(&p.VersionTrailer, c.sizes.VersionTrailer)
+		return
+	case "Folders":
+		if is8xx(c.headerID) {
+			p.code8xxFolders(c)
+			return
+		}
+		c.list(&p.Folders)
 		return
 	}
 	maps := func(c *codec) {
@@ -286,19 +356,22 @@ func (p *Project) hook(c *codec, field string) {
 		}
 		p.intern = intern
 		ic := c.sub(intern)
-		if c.headerID == header245 {
-			ic.layout = V1 // records match 113/116; container stays V2
+		if c.hybrid {
+			ic.layout = V1 // records match 1xx; container stays V2
 		}
 		ic.u8(&p.InternFlag)
 		maps(ic)
 		if left := len(intern) - ic.pos; left != 0 {
 			if c.layout == OLS5 {
-				// OLS5 leaves a short marked-style stub after the maps (65 bytes
-				// on header 503, 69 on 597). Consume it so the map block is fully read.
+				// OLS5 leaves a short marked-style stub after the maps.
 				_ = ic.take(left)
 			} else {
 				c.fail("v2 map block: %d bytes after the maps", left)
 			}
+		}
+		if is8xx(c.headerID) {
+			// Eight bytes between the zip and MapsTag (unconfirmed).
+			_ = c.take(8)
 		}
 		return
 	}
@@ -326,7 +399,7 @@ func (fd *Folder) hook(c *codec, field string) {
 	switch c.layout {
 	case V2:
 		n := 15
-		if c.headerID == header245 {
+		if c.hybrid {
 			n = 14
 		}
 		c.raw(&fd.Pad, n)
