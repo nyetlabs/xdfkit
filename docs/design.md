@@ -13,9 +13,8 @@ Converts map definitions between WinOLS KP, WinOLS CSV, A2L, DAMOS, TunerPro XDF
     - KP orientation kept; axis backwards (bBackwards) not applied. `vislevel` on each table/constant (model level, or 2 when unmarked).
     - Linked image axes get `embedinfo type="3"` when a matching curve exists.
     - Add/subtract axes are live helpers by default; backwards is static labels; `--static-axes` forces labels (`stamp-and-metadata.md`, Live helpers; formulas in `kp-format.md`).
-  - CSV: WinOLS map-list export via `olscsv/` (`xdfkit -f csv`). Semicolon, CRLF, Latin-1 as needed. Detected when the first line starts with `Name;IdName;FolderName`. Lossy: UI-only columns (ViewMode, RWin, SkipBytes, …) are omitted or defaulted on write; folders become model categories.
-  - Mapdump (legacy, output only): ecuxplot mapdump format via `mapcsv/` (`xdfkit -f mapdump -i image -r ref`). Not detected as input. Differences vs mapdump: axis columns follow organisation (`kp-format.md`); no-cell objects get `-`; 32-bit raw range masked; floats read as floats; display text is cleaned (`model.md`). Image and refs apply to mapdump and XDF only.
-  - Edit stamp on every JSON output (model and metadata file): `stamp-and-metadata.md`.
+  - CSV: WinOLS map-list export via `olscsv/` (`xdfkit -f csv`). Semicolon, CRLF, Latin-1 as needed. Detected when the first line starts with `Name;IdName;FolderName`. Lossy: UI-only columns (ViewMode, RWin, SkipBytes, …) are omitted or defaulted on write; folders become model categories. With `-i`, appends scanned cell extremes (`Value min` / `Value max` / `Value min*1` / `Value max*1`); does not fill `ValueRangeMin`/`Max`. A read ignores those trailing columns.
+  - Edit stamp on every JSON output (model and metadata file): `stamp-and-metadata.md`. With `-i` on JSON output, each object gains optional `extremes` (`model.md`).
 - Inputs: KP 1xx and non-hybrid 2xx/3xx (as ecuxplot mapdump); V2 hybrids (245-class), 5xx, and 8xx read-only (`kp-format.md`); A2L; DAMOS `.dam`; WinOLS CSV; JSON/YAML; XDF with metadata file if present.
 - No licensed WinOLS options assumed. Route into WinOLS is KP. No A2L or DAMOS writers (WinOLS import is one-way through the licensed Damos plugin).
 - Readers: A2L (`a2l/`) then DAMOS (`dam/`). Both emit schema 1 with axes and conversions inlined and addresses as file offsets (`model.md`). A2L text is ISO-8859-1; DAMOS display text is CP850 except `0xB0` as degree (`°KW`).
@@ -76,7 +75,7 @@ flowchart LR
 
 - `cmd/xdfkit/`: convert (content-detected input; `-f` or extension for output), `XXX2YYY` aliases, `lint` / `fix`, `merge`, `kpdiff`
 - `api/`: façade (`Convert`, `Merge`, `Verify`, `Lint`, `Fix`, `Version`, `Call`); `api.Version` from the Makefile
-- `model/`, `kp/`, `lint/`, `olscsv/`, `mapcsv/`, `xdf/`, `a2l/`, `dam/`, `canon/`
+- `model/`, `kp/`, `lint/`, `olscsv/`, `xdf/`, `a2l/`, `dam/`, `canon/`
 - `internal/testenv`, `internal/corpus` (`corpus.md`)
 - Planned: `capi/`, `addrmap/`, `cmd/sampdiff/`
 - `Makefile`, `.github/`, `cliff.toml`, `docs/`, `testdata/` (fixtures; `testdata/local/` gitignored), `ecu-corpus/` submodule

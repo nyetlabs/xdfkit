@@ -27,7 +27,7 @@ func TestLocalIncomingCSVJoin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	out, err := Write(cm)
+	out, err := Write(cm, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

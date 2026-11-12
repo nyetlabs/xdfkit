@@ -22,7 +22,6 @@ import (
 	"go.nyet.org/xdfkit/dam"
 	"go.nyet.org/xdfkit/kp"
 	"go.nyet.org/xdfkit/lint"
-	"go.nyet.org/xdfkit/mapcsv"
 	"go.nyet.org/xdfkit/model"
 	"go.nyet.org/xdfkit/olscsv"
 	"go.nyet.org/xdfkit/xdf"
@@ -31,27 +30,23 @@ import (
 // Version is set from git describe by the Makefile. Do not edit it here.
 var Version = "dev"
 
-// Formats. CSV is WinOLS map-list (read/write). Mapdump is the legacy
-// ecuxplot map-list writer (output only). YAML is the model JSON in YAML syntax.
+// Formats. CSV is WinOLS map-list (read/write). YAML is the model JSON in YAML syntax.
 const (
-	JSON    = "json"
-	YAML    = "yaml"
-	KP      = "kp"
-	CSV     = "csv"
-	Mapdump = "mapdump"
-	XDF     = "xdf"
-	A2L     = "a2l"
-	DAMOS   = "damos"
+	JSON  = "json"
+	YAML  = "yaml"
+	KP    = "kp"
+	CSV   = "csv"
+	XDF   = "xdf"
+	A2L   = "a2l"
+	DAMOS = "damos"
 )
 
 // ConvertRequest selects the output format; the input format is detected.
 // Name is the input's file name, recorded in the model's provenance. Template
 // is a KP file for KP output from model JSON: KP fields the model doesn't
-// carry come from it (docs/model.md). Image is the flash image, for CSV value
-// columns and XDF (file size; static subtract-axis labels when StaticAxes is
-// set). Refs, for CSV output,
-// are reference definitions (KP or model JSON) whose matching map names fill
-// one column each (mapdump only). Title is the XDF definition title (default:
+// carry come from it (docs/model.md). Image is the flash image: CSV scan
+// columns, JSON object extremes, and XDF (file size; static subtract-axis
+// labels when StaticAxes is set). Title is the XDF definition title (default:
 // Name without its extension). Meta is the metadata file of an XDF input
 // (docs/stamp-and-metadata.md). Origin, for KP, XDF, A2L, DAMOS or WinOLS CSV
 // input, is where its definitions came from (model.Origins), recorded in the
@@ -64,18 +59,11 @@ type ConvertRequest struct {
 	Name       string `json:"name,omitempty"`
 	Template   []byte `json:"template,omitempty"`
 	Image      []byte `json:"image,omitempty"`
-	Refs       []Ref  `json:"refs,omitempty"`
 	Title      string `json:"title,omitempty"`
 	Meta       []byte `json:"meta,omitempty"`
 	Origin     string `json:"origin,omitempty"`
 	Tuner      []byte `json:"tuner,omitempty"`
 	StaticAxes bool   `json:"staticAxes,omitempty"`
-}
-
-// Ref is a reference definition for mapdump output; Name heads its column.
-type Ref struct {
-	Name string `json:"name"`
-	Data []byte `json:"data"`
 }
 
 // ConvertResponse reports what was converted and any warnings. Meta is the
@@ -89,8 +77,8 @@ type ConvertResponse struct {
 
 // Convert converts a KP file, an A2L file, a DAMOS file, a WinOLS CSV, a model
 // JSON or YAML document (docs/model.md) or an XDF, with its metadata file if
-// given, into To (json, yaml, kp, csv, mapdump or xdf). JSON and YAML output is
-// the stamped canonical model. Name, the input's file name, goes into its
+// given, into To (json, yaml, kp, csv or xdf). JSON and YAML output is the
+// stamped canonical model. Name, the input's file name, goes into its
 // provenance. KP input to KP output is re-encoded as is. XDF output comes with
 // its metadata file. Loading a document whose stamp is mixed or unknown, an
 // XDF edited since its metadata file was written, or a template other than the
@@ -104,11 +92,8 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 	if req.Template != nil && (req.To != KP || resp.From == KP) {
 		return nil, resp, errors.New("a template applies only to KP output from a model document")
 	}
-	if req.Image != nil && req.To != Mapdump && req.To != XDF {
-		return nil, resp, errors.New("an image applies only to mapdump and XDF output")
-	}
-	if req.Refs != nil && req.To != Mapdump {
-		return nil, resp, errors.New("refs apply only to mapdump output")
+	if req.Image != nil && req.To != CSV && req.To != JSON && req.To != XDF {
+		return nil, resp, errors.New("an image applies only to csv, json and XDF output")
 	}
 	if req.Title != "" && req.To != XDF {
 		return nil, resp, errors.New("a title applies only to XDF output")
@@ -154,22 +139,7 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 		}
 	}
 	if req.To == CSV {
-		out, err := olscsv.Write(m)
-		return out, resp, err
-	}
-	if req.To == Mapdump {
-		refs := make([]mapcsv.Ref, len(req.Refs))
-		for i, r := range req.Refs {
-			rm, w, err := loadModel(r.Data, r.Name, nil)
-			for _, s := range w {
-				resp.Warnings = append(resp.Warnings, r.Name+": "+s)
-			}
-			if err != nil {
-				return nil, resp, fmt.Errorf("%s: %w", r.Name, err)
-			}
-			refs[i] = mapcsv.Ref{Name: r.Name, Model: rm}
-		}
-		out, err := mapcsv.Write(m, req.Image, refs)
+		out, err := olscsv.Write(m, req.Image)
 		return out, resp, err
 	}
 	if req.To == XDF {
@@ -183,6 +153,11 @@ func Convert(in []byte, req ConvertRequest) ([]byte, ConvertResponse, error) {
 		}
 		resp.Meta, err = xdf.Meta(m, out, "xdfkit "+Version)
 		return out, resp, err
+	}
+	if req.Image != nil && req.To == JSON {
+		if err := model.ApplyScan(m, req.Image); err != nil {
+			return nil, resp, err
+		}
 	}
 	var t *kp.File
 	if req.Template != nil {
@@ -432,7 +407,7 @@ var kpMagic = []byte("\x0b\x00\x00\x00WinOLS File")
 // Detect names the input format from its contents: json for a JSON object,
 // xdf for XML, kp for the KP signature, csv for WinOLS map-list,
 // a2l for ASAP2_VERSION or a /begin PROJECT block, damos for an ASAP2DAM
-// banner, else yaml. Mapdump is never detected.
+// banner, else yaml.
 func Detect(in []byte) string {
 	text := bytes.TrimLeft(bytes.TrimPrefix(in, []byte("\uFEFF")), " \t\r\n")
 	switch {

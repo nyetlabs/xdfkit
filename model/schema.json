@@ -180,6 +180,34 @@
       ],
       "type": "object"
     },
+    "Extremes": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "description": "Highest cell in display units.",
+          "type": "number"
+        },
+        "min": {
+          "description": "Lowest cell in display units.",
+          "type": "number"
+        },
+        "rawMax": {
+          "description": "Raw cell behind max (0x hex).",
+          "type": "string"
+        },
+        "rawMin": {
+          "description": "Raw cell behind min (0x hex).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "min",
+        "max",
+        "rawMin",
+        "rawMax"
+      ],
+      "type": "object"
+    },
     "Object": {
       "additionalProperties": false,
       "properties": {
@@ -217,6 +245,10 @@
         "description": {
           "description": "Long description (KP name).",
           "type": "string"
+        },
+        "extremes": {
+          "$ref": "#/$defs/Extremes",
+          "description": "Lowest and highest cells from a flash image scan (xdfkit -i). Not definition limits; omitted when not scanned. KP and XDF ignore this field."
         },
         "id": {
           "description": "The source's own identifier (KP id, A2L name); not unique.",
