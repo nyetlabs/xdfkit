@@ -36,7 +36,8 @@ xdfkit lint -i image.bin in.kp              # report axis mistakes
 xdfkit fix -i image.bin -o fixed.kp in.kp   # fix them
 xdfkit merge --update golden.json located.json out.json
 xdfkit -f csv in.kp                         # WinOLS map-list CSV
-xdfkit -f mapdump -i image.bin in.kp        # legacy mapdump with value ranges
+xdfkit -f csv -i image.bin in.kp            # map-list plus scanned cell extremes
+xdfkit -f json -i image.bin in.kp out.json  # JSON with per-object extremes
 xdfkit in.kp out.json                       # KP to JSON (or out.yaml)
 xdfkit verify out.json                      # has it been edited by hand?
 ```

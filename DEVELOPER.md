@@ -43,7 +43,6 @@ flowchart LR
   api --> model["model"]
   api --> xdf["xdf"]
   api --> olscsv["olscsv"]
-  api --> mapcsv["mapcsv"]
   api --> lint["lint"]
   api --> canon["canon"]
 ```

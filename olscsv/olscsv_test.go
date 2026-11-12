@@ -27,7 +27,7 @@ func TestReadWriteSample(t *testing.T) {
 	if o1.ID != "TSTB" || o1.Cols != 4 || o1.Data.Bits != 16 || o1.X == nil || o1.X.Source != "image" {
 		t.Fatalf("obj1 %+v x=%+v", o1, o1.X)
 	}
-	out, err := Write(m)
+	out, err := Write(m, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

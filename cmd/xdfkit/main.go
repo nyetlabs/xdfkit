@@ -1,6 +1,6 @@
 // Command xdfkit converts map definitions. So far it reads and writes WinOLS KP
 // files, WinOLS map-list CSV, the canonical model JSON or YAML (docs/model.md)
-// and TunerPro XDF with its metadata file, and writes legacy mapdump CSV.
+// and TunerPro XDF with its metadata file.
 package main
 
 import (
@@ -22,7 +22,7 @@ import (
 )
 
 const usage = `usage:
-  xdfkit [-f json|yaml|kp|csv|mapdump|xdf] [--template orig.kp] [-i image] [-r ref]...
+  xdfkit [-f json|yaml|kp|csv|xdf] [--template orig.kp] [-i image]
          [--meta file.meta.json] [--origin damos|a2l|manual|auto]
          [--tuner categories.json] [--quiet] [--force] input [output]
   xdfkit verify [--status] file.json|file.yaml...
@@ -39,7 +39,7 @@ const usage = `usage:
   xdfkit kp2xdf [-i image] [-m] FILE...
 
 A single hyphen is for single-letter options, which also have long names:
--f --format, -i --image, -r --ref, -o --output, -n --dry-run, -m --write-meta.
+-f --format, -i --image, -o --output, -n --dry-run, -m --write-meta.
 Long options take two hyphens. Options may come before or after the files.
 
 Converts between KP, A2L, DAMOS, WinOLS CSV, XDF and the model JSON or YAML;
@@ -50,24 +50,22 @@ stdin; output other than KP without an output file goes to stdout. Existing
 output files are not overwritten unless --force is given. KP output from JSON
 or YAML fills the KP fields the model doesn't carry from --template (the KP
 file the JSON came from reproduces it), else from defaults. CSV (-f csv) is
-the WinOLS map-list CSV (semicolon, Latin-1). Legacy mapdump (-f mapdump)
-is ecuxplot's map list: -i adds the value ranges from the image, and each -r
-adds a column with the names of the matching maps in that KP, JSON or YAML
-definition. XDF output is TunerPro's format. -i adds the file region
-(mapdump and XDF only). "subtract" axes are live helper tables;
---static-axes writes them as labels from the image instead (TunerPro before
-5.00.8414). The definition title is the output file's name. An XDF output
-file comes with its metadata file, NAME.meta.json next to NAME.xdf, holding
-what XDF can't express. XDF input reads the metadata file given by --meta,
-else NAME.meta.json next to it if it exists; with it, an XDF unchanged since
-it was written converts back to the definition exactly, and edits made to it
-are reported. --origin records where a KP, XDF or CSV input's definitions
-came from in the model's provenance: damos or a2l (exported from Bosch
-data), manual (made by hand; the default, unless an XDF's metadata file has
-another) or auto (found in the image by a program such as me7info).
---tuner keeps only the maps named in a category table (schema 2: each
-category name maps to its map names) and the objects their axes point at,
-filed under the table's categories.
+the WinOLS map-list CSV (semicolon, Latin-1). With -i, CSV appends scanned
+cell extremes (Value min/max and Value min*1/max*1); JSON gets an extremes
+object per map. XDF output is TunerPro's format; -i sets the file region.
+"subtract" axes are live helper tables; --static-axes writes them as labels
+from the image instead (TunerPro before 5.00.8414). The definition title is
+the output file's name. An XDF output file comes with its metadata file,
+NAME.meta.json next to NAME.xdf, holding what XDF can't express. XDF input
+reads the metadata file given by --meta, else NAME.meta.json next to it if
+it exists; with it, an XDF unchanged since it was written converts back to
+the definition exactly, and edits made to it are reported. --origin records
+where a KP, XDF or CSV input's definitions came from in the model's
+provenance: damos or a2l (exported from Bosch data), manual (made by hand;
+the default, unless an XDF's metadata file has another) or auto (found in
+the image by a program such as me7info). --tuner keeps only the maps named
+in a category table (schema 2: each category name maps to its map names)
+and the objects their axes point at, filed under the table's categories.
 
 xdf2kp, kp2xdf, kp2json, xdf2json and json2kp convert each FILE to the same
 name with the .kp, .xdf or .json extension, next to it, and reject input of
@@ -425,16 +423,15 @@ func mergeCmd(args []string) error {
 
 func convert(args []string) error {
 	fs := newFlags("xdfkit")
-	format := fs.StringP("format", "f", "", "output format: json, yaml, kp, csv, mapdump or xdf")
+	format := fs.StringP("format", "f", "", "output format: json, yaml, kp, csv or xdf")
 	force := fs.Bool("force", false, "overwrite an existing output file")
 	template := fs.String("template", "", "KP file supplying the fields the model doesn't carry")
-	image := fs.StringP("image", "i", "", "flash image, for CSV value ranges and XDF")
+	image := fs.StringP("image", "i", "", "flash image, for CSV scan columns, JSON extremes, and XDF")
 	staticAxes := fs.Bool("static-axes", false, "write subtract axes as labels from the image")
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
 	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, manual or auto")
 	tuner := fs.String("tuner", "", "category table: keep only its maps and their axes")
 	quiet := fs.Bool("quiet", false, "suppress warnings")
-	refs := fs.StringArrayP("ref", "r", nil, "reference definition, for a CSV column of matching map names (repeatable)")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
@@ -483,13 +480,6 @@ func convert(args []string) error {
 		if req.Tuner, err = os.ReadFile(*tuner); err != nil {
 			return err
 		}
-	}
-	for _, r := range *refs {
-		b, err := os.ReadFile(r)
-		if err != nil {
-			return err
-		}
-		req.Refs = append(req.Refs, api.Ref{Name: r, Data: b})
 	}
 	if *meta != "" {
 		req.Meta, err = os.ReadFile(*meta)

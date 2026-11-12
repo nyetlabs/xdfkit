@@ -33,6 +33,9 @@ var header = []string{
 	"AxisY.DataSrc", "AxisY.DataHeader", "AxisY.DataAddr", "AxisY.DataOrg", "AxisY.SignatureByte", "AxisY.SkipBytes",
 }
 
+// Trailing columns added when Write is given an image (scanned cell extremes).
+var scanHeader = []string{"Value min", "Value max", "Value min*1", "Value max*1"}
+
 // Read parses a WinOLS CSV into a model. name is stored in provenance.
 func Read(data []byte, name string) (*model.Model, error) {
 	text, err := decodeLatin1(data)
@@ -84,17 +87,35 @@ func Read(data []byte, name string) (*model.Model, error) {
 	return m, m.Check()
 }
 
-// Write emits m as WinOLS map-list CSV (CRLF, semicolon, Latin-1).
-func Write(m *model.Model) ([]byte, error) {
+// Write emits m as WinOLS map-list CSV (CRLF, semicolon, Latin-1). When image
+// is non-nil, appends Value min/max and Value min*1/max*1 from a cell scan.
+// ValueRangeMin/Max stay blank (definition limits, not the scan).
+func Write(m *model.Model, image []byte) ([]byte, error) {
 	var buf bytes.Buffer
 	w := csv.NewWriter(&buf)
 	w.Comma = ';'
 	w.UseCRLF = true
-	if err := w.Write(header); err != nil {
+	h := header
+	if image != nil {
+		h = append(append([]string(nil), header...), scanHeader...)
+	}
+	if err := w.Write(h); err != nil {
 		return nil, err
 	}
 	for _, o := range m.Objects {
-		if err := w.Write(rowFromObject(o, m)); err != nil {
+		row := rowFromObject(o, m)
+		if image != nil {
+			e, err := model.ScanExtremes(o, image)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", o.Key, err)
+			}
+			cols := []string{"", "", "", ""}
+			if e != nil {
+				cols = []string{fmtFloat(e.Min), fmtFloat(e.Max), e.RawMin, e.RawMax}
+			}
+			row = append(row, cols...)
+		}
+		if err := w.Write(row); err != nil {
 			return nil, err
 		}
 	}

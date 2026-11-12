@@ -87,6 +87,7 @@ type Object struct {
 	Cols        int         `json:"cols" doc:"Number of columns."`
 	Data        Data        `json:"data" doc:"Cell storage."`
 	Value       Value       `json:"value" doc:"Cell meaning and conversion."`
+	Extremes    *Extremes   `json:"extremes,omitempty" doc:"Lowest and highest cells from a flash image scan (xdfkit -i). Not definition limits; omitted when not scanned. KP and XDF ignore this field."`
 	View        View        `json:"view,omitzero" doc:"Display settings."`
 	X           *Axis       `json:"x,omitempty" doc:"Column axis."`
 	Y           *Axis       `json:"y,omitempty" doc:"Row axis."`
