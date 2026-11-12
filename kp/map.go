@@ -85,9 +85,11 @@ type Axis struct {
 	Type          Type       `json:"type"`
 	Width         int32      `json:"width"` // element size in bytes; equals Type's width on all but 2 known axes
 	Base          int32      `json:"base"`
-	Mirror        bool       `json:"mirror" kp:"hook"`                 // "mirror map": shown in descending order; v2/245: int32, v1: byte
-	MirrorPad     Hex        `json:"mirrorPad,omitzero" kp:"v2,len=9"` // zeros (unconfirmed); header 245: 1 byte via Mirror hook
-	Reciprocal    bool       `json:"reciprocal"`                       // bKehrwert: physical = factor/raw + offset
+	Mirror        bool       `json:"mirror" kp:"hook"`                   // v2: byte 0 of the axis flag word; v1: byte
+	FlagPad       Hex        `json:"flagPad,omitzero" kp:"v2only,len=2"` // high bytes of the flag word
+	MirrorPad     Hex        `json:"mirrorPad,omitzero" kp:"v2,len=9"`   // zeros (unconfirmed); header 245: 1 byte via Mirror hook
+	UnknownFlag   byte       `json:"unknownFlag,omitzero" kp:"v2only"`   // byte where the docs place Reciprocal
+	Reciprocal    bool       `json:"reciprocal" kp:"v1,ols5,245"`        // v2: byte 1 of the flag word (see hook); bKehrwert: factor/raw + offset
 	Precision     int32      `json:"precision"`                        // -1 on some unused slots
 	Signed        bool       `json:"signed"`
 	Values        Hex        `json:"values" kp:"bytes"` // free editable values in the axis type, 4 bytes per point
@@ -95,7 +97,9 @@ type Axis struct {
 	SignatureByte int32      `json:"signatureByte"`     // the script's SignaturByte (marker byte before the axis), -1 for none (unconfirmed)
 }
 
-// hook codes Mirror: v1 byte; v2/OLS5 int32; 245 int32 plus 1-byte MirrorPad.
+// hook codes Mirror: v1 byte; v2/OLS5 first byte of the axis flag word, whose
+// second byte is Reciprocal (verified against a WinOLS save: ticking
+// "Reciprocal" on an axis writes 00 01 00 00); 245 int32 plus 1-byte MirrorPad.
 func (a *Axis) hook(c *codec, _ string) {
 	if c.headerID == header245 && c.block {
 		c.mirrorI32(&a.Mirror)
@@ -106,5 +110,17 @@ func (a *Axis) hook(c *codec, _ string) {
 		c.bool(&a.Mirror)
 		return
 	}
-	c.mirrorI32(&a.Mirror)
+	m, r := byte(0), byte(0)
+	if a.Mirror {
+		m = 1
+	}
+	if a.Reciprocal {
+		r = 1
+	}
+	c.u8(&m)
+	c.u8(&r)
+	if m > 1 || r > 1 {
+		c.fail("axis flag word byte %d/%d", m, r)
+	}
+	a.Mirror, a.Reciprocal = m == 1, r == 1
 }
