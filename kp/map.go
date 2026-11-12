@@ -85,9 +85,11 @@ type Axis struct {
 	DataOrg       DataOrg    `json:"dataOrg"`                             // HelpEn DataOrg
 	Width         int32      `json:"width"`                               // element size in bytes; equals DataOrg's width on all but 2 known axes
 	Radix         int32      `json:"radix"`                               // HelpEn Radix
-	Backwards     bool       `json:"backwards" kp:"hook"`                 // HelpEn bRueckwaerts / bBackwards: show descending; v2: int32, v1: byte
-	BackwardsPad  Hex        `json:"backwardsPad,omitzero" kp:"v2,len=9"` // zeros (unconfirmed); V2 hybrid: 1 byte via Backwards hook
-	Reciprocal    bool       `json:"reciprocal"`                          // bKehrwert
+	Backwards     bool       `json:"backwards" kp:"hook"`                   // HelpEn bRueckwaerts / bBackwards: show descending; v2: byte 0 of the axis flag word, v1: byte
+	FlagPad       Hex        `json:"flagPad,omitzero" kp:"v2only,len=2"`    // high bytes of the axis flag word
+	BackwardsPad  Hex        `json:"backwardsPad,omitzero" kp:"v2,len=9"`   // zeros (unconfirmed); V2 hybrid: 1 byte via Backwards hook
+	UnknownFlag   byte       `json:"unknownFlag,omitzero" kp:"v2only"`      // byte where the docs place Reciprocal
+	Reciprocal    bool       `json:"reciprocal" kp:"v1,ols5"`               // bKehrwert; v2: byte 1 of the axis flag word (see hook)
 	Precision     int32      `json:"precision"`                           // -1 on some unused slots
 	Signed        bool       `json:"signed"`
 	Values        Hex        `json:"values" kp:"bytes"` // free editable values in the axis type, 4 bytes per point
@@ -95,7 +97,9 @@ type Axis struct {
 	SignatureByte int32      `json:"signatureByte"`     // HelpEn SignaturByte / SignatureByte, -1 for none (unconfirmed)
 }
 
-// hook codes Backwards: v1 byte; v2/OLS5 int32; V2 hybrid int32 plus 1-byte BackwardsPad.
+// hook codes Backwards: v1 byte; v2/OLS5 byte 0 of the axis flag word, whose
+// byte 1 is Reciprocal (WinOLS save: ticking Reciprocal writes 00 01 00 00);
+// V2 hybrid int32 plus 1-byte BackwardsPad.
 func (a *Axis) hook(c *codec, _ string) {
 	if c.hybrid && c.block {
 		c.mirrorI32(&a.Backwards)
@@ -106,5 +110,17 @@ func (a *Axis) hook(c *codec, _ string) {
 		c.bool(&a.Backwards)
 		return
 	}
-	c.mirrorI32(&a.Backwards)
+	b, r := byte(0), byte(0)
+	if a.Backwards {
+		b = 1
+	}
+	if a.Reciprocal {
+		r = 1
+	}
+	c.u8(&b)
+	c.u8(&r)
+	if b > 1 || r > 1 {
+		c.fail("axis flag word byte %d/%d", b, r)
+	}
+	a.Backwards, a.Reciprocal = b == 1, r == 1
 }
