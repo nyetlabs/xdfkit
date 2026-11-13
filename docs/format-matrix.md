@@ -34,7 +34,7 @@ Legend: `Y` supported, `P` partial or lossy, `N` not supported, `?` unconfirmed,
 | Conversion | Display precision | Y | Y | Y | ? | Y | Y | Y |
 | Conversion | Display base | Y | Y | N | ? | P | Y | Y |
 | Conversion | Min / max | Y | Y | Y | Y | Y | Y | Y |
-| Conversion | Difference / percent | Y | Y | N | N | N | Y | Y |
+| Conversion | Difference / percent / original | Y | Y | N | N | N | Y | Y |
 | Conversion | Per-map doubles | P | P | - | - | - | N | N |
 | Axes | Read from image | Y | Y | Y | Y | Y | Y | Y |
 | Axes | Type, sign, units, conversion | Y | Y | Y | Y | Y | Y | Y |
@@ -54,7 +54,7 @@ Names and limits for the rows above:
 - Comment. Header 292/329 `comment`. A2L `ANNOTATION`. XDF only by appending to `description`.
 - Categories. KP: one folder per map. A2L: `FUNCTION` / `GROUP`, nested, many-to-many. DAMOS: function assignment. XDF: one path of up to 3 levels (`CATEGORYMEM`), not many-to-many. Model: flat, several per object.
 - Project / ECU metadata. KP: name and version. A2L: `PROJECT` / `HEADER` / `MODULE` / `MOD_PAR`. XDF: title, description, author. Model: name and version.
-- File offset. A2L/DAMOS store an ECU address (need a segment map). XDF adds `baseoffset`. Model is a file offset only; target adds CPU address and segment.
+- File offset. Model `address` is a file offset. A2L/DAMOS lower the ECU address into `address` and keep it as optional `cpu`. WinOLS CSV/JSON may supply `StartAddr.Cpu` / `DataAddr.Cpu`. XDF uses file offsets (`baseoffset` on the region). Segment lists remain target.
 - Memory segments. A2L `MEMORY_SEGMENT`. XDF `REGION` is a size only.
 - Checksum definition. KP: separate WinOLS modules. A2L: vendor `IF_DATA`. XDF `CHECKSUM` plugin.
 - Search signature. KP per map and axis; not in the model (axis `signature` is a different marker byte). Target keeps it.
@@ -72,9 +72,9 @@ Names and limits for the rows above:
 - Arbitrary formula. A2L `FORMULA` (+ inverse). XDF equation (can reference other objects).
 - Enum / lookup table. A2L `COMPU_TAB`, `COMPU_VTAB`, `VTAB_RANGE`.
 - Units. A2L `COMPU_METHOD` / `PHYS_UNIT`. Display precision: A2L `FORMAT`, XDF `decimalpl`.
-- Display base. KP base field. XDF decimal/hex only. Model `view.base`.
+- Display base. KP `Radix`. XDF decimal/hex only. Model `view.radix`.
 - Min / max. KP `range` per width (`kp-format.md`). A2L limits / `EXTENDED_LIMITS`. DAMOS `/SPW`/`/SPX`/`/SPY`. Model `min`/`max` (`model.md`).
-- Difference / percent. KP map-window flags. Model view flags.
+- Difference / percent / original. KP `Difference` / `Percent` / `Original` (HelpEn `bDelta` / `bPercent` / `bOriginal`). Model `view.difference` / `view.percent` / `view.original`.
 - Per-map doubles. KP view state (`viewScale`, …); not in the model — template or defaults on KP output.
 - Read from image. KP EEPROM datasource. A2L `STD_AXIS` / `COM_AXIS`. XDF `EMBEDDEDDATA`. Model source `image`.
 - Fixed values. KP ordinal or free editable (`kp-format.md`). A2L `FIX_AXIS_*`. XDF `LABEL`s. Model source `editable` with `values`.

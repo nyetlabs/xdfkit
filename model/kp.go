@@ -428,7 +428,7 @@ func objectFromKP(km *kp.Map, inFolder bool) *Object {
 		Cols:        int(km.Cols),
 		Data:        dataFromKP(km.DataOrg, km.Signed),
 		Value:       valueFromKP(km.Value, int(km.Precision), km.Reciprocal),
-		View:        View{Radix: int(km.Radix), Difference: km.Difference, Percent: km.Percent},
+		View:        View{Radix: int(km.Radix), Difference: km.Difference, Percent: km.Percent, Original: km.Original != 0},
 		X:           axisFromKP(km.X, axisCount(km, true)),
 		Y:           axisFromKP(km.Y, axisCount(km, false)),
 	}
@@ -518,6 +518,9 @@ func (o *Object) kpMap(i int) *kp.Map {
 	}
 	if o.VisLevel == 1 {
 		km.Marked = 1
+	}
+	if o.View.Original {
+		km.Original = 1
 	}
 	return km
 }

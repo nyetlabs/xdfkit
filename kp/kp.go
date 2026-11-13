@@ -1,7 +1,7 @@
 // Package kp reads and writes WinOLS map packs ("OLS Map Pack", *.kp).
 // The int32 at offset 0x10 is a decimal header id. Routing keys off the
 // hundred series (1xx, 2xx/3xx, 5xx, 8xx); known samples are 113/116, 245,
-// 292/329, 503/597, and 839. Hex/BCD does not show a clear major/minor/patch
+// 292/329, 503/597, and 839/855. Hex/BCD does not show a clear major/minor/patch
 // split. OLS5 and V2 hybrids (HeaderLen 0) are read-only until a save oracle
 // exists. Details: docs/kp-format.md.
 //
@@ -33,7 +33,7 @@ const (
 
 // knownHeaders are sample ids we have opened. Routing is by hundred series;
 // an id need not be listed here to parse (e.g. another 2xx still uses the V2 walk).
-var knownHeaders = []int32{113, 116, 245, 292, 329, 503, 597, 839}
+var knownHeaders = []int32{113, 116, 245, 292, 329, 503, 597, 839, 855}
 
 func knownHeader(id int32) bool { return slices.Contains(knownHeaders, id) }
 

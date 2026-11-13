@@ -251,6 +251,7 @@ func (r *reader) characteristic(body []token) (*model.Object, string, []string) 
 	}
 	valOff, axisOff := place(ms, pts, r.alignW, r.alignL)
 	o.Address = off + model.Addr(valOff)
+	o.CPU = model.AddrOf(model.Addr(addr) + model.Addr(valOff))
 	// ASAM lists the column axis first. A DAMOS map lists the row axis first.
 	col, row := 0, 1
 	if kind == "MAP" && r.damos {
@@ -281,8 +282,9 @@ func (r *reader) characteristic(body []token) (*model.Object, string, []string) 
 		}
 		o.Shape, o.Rows, o.Cols = "2d", ny, nx
 	}
+	cpuBase := model.Addr(addr)
 	for i, a := range axes {
-		ax, w := r.axis(a, off, axisOff, i, ms)
+		ax, w := r.axis(a, off, cpuBase, axisOff, i, ms)
 		warnings = append(warnings, w...)
 		switch i {
 		case col:
@@ -324,7 +326,7 @@ func parseAxisDescr(body []token) axisDesc {
 	return a
 }
 
-func (r *reader) axis(a axisDesc, base model.Addr, axisOff map[string]int, index int, ms []member) (*model.Axis, []string) {
+func (r *reader) axis(a axisDesc, fileBase, cpuBase model.Addr, axisOff map[string]int, index int, ms []member) (*model.Axis, []string) {
 	key := axisKey(index)
 	c := r.comps[a.conv]
 	v := valueOf(c, c.prec, nil, nil)
@@ -349,20 +351,22 @@ func (r *reader) axis(a axisDesc, base model.Addr, axisOff map[string]int, index
 			mem = findMember(r.layouts[ap.layout], "FNC_VALUES")
 		}
 		ad := off + model.Addr(delta)
+		cpu := model.Addr(ap.addr) + model.Addr(delta)
 		d := dataOf(mem, r.little)
-		return &model.Axis{Source: "image", Stored: "absolute", Address: &ad, Data: &d, Value: v}, nil
+		return &model.Axis{Source: "image", Stored: "absolute", Address: &ad, CPU: model.AddrOf(cpu), Data: &d, Value: v}, nil
 	case "FIX_AXIS":
 		return &model.Axis{Source: "ordinal", Value: v}, nil
 	case "STD_AXIS":
 		mem := findMember(ms, key)
 		delta, ok := axisOff[key]
 		if !ok || mem.bits == 0 {
-			ad := base
-			return &model.Axis{Source: "image", Stored: "absolute", Address: &ad, Value: v}, []string{key + " not in the record layout; axis address is the record start"}
+			ad := fileBase
+			return &model.Axis{Source: "image", Stored: "absolute", Address: &ad, CPU: model.AddrOf(cpuBase), Value: v}, []string{key + " not in the record layout; axis address is the record start"}
 		}
-		ad := base + model.Addr(delta)
+		ad := fileBase + model.Addr(delta)
+		cpu := cpuBase + model.Addr(delta)
 		d := dataOf(mem, r.little)
-		return &model.Axis{Source: "image", Stored: "absolute", Address: &ad, Data: &d, Value: v}, nil
+		return &model.Axis{Source: "image", Stored: "absolute", Address: &ad, CPU: model.AddrOf(cpu), Data: &d, Value: v}, nil
 	default:
 		return &model.Axis{Source: "unknown", Value: v}, []string{a.attr + " axis skipped"}
 	}
@@ -388,8 +392,9 @@ func (r *reader) axisObject(a *axisPts) (*model.Object, bool) {
 		n = 1
 	}
 	c := r.comps[a.conv]
+	delta := model.Addr(at["AXIS_PTS_X"])
 	return &model.Object{
-		ID: a.name, Shape: "1d", Address: off + model.Addr(at["AXIS_PTS_X"]),
+		ID: a.name, Shape: "1d", Address: off + delta, CPU: model.AddrOf(model.Addr(a.addr) + delta),
 		Rows: 1, Cols: n, Data: dataOf(mem, r.little), Value: valueOf(c, c.prec, nil, nil),
 	}, true
 }

@@ -83,6 +83,7 @@ type Object struct {
 	Inverse     bool        `json:"inverse,omitzero" doc:"KP \"2d Inverse\" organisation; its meaning is unconfirmed (docs/kp-format.md)."`
 	VisLevel    int         `json:"vislevel,omitzero" doc:"TunerPro XDF vislevel (Show Up To / Show Only). 1 matches the WinOLS map-list marker (KP Marked); 0 is unmarked and written as XDF level 2."`
 	Address     Addr        `json:"address" doc:"File offset of the first cell."`
+	CPU         *Addr       `json:"cpu,omitempty" doc:"ECU/CPU address of the first cell when known (A2L/DAMOS before lowering; WinOLS StartAddr.Cpu). Omitted when unknown."`
 	Rows        int         `json:"rows" doc:"Number of rows."`
 	Cols        int         `json:"cols" doc:"Number of columns."`
 	Data        Data        `json:"data" doc:"Cell storage."`
@@ -136,6 +137,7 @@ type View struct {
 	Radix      int  `json:"radix,omitzero" doc:"Number base shown (WinOLS Radix: 10, 16 or 2)."`
 	Difference bool `json:"difference,omitzero" doc:"Show the difference to the original."`
 	Percent    bool `json:"percent,omitzero" doc:"Show the difference in percent."`
+	Original   bool `json:"original,omitzero" doc:"WinOLS ignore-factor view (HelpEn bOriginal)."`
 }
 
 // Axis gives the axis points of a curve or map.
@@ -143,6 +145,7 @@ type Axis struct {
 	Source    string    `json:"source" doc:"image: read from the image; ordinal: 1, 2, 3; editable: fixed values (KP \"Free editable\"); unknown: an unnamed KP datasource (written back as ordinal)." enum:"image|ordinal|editable|unknown"`
 	Stored    string    `json:"stored,omitempty" doc:"How image values are stored: absolute; add: prefix sum of raw values; subtract: 2^bits minus the sum of the remaining raw values; backwards: absolute values in reverse image order (docs/kp-format.md)." enum:"absolute|add|subtract|backwards"`
 	Address   *Addr     `json:"address,omitempty" doc:"File offset of the first axis point, for image axes."`
+	CPU       *Addr     `json:"cpu,omitempty" doc:"ECU/CPU address of the first axis point when known (A2L/DAMOS before lowering; WinOLS DataAddr.Cpu). Omitted when unknown."`
 	Data      *Data     `json:"data,omitempty" doc:"Axis-point storage, for image and editable axes."`
 	Value     Value     `json:"value" doc:"Axis-point meaning and conversion."`
 	View      View      `json:"view,omitzero" doc:"Display settings."`
@@ -174,6 +177,8 @@ func (a *Addr) UnmarshalJSON(b []byte) error {
 func (Addr) jsonSchema() map[string]any {
 	return map[string]any{"type": "string", "pattern": "^0x[0-9A-Fa-f]{1,8}$"}
 }
+
+func AddrOf(a Addr) *Addr { return &a }
 
 // AssignKeys sets the Key of each object that has none from its ID (see
 // Object.Key). A blank id leaves the key blank. A repeated key is kept.

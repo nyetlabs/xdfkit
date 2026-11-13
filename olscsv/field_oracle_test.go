@@ -12,12 +12,36 @@ import (
 	"go.nyet.org/xdfkit/kp"
 )
 
-// Compares WinOLS CSV columns to KP fields on the local 839 pair.
-// Prints per-field match rates; fails only if IdName/StartAddr join breaks.
+// Compares WinOLS CSV columns to KP fields on local pairs (skip if absent).
+// Prints per-field match rates; fails if IdName/StartAddr join breaks or a
+// required field is not 100% (839: RWin/ViewMode/bSigned; 855: bDelta/bPercent).
 func TestLocalCSVFieldOracle(t *testing.T) {
-	dir := filepath.Join("..", "testdata", "local", "incoming", "csv")
-	csvPath := filepath.Join(dir, "06A906032HJ 0002.csv")
-	kpPath := filepath.Join(dir, "06A906032HJ 0002.kp")
+	root := filepath.Join("..", "testdata", "local", "incoming")
+	for _, p := range []struct {
+		csv, kp string
+		minJoin int
+		must    []string
+	}{
+		{"csv/06A906032HJ 0002.csv", "csv/06A906032HJ 0002.kp", 4000, []string{"RWin", "ViewMode", "bSigned"}},
+		{
+			"csvgaps/new good export all/all maps KFKHFM in difference view.csv",
+			"csvgaps/new good export all/all maps KFKHFM in difference view.kp",
+			4000, []string{"bDelta", "bPercent"},
+		},
+		{
+			"csvgaps/new good export all/all maps KFKHFM in ignore factor  view.csv",
+			"csvgaps/new good export all/all maps KFKHFM in ignore factor offset view.kp",
+			4000, []string{"bOriginal"},
+		},
+	} {
+		t.Run(filepath.Base(p.kp), func(t *testing.T) {
+			oracleCSVKP(t, filepath.Join(root, p.csv), filepath.Join(root, p.kp), p.minJoin, p.must)
+		})
+	}
+}
+
+func oracleCSVKP(t *testing.T, csvPath, kpPath string, minJoin int, must []string) {
+	t.Helper()
 	cb, err := os.ReadFile(csvPath)
 	if err != nil {
 		t.Skip(err)
@@ -106,6 +130,7 @@ func TestLocalCSVFieldOracle(t *testing.T) {
 		hit("bSigned", (get("bSigned") == "1") == m.Signed)
 		hit("bDelta", (get("bDelta") == "1") == m.Difference)
 		hit("bPercent", (get("bPercent") == "1") == m.Percent)
+		hit("bOriginal", (get("bOriginal") == "1") == (m.Original != 0))
 		hit("Columns", atoiDefault(get("Columns"), 1) == int(m.Cols))
 		hit("Rows", atoiDefault(get("Rows"), 1) == int(m.Rows))
 		hit("Radix", radixBase(get("Radix")) == int(m.Radix))
@@ -125,12 +150,10 @@ func TestLocalCSVFieldOracle(t *testing.T) {
 			hit("ValueRange", lo == m.Range[slot][0] && hi == m.Range[slot][1])
 		}
 
-		cmpAxis := func(prefix string, a *kp.Axis, defined bool) {
+		cmpAxis := func(prefix string, a *kp.Axis) {
 			if a == nil {
 				return
 			}
-			// Always compare description/units/factor for defined axes;
-			// ordinal slots still carry residue in KP.
 			hit(prefix+".Name", get(prefix+".Name") == a.Value.Description)
 			hit(prefix+".Unit", dashEmpty(get(prefix+".Unit")) == a.Value.Units)
 			hit(prefix+".Factor", eqf(atofDefault(get(prefix+".Factor"), 1), a.Value.Factor))
@@ -150,24 +173,20 @@ func TestLocalCSVFieldOracle(t *testing.T) {
 				ad, err := parseAddr(get(prefix + ".DataAddr"))
 				hit(prefix+".DataAddr", err == nil && ad == a.Addr)
 			}
-			_ = defined
 		}
-		cmpAxis("AxisX", m.X, m.X != nil && m.X.Defined)
-		cmpAxis("AxisY", m.Y, m.Y != nil && m.Y.Defined)
+		cmpAxis("AxisX", m.X)
+		cmpAxis("AxisY", m.Y)
 
-		// Columns with no known KP home: report non-zero rate only.
-		hit("bOriginal_nonzero", get("bOriginal") == "0")
-		hit("bOriginalValues_nonzero", get("bOriginalValues") == "0")
+		// Columns with no known KP home: report zero rate.
 		hit("SkipBytes_zero", get("SkipBytes") == "0" || get("SkipBytes") == "")
 		hit("LineSkipBytes_zero", get("LineSkipBytes") == "0" || get("LineSkipBytes") == "")
 		hit("ValueRangeLock_zero", get("ValueRangeLock") == "0" || get("ValueRangeLock") == "")
 	}
 
-	if joined < 4000 {
+	if joined < minJoin {
 		t.Fatalf("joined %d", joined)
 	}
-	// Confirmed with value variance on this pack.
-	for _, name := range []string{"RWin", "ViewMode", "bSigned"} {
+	for _, name := range must {
 		x := c[name]
 		if x == nil || x.n == 0 || x.ok != x.n {
 			t.Fatalf("%s: %v (want 100%% match)", name, x)
@@ -185,7 +204,7 @@ func TestLocalCSVFieldOracle(t *testing.T) {
 		"AxisY.Name", "AxisY.Unit", "AxisY.Factor", "AxisY.Offset", "AxisY.Precision", "AxisY.Radix",
 		"AxisY.bReciprocal", "AxisY.bSigned", "AxisY.bBackwards", "AxisY.DataSrc", "AxisY.DataHeader",
 		"AxisY.DataOrg", "AxisY.SignatureByte", "AxisY.DataAddr",
-		"bOriginal_nonzero", "bOriginalValues_nonzero", "SkipBytes_zero", "LineSkipBytes_zero", "ValueRangeLock_zero",
+		"bOriginal", "SkipBytes_zero", "LineSkipBytes_zero", "ValueRangeLock_zero",
 	}
 	for _, name := range order {
 		x := c[name]
