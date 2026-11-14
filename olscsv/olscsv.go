@@ -24,13 +24,14 @@ var header = []string{
 	"bReciprocal", "bSigned", "bDelta", "bPercent", "bOriginal", "bOriginalValues",
 	"Columns", "Rows", "Radix", "Comment", "Precision", "SkipBytes", "LineSkipBytes",
 	"ValueRangeMin", "ValueRangeMax", "ValueRangeLock", "Marker",
-	"Fieldvalues.Name", "Fieldvalues.Unit", "Fieldvalues.Factor", "Fieldvalues.Offset", "Fieldvalues.StartAddr",
+	"Fieldvalues.Name", "Fieldvalues.Unit", "Fieldvalues.Factor", "Fieldvalues.Offset",
+	"Fieldvalues.StartAddr.Cpu", "Fieldvalues.StartAddr",
 	"AxisX.Name", "AxisX.IdName", "AxisX.Unit", "AxisX.Factor", "AxisX.Offset", "AxisX.Radix",
 	"AxisX.bBackwards", "AxisX.bReciprocal", "AxisX.bSigned", "AxisX.Precision",
-	"AxisX.DataSrc", "AxisX.DataHeader", "AxisX.DataAddr", "AxisX.DataOrg", "AxisX.SignatureByte", "AxisX.SkipBytes",
+	"AxisX.DataSrc", "AxisX.DataHeader", "AxisX.DataAddr.Cpu", "AxisX.DataAddr", "AxisX.DataOrg", "AxisX.SignatureByte", "AxisX.SkipBytes",
 	"AxisY.Name", "AxisY.IdName", "AxisY.Unit", "AxisY.Factor", "AxisY.Offset", "AxisY.Radix",
 	"AxisY.bBackwards", "AxisY.bReciprocal", "AxisY.bSigned", "AxisY.Precision",
-	"AxisY.DataSrc", "AxisY.DataHeader", "AxisY.DataAddr", "AxisY.DataOrg", "AxisY.SignatureByte", "AxisY.SkipBytes",
+	"AxisY.DataSrc", "AxisY.DataHeader", "AxisY.DataAddr.Cpu", "AxisY.DataAddr", "AxisY.DataOrg", "AxisY.SignatureByte", "AxisY.SkipBytes",
 }
 
 // Trailing columns added when Write is given an image (scanned cell extremes).
@@ -177,6 +178,7 @@ func objectFromRow(row []string, idx map[string]int) (*model.Object, string, err
 		Description: cell(row, idx, "Name"),
 		Comment:     cell(row, idx, "Comment"),
 		Address:     model.Addr(addr),
+		CPU:         optionalAddr(cell(row, idx, "Fieldvalues.StartAddr.Cpu")),
 		Rows:        rows,
 		Cols:        cols,
 		Data:        dataFromOrg(cell(row, idx, "DataOrg"), cell(row, idx, "bSigned") == "1"),
@@ -194,6 +196,7 @@ func objectFromRow(row []string, idx map[string]int) (*model.Object, string, err
 			Radix:      radixBase(cell(row, idx, "Radix")),
 			Difference: cell(row, idx, "bDelta") == "1",
 			Percent:    cell(row, idx, "bPercent") == "1",
+			Original:   cell(row, idx, "bOriginal") == "1",
 		},
 	}
 	if cell(row, idx, "Marker") == "1" {
@@ -262,6 +265,7 @@ func axisFromRow(row []string, idx map[string]int, prefix string, n int) *model.
 			ad := model.Addr(addr)
 			a.Address = &ad
 		}
+		a.CPU = optionalAddr(cell(row, idx, prefix+".DataAddr.Cpu"))
 		d := dataFromOrg(cell(row, idx, prefix+".DataOrg"), cell(row, idx, prefix+".bSigned") == "1")
 		a.Data = &d
 	}
@@ -307,7 +311,7 @@ func rowFromObject(o *model.Object, m *model.Model) []string {
 	set("bSigned", bool01(o.Data.Signed))
 	set("bDelta", bool01(o.View.Difference))
 	set("bPercent", bool01(o.View.Percent))
-	set("bOriginal", "0")
+	set("bOriginal", bool01(o.View.Original))
 	set("bOriginalValues", "0")
 	set("Columns", strconv.Itoa(o.Cols))
 	set("Rows", strconv.Itoa(o.Rows))
@@ -323,6 +327,7 @@ func rowFromObject(o *model.Object, m *model.Model) []string {
 	set("Fieldvalues.Factor", fmtFloat(o.Value.Conversion.Factor))
 	set("Fieldvalues.Offset", fmtFloat(o.Value.Conversion.Offset))
 	set("Fieldvalues.StartAddr", fmt.Sprintf("$%X", uint32(o.Address)))
+	setOptAddr(set, "Fieldvalues.StartAddr.Cpu", o.CPU)
 	fillAxis(set, "AxisX", o.X)
 	fillAxis(set, "AxisY", o.Y)
 	return row
@@ -357,6 +362,7 @@ func fillAxis(set func(string, string), prefix string, a *model.Axis) {
 		} else {
 			set(prefix+".DataAddr", "$0")
 		}
+		setOptAddr(set, prefix+".DataAddr.Cpu", a.CPU)
 		if a.Stored == "backwards" {
 			set(prefix+".bBackwards", "1")
 		}
@@ -437,6 +443,24 @@ func parseAddr(s string) (uint32, error) {
 	s = strings.TrimPrefix(strings.ToLower(s), "0x")
 	v, err := strconv.ParseUint(s, 16, 32)
 	return uint32(v), err
+}
+
+func optionalAddr(s string) *model.Addr {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "-" {
+		return nil
+	}
+	v, err := parseAddr(s)
+	if err != nil {
+		return nil
+	}
+	return model.AddrOf(model.Addr(v))
+}
+
+func setOptAddr(set func(string, string), col string, a *model.Addr) {
+	if a != nil {
+		set(col, fmt.Sprintf("$%X", uint32(*a)))
+	}
 }
 
 func atoi(s string) (int, error) {

@@ -6,7 +6,7 @@ The Go structs are the record layouts. `kp/codec.go` walks fields in declaration
 
 ## Versions
 
-The int32 at offset 0x10 is a decimal header id. Routing keys off the hundred series (`id/100`); hex/BCD does not show a clear major/minor/patch split. Known samples: 113/116 (1xx), 245 (2xx hybrid), 292/329 (2xx/3xx), 503/597 (5xx), 839 (8xx). Walk names match `kp-defaults.json` pools.
+The int32 at offset 0x10 is a decimal header id. Routing keys off the hundred series (`id/100`); hex/BCD does not show a clear major/minor/patch split. Known samples: 113/116 (1xx), 245 (2xx hybrid), 292/329 (2xx/3xx), 503/597 (5xx), 839/855 (8xx). Walk names match `kp-defaults.json` pools.
 
 | Series (samples) | Walk | Value at 0x14 | Fixed header ends | Maps |
 | --- | --- | --- | --- | --- |
@@ -14,7 +14,7 @@ The int32 at offset 0x10 is a decimal header id. Routing keys off the hundred se
 | 2xx hybrid (245) | 200+300 | 0 | 0x5c | zip entry `intern` |
 | 2xx/3xx (292, 329) | 200+300 | file length | 0x60 | zip entry `intern` |
 | 5xx (503, 597) | 500 | file length | 0x60 | zip entry `intern` |
-| 8xx (839) | 800 | file length | 0x60 | zip entry `intern` |
+| 8xx (839, 855) | 800 | file length | 0x60 | zip entry `intern` |
 
 329 is accepted; archived packs use 292. WinOLS 2.24 writes header 292. The KP `Version` string is commonly `OLS 5.0 (Windows)` on 1xx through 8xx (including a 5.92 export) and does not identify the product version. Hybrids, 5xx, and 8xx are read-only. OLS5 string modes: `kp/ols5.go`.
 
@@ -35,23 +35,11 @@ Trailer and `MarkedExtra` lengths follow the tens band (`id/10`):
 - 50x (sample 503): shorter trailers
 - Other 5xx (sample 597): longer trailers
 
-### 8xx (sample 839)
+### 8xx (samples 839, 855)
 
-Layout details (unconfirmed; `kp/ols5.go`, `kp/header8xx.go`):
+Unconfirmed details in `kp/ols5.go`, `kp/header8xx.go`: name/version trailers 105/109; EndTag ends in `02 00 00 00` then a printable project name (first four bytes vary); eight bytes between zip and `MapsTag`; folder blob; axis `TailPad` `0,0,-1,0,0`; `MarkedExtra` scanned (often 73; long comments after it). If the dword before axis X is `0x800000`, it is `PreX` (855; absent on 839; peek, not exact id).
 
-- Name trailer 105, version trailer 109
-- EndTag: ends in `02 00 00 00` then a printable project name; first four EndTag bytes vary
-- Eight bytes between the zip and `MapsTag`
-- Folder entries carry a length-prefixed blob
-- Each axis ends with a 20-byte `TailPad` (`0,0,-1,0,0`)
-- `MarkedExtra` usually 73 bytes; long comments sit after that block, before the display name
-- `MarkedExtra` length is scanned (not fixed like 5xx)
-
-Sample provenance and CSV checks on `06A906032HJ 0002` (licensed WinOLS 5.92 export):
-
-- Matches: IdName, StartAddr; with variance, map `RWin`, `ViewMode`, `Signed` (`bSigned`)
-- KP stays `Marked` (map-list bit); CSV `Marker` is a different unmatched column
-- `bDelta` / `bPercent` are all zero on that export, so which KP bool is which stays open
+WinOLS map-list CSV and JSON share the same property names (`{"maps":[...]}`). Local checks: 839 pair confirms `RWin` / `ViewMode` / `Signed`; 855 csvgaps confirms `bDelta`/`bPercent` ↔ `Difference`/`Percent` and `bOriginal` ↔ `Original` (ignore-factor). Original-view `bOriginalValues` appears in CSV/JSON only (KP vs normal differs by cursor alone; not a map-pack field). KP stays `Marked`; CSV `Marker` unmatched.
 
 ### Fixtures and defaults
 
@@ -106,7 +94,7 @@ Order is the `kp.Map` struct. Writers need:
 - `Type` (HelpEn Type/Typ), `DataOrg` / `Width`, `Radix` (10/16/2): [Enums](#enums)
 - `ID` (short name), `Name` (long description), optional `Comment` (v2)
 - `Range`: three low/high pairs for 8/16/32-bit raw spans. Without a template, the pair for the map's width is the model's min/max converted to raw; the other pairs stay at defaults. The model omits min/max when the KP pair is that default.
-- Flags: `Reciprocal`, `Signed` (HelpEn `bSigned`), `Difference` / `Percent` (HelpEn `bDelta` / `bPercent` candidates)
+- Flags: `Reciprocal`, `Signed` (HelpEn `bSigned`), `Difference` / `Percent` / `Original` (HelpEn `bDelta` / `bPercent` / `bOriginal`)
 - `RWin`, `ViewMode` (1 text, 2 2D, 3 3D)
 - `Cols`, `Rows`, `Precision`, `Value` (description, units, factor, offset)
 - `Start`, `End` (`End` = start + byte length; MP01 in `autocorrect.md`), `ImageSize`, `Addr2`

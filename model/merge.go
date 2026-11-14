@@ -334,6 +334,10 @@ func copyDetected(dst, src *Object) []string {
 		dst.Address = src.Address
 		c = append(c, "address")
 	}
+	if !addrEqual(dst.CPU, src.CPU) {
+		dst.CPU = addrCopy(src.CPU)
+		c = append(c, "cpu")
+	}
 	if dst.Shape != src.Shape {
 		dst.Shape = src.Shape
 		c = append(c, "shape")
@@ -368,7 +372,7 @@ func copyAxisDetected(dst **Axis, src *Axis) bool {
 		return false
 	}
 	if *dst == nil {
-		a := &Axis{Source: src.Source, Address: addrCopy(src.Address)}
+		a := &Axis{Source: src.Source, Address: addrCopy(src.Address), CPU: addrCopy(src.CPU)}
 		if src.Data != nil {
 			a.Data = &Data{Bits: src.Data.Bits}
 		}
@@ -383,6 +387,10 @@ func copyAxisDetected(dst **Axis, src *Axis) bool {
 	}
 	if a.Address == nil || *a.Address != *src.Address {
 		a.Address = addrCopy(src.Address)
+		changed = true
+	}
+	if !addrEqual(a.CPU, src.CPU) {
+		a.CPU = addrCopy(src.CPU)
 		changed = true
 	}
 	if src.Data != nil {
@@ -403,6 +411,13 @@ func addrCopy(a *Addr) *Addr {
 	}
 	v := *a
 	return &v
+}
+
+func addrEqual(a, b *Addr) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 func defaultDiff(base, in *Object) []string {

@@ -13,7 +13,7 @@ Converts map definitions between WinOLS KP, WinOLS CSV, A2L, DAMOS, TunerPro XDF
     - KP orientation kept; axis backwards (bBackwards) not applied. `vislevel` on each table/constant (model level, or 2 when unmarked).
     - Linked image axes get `embedinfo type="3"` when a matching curve exists.
     - Add/subtract axes are live helpers by default; backwards is static labels; `--static-axes` forces labels (`stamp-and-metadata.md`, Live helpers; formulas in `kp-format.md`).
-  - CSV: WinOLS map-list export via `olscsv/` (`xdfkit -f csv`). Semicolon, CRLF, Latin-1 as needed. Detected when the first line starts with `Name;IdName;FolderName`. Lossy: UI-only columns (ViewMode, RWin, SkipBytes, …) are omitted or defaulted on write; folders become model categories. With `-i`, appends scanned cell extremes (`Value min` / `Value max` / `Value min*1` / `Value max*1`); does not fill `ValueRangeMin`/`Max`. A read ignores those trailing columns.
+  - CSV: WinOLS map-list export via `olscsv/` (`xdfkit -f csv`). Semicolon, CRLF, Latin-1 as needed. Detected when the first line starts with `Name;IdName;FolderName`. Lossy: UI-only columns (ViewMode, RWin, SkipBytes, …) are omitted or defaulted on write; folders become model categories. With `-i`, appends scanned cell extremes (`Value min` / `Value max` / `Value min*1` / `Value max*1`); does not fill `ValueRangeMin`/`Max`. A read ignores those trailing columns. WinOLS also exports the same columns as JSON (`{"maps":[...]}`); used as a field oracle alongside CSV (`kp-format.md`).
   - Edit stamp on every JSON output (model and metadata file): `stamp-and-metadata.md`. With `-i` on JSON output, each object gains optional `extremes` (`model.md`).
 - Inputs: KP 1xx and non-hybrid 2xx/3xx (as ecuxplot mapdump); V2 hybrids (245-class), 5xx, and 8xx read-only (`kp-format.md`); A2L; DAMOS `.dam`; WinOLS CSV; JSON/YAML; XDF with metadata file if present.
 - No licensed WinOLS options assumed. Route into WinOLS is KP. No A2L or DAMOS writers (WinOLS import is one-way through the licensed Damos plugin).
@@ -68,7 +68,7 @@ flowchart LR
 
 - Model: `model.md`. Schema 1 inlines axes and conversion. No per-source residue; KP writer fills gaps from a template or defaults.
 - JSON/YAML: schema from model types (`model/schema.json`); output is canonical stamped form (`stamp-and-metadata.md`).
-- Address lowering in `a2l/` and `dam/`: subtract 0x800000 for the ME7 window. Outside that window A2L uses a containing `MEMORY_SEGMENT` base. `--base` / original CPU address not implemented.
+- Address lowering in `a2l/` and `dam/`: subtract 0x800000 for the ME7 window into `address` (file offset); the ECU address is kept as optional `cpu` on the object and image axes. Outside that window A2L uses a containing `MEMORY_SEGMENT` base. `--base` for an address outside every segment and the ME7 window is not implemented.
 - Each writer reports per-object loss to stderr, or to a file with `--report`.
 
 ## Repo layout

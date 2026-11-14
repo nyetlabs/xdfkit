@@ -308,7 +308,7 @@ var unconfirmed = map[string]bool{
 	"flags": true, "style": true, "pad": true,
 	"linkId": true, "commentFlag": true, "idPad": true,
 	"idFlag": true, "idState": true, "range": true, "cursor": true, "imageSizePad": true,
-	"addr2": true, "addr2Flags": true, "addr2ImageSize": true, "addr2Pad": true, "yFlag": true,
+	"addr2": true, "addr2Flags": true, "addr2ImageSize": true, "addr2Pad": true,
 	"yPad": true, "viewFlags": true, "view2DScale": true, "view2DRef": true, "viewFlag": true,
 	"view3DRotation": true, "viewScale": true, "viewScaleRef": true, "viewOffset": true,
 	"mirrorPad": true, "dataHeader": true, "signatureByte": true,

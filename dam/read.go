@@ -341,7 +341,22 @@ func emit(rec record, regs map[int]*reg, tables map[int]record) (*model.Object, 
 	if rec.typ == 2 || rec.typ == 6 {
 		placeCurve(o, off, xbits, bits, rec.typ == 6)
 	}
+	setCPU(o, rec.addr, off)
 	return o, "", warnings
+}
+
+// setCPU sets object/axis cpu from ECU addr using the same delta as file address - fileBase.
+// Leaves axes that already have cpu (shared type-6).
+func setCPU(o *model.Object, ecu uint32, fileBase model.Addr) {
+	delta := uint32(o.Address) - uint32(fileBase)
+	o.CPU = model.AddrOf(model.Addr(ecu + delta))
+	for _, ax := range []*model.Axis{o.X, o.Y} {
+		if ax == nil || ax.Address == nil || ax.CPU != nil {
+			continue
+		}
+		d := uint32(*ax.Address) - uint32(fileBase)
+		ax.CPU = model.AddrOf(model.Addr(ecu + d))
+	}
 }
 
 // axisRef is a type 6 axis-point series copied onto a shared-axis map.
@@ -371,8 +386,9 @@ func sharedAxis(tables map[int]record, index int, regs map[int]*reg) (axisRef, b
 	}
 	ad := model.Addr(p)
 	d := dataOf(bits, signed)
+	cpu := model.Addr(rec.addr + (uint32(ad) - uint32(off)))
 	return axisRef{n, &model.Axis{
-		Source: "image", Stored: "absolute", Address: &ad, Data: &d,
+		Source: "image", Stored: "absolute", Address: &ad, CPU: model.AddrOf(cpu), Data: &d,
 		Value: valueFrom(regs[x.id], x.min, x.max),
 	}}, true
 }

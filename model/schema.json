@@ -52,6 +52,11 @@
           "description": "WinOLS bRueckwaerts / bBackwards: show the axis in descending order; storage is unchanged.",
           "type": "boolean"
         },
+        "cpu": {
+          "description": "ECU/CPU address of the first axis point when known (A2L/DAMOS before lowering; WinOLS DataAddr.Cpu). Omitted when unknown.",
+          "pattern": "^0x[0-9A-Fa-f]{1,8}$",
+          "type": "string"
+        },
         "data": {
           "$ref": "#/$defs/Data",
           "description": "Axis-point storage, for image and editable axes."
@@ -236,6 +241,11 @@
         },
         "comment": {
           "description": "Free-text comment.",
+          "type": "string"
+        },
+        "cpu": {
+          "description": "ECU/CPU address of the first cell when known (A2L/DAMOS before lowering; WinOLS StartAddr.Cpu). Omitted when unknown.",
+          "pattern": "^0x[0-9A-Fa-f]{1,8}$",
           "type": "string"
         },
         "data": {
@@ -488,6 +498,10 @@
       "properties": {
         "difference": {
           "description": "Show the difference to the original.",
+          "type": "boolean"
+        },
+        "original": {
+          "description": "WinOLS ignore-factor view (HelpEn bOriginal).",
           "type": "boolean"
         },
         "percent": {

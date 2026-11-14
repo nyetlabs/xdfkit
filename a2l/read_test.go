@@ -159,13 +159,13 @@ func TestRead(t *testing.T) {
 		byID[o.ID] = o
 	}
 	c := byID["Curve"]
-	if c == nil || c.Shape != "1d" || c.Cols != 4 || c.Address != 0x206 {
+	if c == nil || c.Shape != "1d" || c.Cols != 4 || c.Address != 0x206 || c.CPU == nil || *c.CPU != 0x800206 {
 		t.Fatalf("curve %+v", c)
 	}
 	if c.Data.Bits != 16 || c.Data.Endian != "little" || !c.Value.Conversion.Reciprocal || c.Value.Conversion.Factor != 2560 || c.Value.Precision != 1 || c.Value.Units != "1/s" {
 		t.Fatalf("curve value %+v data %+v", c.Value, c.Data)
 	}
-	if c.X == nil || c.X.Source != "image" || c.X.Address == nil || *c.X.Address != 0x201 || c.X.Data.Bits != 8 {
+	if c.X == nil || c.X.Source != "image" || c.X.Address == nil || *c.X.Address != 0x201 || c.X.CPU == nil || *c.X.CPU != 0x800201 || c.X.Data.Bits != 8 {
 		t.Fatalf("curve axis %+v", c.X)
 	}
 	if len(c.Categories) != 1 || m.Categories[c.Categories[0]].Name != "F1" {
@@ -179,11 +179,11 @@ func TestRead(t *testing.T) {
 		t.Fatalf("map axes x %+v y %+v", mp.X, mp.Y)
 	}
 	sst := byID["SST"]
-	if sst == nil || sst.Shape != "1d" || sst.Address != 0x102 || sst.Cols != 4 || sst.Data.Bits != 16 {
+	if sst == nil || sst.Shape != "1d" || sst.Address != 0x102 || sst.CPU == nil || *sst.CPU != 0x800102 || sst.Cols != 4 || sst.Data.Bits != 16 {
 		t.Fatalf("axis pts %+v", sst)
 	}
 	blk := byID["Block"]
-	if blk == nil || blk.Shape != "1d" || blk.Cols != 8 || blk.Address != 0x10020 || blk.X == nil || blk.X.Source != "ordinal" {
+	if blk == nil || blk.Shape != "1d" || blk.Cols != 8 || blk.Address != 0x10020 || blk.CPU == nil || *blk.CPU != 0x810020 || blk.X == nil || blk.X.Source != "ordinal" {
 		t.Fatalf("valblk %+v", blk)
 	}
 	if _, ok := byID["Cube"]; ok {

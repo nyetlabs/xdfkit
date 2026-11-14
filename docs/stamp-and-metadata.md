@@ -71,7 +71,7 @@ Implemented in `xdf/meta.go` (`xdf.Meta`, `xdf.Read`).
 ```
 
 - `model`: JSON Merge Patch (RFC 7396) from the view without objects to the model without objects.
-- `objects`: per object, keyed by XDF `uniqueid`, the merge patch from its view to the model object (omitted when empty). Typical residue: key, full id, comment, category ids, `inverse`, `vislevel`, `value.description`, display base, axis `mirror` / `header` / `signature`, add/subtract storage, precision capped at six digits.
+- `objects`: per object, keyed by XDF `uniqueid`, the merge patch from its view to the model object (omitted when empty). Typical residue: key, full id, comment, category ids, `inverse`, `vislevel`, `value.description`, display base, axis `backwards` / `header` / `signature`, add/subtract storage, precision capped at six digits.
 - `xdf`: digests of the view. Own `stamp`.
 
 ### Reconstruction (`xdf.Read`)

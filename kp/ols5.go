@@ -14,7 +14,10 @@ type ols5MapExtra struct {
 	NameExtra   [2]int32
 	IDPad4      [4]int32 // replaces IDPad/IDFlag/IDState (unconfirmed)
 	RangePad    [12]int32
+	PreX        int32 // 855: dword before axis X when == preXMagic; peek, not by HeaderID
 }
+
+const preXMagic = 0x800000 // 855-class marker before axis X (unconfirmed meaning)
 
 type ols5AxisExtra struct {
 	ValueMid   [3]int32 // between axis description and units (unconfirmed)
@@ -112,11 +115,15 @@ func (m *Map) codeOLS5(c *codec) {
 	c.i32(&m.Addr2Flags[1])
 	c.i32(&m.Addr2ImageSize)
 	c.i32(&m.Addr2Pad)
+	if is8xx(c.headerID) && c.pos+4 <= len(c.b) &&
+		binary.LittleEndian.Uint32(c.b[c.pos:]) == preXMagic {
+		c.i32(&ex.PreX)
+	}
 	m.X = new(Axis)
 	m.Y = new(Axis)
 	m.X.codeOLS5(c)
 	m.Y.codeOLS5(c)
-	c.i32(&m.YFlag)
+	c.i32(&m.Original)
 	c.i16(&m.YPad)
 	c.i32(&m.StoredCols)
 	c.i32(&m.StoredRows)

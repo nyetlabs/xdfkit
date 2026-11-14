@@ -23,8 +23,8 @@ type Map struct {
 	Range          [3][2]int64 `json:"range"`                           // value range low/high for 8-, 16- and 32-bit (32-bit unconfirmed)
 	Reciprocal     bool        `json:"reciprocal"`                      // HelpEn bKehrwert / bReciprocal
 	Signed         bool        `json:"signed"`                          // HelpEn bSigned / bVorzeichen (CSV-confirmed on 8xx)
-	Difference     bool        `json:"difference"`                      // HelpEn bDelta candidate (unconfirmed; always 0 on 839 CSV pair)
-	Percent        bool        `json:"percent"`                         // HelpEn bPercent / bProzent candidate (unconfirmed; always 0 on 839 CSV pair)
+	Difference     bool        `json:"difference"`                      // HelpEn bDelta (CSV/JSON-confirmed; KP join on 855)
+	Percent        bool        `json:"percent"`                         // HelpEn bPercent / bProzent (CSV/JSON-confirmed; KP join on 855)
 	Cols           int32       `json:"cols"`
 	Rows           int32       `json:"rows"`
 	Cursor         [2]int32    `json:"cursor"`    // editor state, the last cursor cell (unconfirmed)
@@ -40,7 +40,7 @@ type Map struct {
 	Addr2Pad       int32       `json:"addr2Pad"`                      // 0 (unconfirmed)
 	X              *Axis       `json:"x"`
 	Y              *Axis       `json:"y"`
-	YFlag          int32       `json:"yFlag"`      // 0, 1 on two maps (unconfirmed)
+	Original       int32       `json:"original"`   // HelpEn bOriginal (CSV/JSON ignore-factor; 0/1)
 	YPad           int16       `json:"yPad"`       // 0 (unconfirmed)
 	StoredCols     int32       `json:"storedCols"` // Cols and Rows in storage order: swapped on 2d-inverse maps
 	StoredRows     int32       `json:"storedRows"`
