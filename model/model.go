@@ -28,17 +28,17 @@ type Model struct {
 // Provenance identifies the original file.
 type Provenance struct {
 	Format    string     `json:"format" doc:"Source format; image: located in a flash image by a program such as me7info." enum:"kp|xdf|a2l|damos|csv|image"`
-	Origin    string     `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), manual (made by hand, as KP map packs usually are), auto (found in the image by a program)." enum:"damos|a2l|manual|auto"`
+	Origin    string     `json:"origin,omitempty" doc:"Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), handmade (made by hand, as KP map packs usually are), detected (found in the image by a program)." enum:"damos|a2l|handmade|detected"`
 	File      string     `json:"file,omitempty" doc:"Original file name."`
 	SHA256    string     `json:"sha256" doc:"SHA-256 of the original file (the image, for format image), lowercase hex." pattern:"^[0-9a-f]{64}$"`
 	Subset    *Subset    `json:"subset,omitempty" doc:"Set when the definition is a subset of the original file's."`
 	Verified  bool       `json:"verified,omitzero" doc:"A person checked every definition against the image."`
-	Reference *Reference `json:"reference,omitempty" doc:"The definition an auto one was checked against."`
+	Reference *Reference `json:"reference,omitempty" doc:"The definition a detected one was checked against."`
 }
 
-// Reference is the definition an auto one replaced, and how well they agree.
+// Reference is the definition a detected one replaced, and how well they agree.
 type Reference struct {
-	Origin       string   `json:"origin" doc:"The reference's origin." enum:"damos|a2l|manual"`
+	Origin       string   `json:"origin" doc:"The reference's origin." enum:"damos|a2l|handmade"`
 	File         string   `json:"file,omitempty" doc:"The reference's file name."`
 	SHA256       string   `json:"sha256" doc:"SHA-256 of the reference file, lowercase hex." pattern:"^[0-9a-f]{64}$"`
 	Agree        [2]int   `json:"agree" doc:"Names at the same address, and names in the reference."`
@@ -58,7 +58,7 @@ type Subset struct {
 }
 
 // Origins are the values of Provenance.Origin.
-var Origins = []string{"damos", "a2l", "manual", "auto"}
+var Origins = []string{"damos", "a2l", "handmade", "detected"}
 
 // Project is file-level metadata.
 type Project struct {
@@ -201,11 +201,11 @@ func (m *Model) Check() error {
 	}
 	if p := m.Provenance; p != nil && p.Reference != nil {
 		r := p.Reference
-		if p.Origin != "auto" {
-			return fmt.Errorf("provenance reference on origin %q, want auto", p.Origin)
+		if p.Origin != "detected" {
+			return fmt.Errorf("provenance reference on origin %q, want detected", p.Origin)
 		}
-		if r.Origin == "auto" || !slices.Contains(Origins, r.Origin) {
-			return fmt.Errorf("provenance reference origin %q, want damos, a2l, or manual", r.Origin)
+		if r.Origin == "detected" || !slices.Contains(Origins, r.Origin) {
+			return fmt.Errorf("provenance reference origin %q, want damos, a2l, or handmade", r.Origin)
 		}
 		if r.Agree[0] < 0 || r.Agree[0] > r.Agree[1] {
 			return fmt.Errorf("provenance reference agree %d/%d", r.Agree[0], r.Agree[1])

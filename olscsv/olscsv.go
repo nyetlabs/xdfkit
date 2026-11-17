@@ -65,7 +65,7 @@ func Read(data []byte, name string) (*model.Model, error) {
 			Format: "csv",
 			File:   name,
 			SHA256: hex.EncodeToString(sum[:]),
-			Origin: "manual",
+			Origin: "handmade",
 		},
 	}
 	folders := map[string]int{}

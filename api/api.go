@@ -318,7 +318,7 @@ func loadModel(in []byte, name string, meta []byte) (*model.Model, []string, err
 			m.Provenance = p
 		}
 		if m.Provenance.Origin == "" {
-			m.Provenance.Origin = "manual"
+			m.Provenance.Origin = "handmade"
 		}
 		return m, subsetWarning(m, warnings), nil
 	}

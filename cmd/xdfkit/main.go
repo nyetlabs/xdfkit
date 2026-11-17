@@ -23,7 +23,7 @@ import (
 
 const usage = `usage:
   xdfkit [-f json|yaml|kp|csv|xdf] [--template orig.kp] [-i image]
-         [--meta file.meta.json] [--origin damos|a2l|manual|auto]
+         [--meta file.meta.json] [--origin damos|a2l|handmade|detected]
          [--tuner categories.json] [--quiet] [--force] input [output]
   xdfkit verify [--status] file.json|file.yaml...
   xdfkit lint -i image [--family me7|m3] [--rules RC01,RC02] [--json findings.json] input
@@ -61,8 +61,8 @@ reads the metadata file given by --meta, else NAME.meta.json next to it if
 it exists; with it, an XDF unchanged since it was written converts back to
 the definition exactly, and edits made to it are reported. --origin records
 where a KP, XDF or CSV input's definitions came from in the model's
-provenance: damos or a2l (exported from Bosch data), manual (made by hand;
-the default, unless an XDF's metadata file has another) or auto (found in
+provenance: damos or a2l (exported from Bosch data), handmade (made by hand;
+the default, unless an XDF's metadata file has another) or detected (found in
 the image by a program such as me7info). --tuner keeps only the maps named
 in a category table (schema 2: each category name maps to its map names)
 and the objects their axes point at, filed under the table's categories.
@@ -429,7 +429,7 @@ func convert(args []string) error {
 	image := fs.StringP("image", "i", "", "flash image, for CSV scan columns, JSON extremes, and XDF")
 	staticAxes := fs.Bool("static-axes", false, "write subtract axes as labels from the image")
 	meta := fs.String("meta", "", "metadata file of the XDF input (default: NAME.meta.json next to it)")
-	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, manual or auto")
+	origin := fs.String("origin", "", "where a KP or XDF input's definitions came from: damos, a2l, handmade or detected")
 	tuner := fs.String("tuner", "", "category table: keep only its maps and their axes")
 	quiet := fs.Bool("quiet", false, "suppress warnings")
 	pos, err := parse(fs, args)

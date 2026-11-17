@@ -15,9 +15,9 @@ The format-neutral model every reader converts into and every writer converts ou
 - `schema`: `xdfkit-model/1`.
 - `provenance`:
   - `format`: `kp`, `xdf` (XDF without metadata), `a2l`, `damos`, or `image` (maps located in a flash image; with the image's `sha256`).
-  - `origin`: `damos`, `a2l`, `manual`, or `auto` (for format `image`).
+  - `origin`: `damos`, `a2l`, `handmade`, or `detected` (for format `image`).
   - `file`, `sha256`; `verified` when a person checked every definition against the image.
-  - `reference` (optional): when an auto definition was checked against another — `origin`, `file`, `sha256`, `agree`, `except`, `unreferenced`. `Reference.Agreed` is true when every reference name outside `except` agrees.
+  - `reference` (optional): when a detected definition was checked against another — `origin`, `file`, `sha256`, `agree`, `except`, `unreferenced`. `Reference.Agreed` is true when every reference name outside `except` agrees.
   - `subset` (`kind` `tuner`, `table` SHA-256): set by `Model.Tuner`; XDF writer adds `xdfkit-subset:` to the header description.
 - `Model.Tuner(table)` (`--tuner`, `ConvertRequest.Tuner`): keeps objects named in a `CategoryTable` plus objects their image axes point at; replaces categories; sets `provenance.subset`. Needs provenance. `Model.Categorize(table, rest)` files the same way but keeps every object (rest under `rest`). Category table is schema 2 (`categories.schema.json`): each category name maps to map names; a name is listed once.
 - `project`: `name`, `version`.

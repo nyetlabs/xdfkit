@@ -352,18 +352,18 @@
           "type": "string"
         },
         "origin": {
-          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), manual (made by hand, as KP map packs usually are), auto (found in the image by a program).",
+          "description": "Where the definitions came from, whatever format carried them: damos or a2l (exported from Bosch data), handmade (made by hand, as KP map packs usually are), detected (found in the image by a program).",
           "enum": [
             "damos",
             "a2l",
-            "manual",
-            "auto"
+            "handmade",
+            "detected"
           ],
           "type": "string"
         },
         "reference": {
           "$ref": "#/$defs/Reference",
-          "description": "The definition an auto one was checked against."
+          "description": "The definition a detected one was checked against."
         },
         "sha256": {
           "description": "SHA-256 of the original file (the image, for format image), lowercase hex.",
@@ -413,7 +413,7 @@
           "enum": [
             "damos",
             "a2l",
-            "manual"
+            "handmade"
           ],
           "type": "string"
         },

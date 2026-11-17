@@ -51,7 +51,7 @@ func TestOracle(t *testing.T) {
 			continue
 		}
 		ref.CleanDisplay()
-		if ref.Provenance == nil || (ref.Provenance.Origin != "damos" && ref.Provenance.Origin != "manual") {
+		if ref.Provenance == nil || (ref.Provenance.Origin != "damos" && ref.Provenance.Origin != "handmade") {
 			t.Errorf("%s: origin %v", c.def, ref.Provenance)
 		}
 		// 06A906032S is the DAMOS dataset the corpus definition was converted from.

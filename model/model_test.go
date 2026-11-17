@@ -297,11 +297,11 @@ func TestReference(t *testing.T) {
 		ok     bool
 		agreed bool
 	}{
-		{"auto", Reference{Origin: "damos", SHA256: sha, Agree: [2]int{10, 10}}, true, true},
-		{"auto", Reference{Origin: "manual", SHA256: sha, Agree: [2]int{9, 10}, Except: []string{"ESKONF"}}, true, true},
-		{"auto", Reference{Origin: "a2l", SHA256: sha, Agree: [2]int{8, 10}, Except: []string{"ESKONF"}}, true, false},
-		{"auto", Reference{Origin: "auto", SHA256: sha}, false, false},
-		{"auto", Reference{Origin: "damos", SHA256: sha, Agree: [2]int{11, 10}}, false, true},
+		{"detected", Reference{Origin: "damos", SHA256: sha, Agree: [2]int{10, 10}}, true, true},
+		{"detected", Reference{Origin: "handmade", SHA256: sha, Agree: [2]int{9, 10}, Except: []string{"ESKONF"}}, true, true},
+		{"detected", Reference{Origin: "a2l", SHA256: sha, Agree: [2]int{8, 10}, Except: []string{"ESKONF"}}, true, false},
+		{"detected", Reference{Origin: "detected", SHA256: sha}, false, false},
+		{"detected", Reference{Origin: "damos", SHA256: sha, Agree: [2]int{11, 10}}, false, true},
 		{"damos", Reference{Origin: "damos", SHA256: sha, Agree: [2]int{1, 1}}, false, true},
 	} {
 		m := &Model{Schema: SchemaID, Provenance: &Provenance{Format: "xdf", Origin: c.origin, Reference: &c.ref}}
