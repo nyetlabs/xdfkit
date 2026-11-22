@@ -44,7 +44,7 @@ Fixing KP files mechanically against the flash image. Implemented in `lint/` (DS
 | MG01 | ME7 only, against me7info-located maps (origin `detected`): address or axis mismatch, or missing located map | `xdfkit merge --update` (`design.md`); not a lint rule | medium; report only |
 | MP01 | map end other than start + byte length | set end address | high |
 | RC01 | ME7: 16- or 32-bit integer cells at an odd address | move start or axis per `cause`; no fix for `shape` / empty cause; only with `--only` or `--min-confidence low` | low when fixed, else n/a |
-| RC02 | ME7: curve/map without image axes whose data starts with its own counts then monotonic axes (`cause` `record-start`) | move start to record values address; only with `--only` or `--min-confidence low` | low |
+| RC02 | ME7: curve/map without image axes whose data starts with its own counts then monotonic axes (`cause` `record-start`), unless an axis falls in another map | move start to record values address; only with `--only` or `--min-confidence low` | low |
 
 - Only image-reading integer axes with at least two points are checked; float axes skipped. MP01 checks every map without the image; RC01 every integer map of 16+ bits; RC02 every integer curve/map without image axes.
 - Family: from the Bosch ident in the image (`…/ME7…` → ME7; `…/M3…` / `…/M5…` → delta). Images without one need `--family`.

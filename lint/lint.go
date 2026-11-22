@@ -125,6 +125,7 @@ func Lint(f *kp.File, img []byte, opt Options) (Report, error) {
 	} else if r.Family != ME7 && r.Family != M3 {
 		return r, fmt.Errorf("unknown family %q (want %s or %s)", r.Family, ME7, M3)
 	}
+	spans := mapSpans(f.Project.Maps)
 	byID := map[string]int{}
 	add := func(fd *Finding, m *kp.Map, axis string) {
 		if fd == nil {
@@ -142,7 +143,7 @@ func Lint(f *kp.File, img []byte, opt Options) (Report, error) {
 	for _, m := range f.Project.Maps {
 		add(checkEnd(m), m, "")
 		add(checkAlign(m, img, r.Family), m, "")
-		add(checkHeader(m, img, r.Family), m, "")
+		add(checkHeader(m, img, r.Family, spans), m, "")
 		add(check(m.X, int(m.Cols), m.Y, int(m.Rows), img, r.Family), m, "x")
 		add(check(m.Y, int(m.Rows), m.X, int(m.Cols), img, r.Family), m, "y")
 	}
@@ -309,6 +310,35 @@ func subtracted(v []int64, w int) []int64 {
 // mapBytes is the byte length of a map's data, or 0 if unknown.
 func mapBytes(m *kp.Map) int { return int(m.Cols) * int(m.Rows) * m.DataOrg.Width() }
 
+// mapSpan is one map's data range [start, end).
+type mapSpan struct{ start, end uint32 }
+
+// mapSpans are the data ranges of maps with a known length.
+func mapSpans(maps []*kp.Map) []mapSpan {
+	var s []mapSpan
+	for _, m := range maps {
+		if n := mapBytes(m); n > 0 {
+			s = append(s, mapSpan{m.Start, m.Start + uint32(n)})
+		}
+	}
+	return s
+}
+
+// axisInOther reports whether an axis of r overlaps a map other than m.
+// The same start and end is m itself, or the same region defined twice.
+func axisInOther(r Record, m *kp.Map, spans []mapSpan) bool {
+	self := mapSpan{m.Start, m.Start + uint32(mapBytes(m))}
+	for i, ax := range r.Axes {
+		a0, a1 := ax.Addr, ax.Addr+uint32(r.Counts[i]*ax.Bits/8)
+		for _, s := range spans {
+			if s != self && a0 < s.end && s.start < a1 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // checkEnd applies rule MP01: WinOLS writes a map's end address as start +
 // byte length and recomputes it on export, so a different value is stale.
 func checkEnd(m *kp.Map) *Finding {
@@ -357,8 +387,9 @@ func checkAlign(m *kp.Map, img []byte, family string) *Finding {
 // table record starts with its point counts, one byte per axis, then the
 // axes, then the values, each 16-bit field at an even address
 // (docs/model.md). A map without image axes whose data reads as such a
-// record with its own point counts points at the record start. Report only.
-func checkHeader(m *kp.Map, img []byte, family string) *Finding {
+// record with its own point counts points at the record start, unless an
+// axis falls in another map. Report only.
+func checkHeader(m *kp.Map, img []byte, family string, spans []mapSpan) *Finding {
 	n, w := int(m.Cols), m.DataOrg.Width()
 	if family != ME7 || n < 2 || w == 0 || m.DataOrg.Float() || imageAxis(m.X, n) || imageAxis(m.Y, int(m.Rows)) {
 		return nil
@@ -373,7 +404,7 @@ func checkHeader(m *kp.Map, img []byte, family string) *Finding {
 	}
 	for _, l := range layouts {
 		r, ok := inline(img, m.Start, l, w)
-		if len(l) != len(counts) || !ok || !sameCounts(r.Counts, counts) {
+		if len(l) != len(counts) || !ok || !sameCounts(r.Counts, counts) || axisInOther(r, m, spans) {
 			continue
 		}
 		fix := recordFix(RecordStart, &r)

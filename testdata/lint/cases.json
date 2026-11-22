@@ -65,6 +65,21 @@
         {"id": "AX02@0x1050:4", "confidence": "low", "maps": ["NEAR/x"]},
         {"id": "XR01@0x1030:4", "confidence": "n/a", "maps": ["OVERFLOW/x"]}
       ]
+    },
+    {
+      "name": "packed",
+      "ident": "40/1/ME7.1/5/6005.01//22m/DstC2o/011200/",
+      "maps": [
+        {"id": "P0301", "addr": "0x8300", "cols": 3, "data": [3, 1, 10]},
+        {"id": "P0302", "addr": "0x8303", "cols": 3, "data": [3, 2, 10]},
+        {"id": "P0307", "addr": "0x8306", "cols": 3, "data": [3, 7, 10]},
+        {"id": "P0308", "addr": "0x8309", "cols": 3, "data": [3, 8, 10]},
+        {"id": "P0381", "addr": "0x830C", "cols": 3, "data": [3, 129, 10]},
+        {"id": "P0382", "addr": "0x830F", "cols": 3, "data": [3, 130, 10]},
+        {"id": "P0383", "addr": "0x8312", "cols": 3, "data": [3, 131, 10]},
+        {"id": "P4185", "addr": "0x8315", "cols": 3, "data": [65, 133, 22]}
+      ],
+      "want": []
     }
   ]
 }
