@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -27,6 +28,11 @@ type rdoc struct {
 			SigDigits *int `xml:"sigdigits,attr"`
 			LSBFirst  *int `xml:"lsbfirst,attr"`
 		} `xml:"DEFAULTS"`
+		BaseOffset string `xml:"baseoffset"`
+		BaseElem   struct {
+			Offset   string `xml:"offset,attr"`
+			Subtract string `xml:"subtract,attr"`
+		} `xml:"BASEOFFSET"`
 		Categories []category `xml:"CATEGORY"`
 	} `xml:"XDFHEADER"`
 	Objects []robject `xml:",any"`
@@ -55,6 +61,7 @@ type raxis struct {
 	Max        string   `xml:"max"`
 	OutputType string   `xml:"outputtype"`
 	Math       equation `xml:"MATH"`
+	Labels     []label  `xml:"LABEL"`
 }
 
 // stampPrefix starts the stamp line in the header description, which the
@@ -87,6 +94,23 @@ func view(b []byte) (m *model.Model, uids, warnings []string, folds map[string]s
 		return nil, nil, nil, nil, err
 	}
 	h := &d.Header
+	// BASEOFFSET: XDF addresses are in the region's address space, the image
+	// holds file offsets, so the file offset is addr + base. Two spellings
+	// appear: <baseoffset>-32768</baseoffset> and
+	// <BASEOFFSET offset="32768" subtract="1"/>.
+	var base int64
+	if s := strings.TrimSpace(h.BaseOffset); s != "" {
+		if v, err := strconv.ParseInt(s, 0, 64); err == nil {
+			base = v
+		}
+	} else if s := strings.TrimSpace(h.BaseElem.Offset); s != "" {
+		if v, err := parseHex(s); err == nil {
+			base = int64(v)
+			if strings.TrimSpace(h.BaseElem.Subtract) == "1" {
+				base = -base
+			}
+		}
+	}
 	m = &model.Model{Schema: model.SchemaID, Objects: []*model.Object{}}
 	var desc []string
 	for _, l := range strings.Split(trim(h.Description), "\n") {
@@ -138,7 +162,7 @@ func view(b []byte) (m *model.Model, uids, warnings []string, folds map[string]s
 		if strings.HasPrefix(strings.TrimSpace(r.Description), livePrefix) {
 			continue
 		}
-		o, ws, err := r.object(prec, cats, defaultLE)
+		o, ws, err := r.object(prec, cats, defaultLE, base)
 		name := fmt.Sprintf("%s %s %q", r.XMLName.Local, r.UniqueID, trim(r.Title))
 		for _, w := range ws {
 			warnings = append(warnings, name+": "+w)
@@ -187,7 +211,7 @@ func foldOf(desc string) (primary, rest string, ok bool) {
 }
 
 // object converts an XDFTABLE or XDFCONSTANT; cats holds the category ids.
-func (r *robject) object(prec int, cats map[int]bool, defaultLE bool) (*model.Object, []string, error) {
+func (r *robject) object(prec int, cats map[int]bool, defaultLE bool, base int64) (*model.Object, []string, error) {
 	o := &model.Object{ID: trim(r.Title), Description: trim(r.Description)}
 	var warnings []string
 	if s := strings.TrimSpace(r.VisLevel); s != "" {
@@ -227,6 +251,7 @@ func (r *robject) object(prec int, cats map[int]bool, defaultLE bool) (*model.Ob
 	if err != nil || addr > 0xFFFFFFFF {
 		return nil, nil, fmt.Errorf("cell address %q", z.Data.Address)
 	}
+	addr = uint64(max(int64(addr)+base, 0))
 	o.Address, o.Data = model.Addr(addr), z.Data.data(defaultLE)
 	o.Value, o.View, err = z.value(prec)
 	if err != nil {
@@ -238,7 +263,7 @@ func (r *robject) object(prec int, cats map[int]bool, defaultLE bool) (*model.Ob
 			id string
 			x  **model.Axis
 		}{{"x", &o.X}, {"y", &o.Y}} {
-			if *a.x, err = r.axis(a.id, prec, defaultLE); err != nil {
+			if *a.x, err = r.axis(a.id, prec, defaultLE, base); err != nil {
 				warnings = append(warnings, fmt.Sprintf("axis %s: %v", a.id, err))
 			}
 		}
@@ -246,9 +271,9 @@ func (r *robject) object(prec int, cats map[int]bool, defaultLE bool) (*model.Ob
 	return o, warnings, nil
 }
 
-// axis converts a table's x or y axis: ordinal for labels (nil for one label
-// or none), else an image axis.
-func (r *robject) axis(id string, prec int, defaultLE bool) (*model.Axis, error) {
+// axis converts a table's x or y axis: an image axis, else a static label
+// list as an editable axis (nil for one label or none).
+func (r *robject) axis(id string, prec int, defaultLE bool, base int64) (*model.Axis, error) {
 	i := slices.IndexFunc(r.Axes, func(a raxis) bool { return a.ID == id })
 	if i < 0 {
 		return nil, nil
@@ -260,15 +285,99 @@ func (r *robject) axis(id string, prec int, defaultLE bool) (*model.Axis, error)
 		if a.IndexCount <= 1 {
 			return nil, err
 		}
+		// Static label lists are the axis values: TunerPro shows them directly
+		// and there is no word to point at. Keep them as an editable axis,
+		// except a plain 1..N / 0..N-1 index list: that is kp's ordinal axis
+		// (datasource 0), which WinOLS draws without storing anything.
+		if vals, ok := labelValues(a.Labels, a.IndexCount); ok && !ordinalLabels(vals) {
+			d := a.Data.data(defaultLE)
+			d.Bits = 16 // 16-bit so any numeric label fits after scaling
+			for _, v := range vals {
+				if v < 0 {
+					d.Signed = true // coolant curves go negative
+					break
+				}
+			}
+			x.Source, x.Data, x.Values = "editable", &d, vals
+			x.Value.Conversion = model.Conversion{Factor: axisScale(vals)}
+		}
 		return x, err
 	}
 	addr, aerr := parseHex(a.Data.Address)
 	if aerr != nil || addr > 0xFFFFFFFF {
 		return nil, fmt.Errorf("address %q", a.Data.Address)
 	}
-	ad, d := model.Addr(addr), a.Data.data(defaultLE)
+	ad, d := model.Addr(uint64(max(int64(addr)+base, 0))), a.Data.data(defaultLE)
 	x.Source, x.Stored, x.Address, x.Data = "image", "absolute", &ad, &d
 	return x, err
+}
+
+// labelValues returns an axis' static label list when there is one per point
+// and every label is a number.
+func labelValues(labels []label, n int) ([]float64, bool) {
+	if n < 2 || len(labels) != n {
+		return nil, false
+	}
+	vals := make([]float64, 0, n)
+	for _, l := range labels {
+		s := strings.TrimSpace(l.Value)
+		if s == "" {
+			return nil, false
+		}
+		f, err := strconv.ParseFloat(s, 64)
+		if err != nil || math.IsNaN(f) || math.IsInf(f, 0) {
+			return nil, false
+		}
+		vals = append(vals, f)
+	}
+	return vals, true
+}
+
+// ordinalLabels reports whether the labels are exactly 1..n or 0..n-1: kp's
+// ordinal axis shows those by itself, so they are not axis data.
+func ordinalLabels(vals []float64) bool {
+	one, zero := true, true
+	for i, v := range vals {
+		if v != float64(i+1) {
+			one = false
+		}
+		if v != float64(i) {
+			zero = false
+		}
+	}
+	return one || zero
+}
+
+// axisScale picks the conversion factor that lets a 16-bit editable axis hold
+// the label values: a decimal place per power of ten below 1 (44.12 -> 0.01),
+// and one per power above 65535 (1250000 -> 100).
+func axisScale(vals []float64) float64 {
+	const limit = 65535.0
+	maxv, dec := 0.0, 0
+	for _, v := range vals {
+		if a := math.Abs(v); a > maxv {
+			maxv = a
+		}
+		if s := strconv.FormatFloat(v, 'f', -1, 64); strings.Contains(s, ".") {
+			if d := len(s) - strings.IndexByte(s, '.') - 1; d > dec {
+				dec = d
+			}
+		}
+	}
+	if dec > 6 {
+		dec = 6
+	}
+	k := 0
+	for k < 18 && maxv/math.Pow(10, float64(k)) > limit {
+		k++
+	}
+	if -k < dec {
+		k = -dec
+	}
+	for k < 18 && maxv/math.Pow(10, float64(k)) > limit {
+		k++
+	}
+	return math.Pow(10, float64(k))
 }
 
 // value reads the units, decimal places (default prec), output type (3 is
